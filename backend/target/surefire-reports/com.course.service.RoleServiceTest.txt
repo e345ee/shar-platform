@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.course.service.RoleServiceTest
+-------------------------------------------------------------------------------
+Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.400 s -- in com.course.service.RoleServiceTest
