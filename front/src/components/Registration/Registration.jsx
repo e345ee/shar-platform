@@ -44,6 +44,7 @@ export default function Registration() {
               <option value="methodist">Методист</option>
               <option value="student">Ученик</option>
               <option value="teacher">Преподаватель</option>
+              <option value="admin">Админ</option>
             </select>
           </div>
           <div className="input-wrapper">

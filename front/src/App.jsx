@@ -1,7 +1,8 @@
-import Registration from './components/RegistrationPage/Registration.jsx'
+import RegistrationPage from "./components/Pages/RegistrationPage";
+import AdminPage from "./components/Pages/AdminPage";
 
 function App() {
-    return <Registration />
+  return <AdminPage />;
 }
 
-export default App
+export default App;
