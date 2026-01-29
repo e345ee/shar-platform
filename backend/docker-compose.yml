@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./table.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -35,6 +35,20 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
     ports:
       - "8080:8080"
+    networks:
+      - course_network
+
+
+  #   добавил сервис для frontend
+  frontend:
+    build:
+      context: ../front
+      dockerfile: Dockerfile
+    container_name: course_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - app
     networks:
       - course_network
 
