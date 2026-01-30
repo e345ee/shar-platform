@@ -21,7 +21,7 @@ services:
 
   app:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: course_app
     depends_on:
@@ -42,7 +42,7 @@ services:
   #   добавил сервис для frontend
   frontend:
     build:
-      context: ../front
+      context: ./front
       dockerfile: Dockerfile
     container_name: course_frontend
     ports:
