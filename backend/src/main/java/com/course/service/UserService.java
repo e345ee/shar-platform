@@ -1,11 +1,11 @@
 package com.course.service;
 
-import com.course.dto.CreateUserDto;
 import com.course.dto.PageDto;
 import com.course.dto.UserDto;
 import com.course.entity.Role;
 import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
+import com.course.exception.ForbiddenOperationException;
 import com.course.exception.ResourceNotFoundException;
 import com.course.repository.RoleRepository;
 import com.course.repository.UserRepository;
@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -25,19 +26,143 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UserDto createUser(CreateUserDto dto) {
-        if (userRepository.existsByEmail(dto.getEmail())) {
-            throw new DuplicateResourceException("User with email '" + dto.getEmail() + "' already exists");
+    private static final String ROLE_ADMIN = "ADMIN";
+    private static final String ROLE_METHODIST = "METHODIST";
+    private static final String ROLE_TEACHER = "TEACHER";
+
+    /**
+     * Business operation:
+     * METHODIST can register a new TEACHER in the system.
+     *
+     * NOTE: This method does NOT rely on authentication yet.
+     * The caller must provide metodistUserId.
+     */
+    public UserDto createTeacherByMethodist(Integer metodistUserId, UserDto dto) {
+        assertUserHasRole(metodistUserId, ROLE_METHODIST);
+
+        validateUserCreateCommon(dto);
+
+        Role teacherRole = roleRepository.findByRolename(ROLE_TEACHER)
+                .orElseThrow(() -> new ResourceNotFoundException("Role '" + ROLE_TEACHER + "' not found"));
+
+        User teacher = new User();
+        teacher.setRole(teacherRole);
+        teacher.setName(dto.getName());
+        teacher.setEmail(dto.getEmail());
+        teacher.setPassword(passwordEncoder.encode(dto.getPassword()));
+        teacher.setBio(dto.getBio());
+        teacher.setPhoto(dto.getPhoto());
+        teacher.setTgId(dto.getTgId());
+
+        User saved = userRepository.save(teacher);
+        return convertToDto(saved);
+    }
+
+    /**
+     * Business operation:
+     * METHODIST can delete only TEACHER users.
+     */
+    public void deleteTeacherByMethodist(Integer metodistUserId, Integer teacherUserId) {
+        assertUserHasRole(metodistUserId, ROLE_METHODIST);
+
+        User teacher = userRepository.findById(teacherUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + teacherUserId + " not found"));
+
+        if (teacher.getRole() == null || teacher.getRole().getRolename() == null
+                || !ROLE_TEACHER.equalsIgnoreCase(teacher.getRole().getRolename())) {
+            throw new ForbiddenOperationException("Methodist can delete only TEACHER users");
         }
 
-        if (userRepository.existsByName(dto.getName())) {
-            throw new DuplicateResourceException("User with name '" + dto.getName() + "' already exists");
+        userRepository.delete(teacher);
+    }
+
+    /**
+     * Admin operation:
+     * create a new METHODIST.
+     *
+     * Role is enforced on the backend.
+     */
+    public UserDto createMethodist(UserDto dto) {
+        validateUserCreateCommon(dto);
+
+        Role methodistRole = roleRepository.findByRolename(ROLE_METHODIST)
+                .orElseThrow(() -> new ResourceNotFoundException("Role '" + ROLE_METHODIST + "' not found"));
+
+        User methodist = new User();
+        methodist.setRole(methodistRole);
+        methodist.setName(dto.getName());
+        methodist.setEmail(dto.getEmail());
+        methodist.setPassword(passwordEncoder.encode(dto.getPassword()));
+        methodist.setBio(dto.getBio());
+        methodist.setPhoto(dto.getPhoto());
+        methodist.setTgId(dto.getTgId());
+
+        User saved = userRepository.save(methodist);
+        return convertToDto(saved);
+    }
+
+    /**
+     * Admin operation:
+     * delete only METHODIST users.
+     */
+    public void deleteMethodist(Integer methodistUserId) {
+        User methodist = userRepository.findById(methodistUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + methodistUserId + " not found"));
+
+        if (methodist.getRole() == null || methodist.getRole().getRolename() == null
+                || !ROLE_METHODIST.equalsIgnoreCase(methodist.getRole().getRolename())) {
+            throw new ForbiddenOperationException("Admin can delete only METHODIST users via this endpoint");
         }
 
-        if (dto.getTgId() != null && userRepository.existsByTgId(dto.getTgId())) {
-            throw new DuplicateResourceException("User with Telegram ID '" + dto.getTgId() + "' already exists");
+        userRepository.delete(methodist);
+    }
+
+    /**
+     * Admin operation:
+     * change password of the currently authenticated ADMIN.
+     */
+    public void changeAdminPassword(String usernameOrEmail, String newPassword) {
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("Password cannot be blank");
         }
+        if (newPassword.length() > 127) {
+            throw new IllegalArgumentException("Password must be between 1 and 127 characters");
+        }
+
+        User admin = userRepository.findByEmail(usernameOrEmail)
+                .or(() -> userRepository.findByName(usernameOrEmail))
+                .orElseThrow(() -> new ResourceNotFoundException("User '" + usernameOrEmail + "' not found"));
+
+        if (admin.getRole() == null || admin.getRole().getRolename() == null
+                || !ROLE_ADMIN.equalsIgnoreCase(admin.getRole().getRolename())) {
+            throw new ForbiddenOperationException("Only ADMIN can change admin password");
+        }
+
+        admin.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(admin);
+    }
+
+    private void assertUserHasRole(Integer userId, String requiredRole) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + userId + " not found"));
+
+        if (user.getRole() == null || user.getRole().getRolename() == null
+                || !requiredRole.equalsIgnoreCase(user.getRole().getRolename())) {
+            throw new ForbiddenOperationException("User with id " + userId + " must have role " + requiredRole);
+        }
+    }
+
+    /**
+     * Generic create (admin-like) endpoint: create a user with the role supplied via roleId.
+     */
+    public UserDto createUser(UserDto dto) {
+        if (dto.getRoleId() == null) {
+            throw new IllegalArgumentException("Role ID cannot be null");
+        }
+
+        validateUserCreateCommon(dto);
 
         Role role = roleRepository.findById(dto.getRoleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Role with id " + dto.getRoleId() + " not found"));
@@ -46,7 +171,7 @@ public class UserService {
         user.setRole(role);
         user.setName(dto.getName());
         user.setEmail(dto.getEmail());
-        user.setPassword(dto.getPassword());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setBio(dto.getBio());
         user.setPhoto(dto.getPhoto());
         user.setTgId(dto.getTgId());
@@ -89,7 +214,11 @@ public class UserService {
         return convertPageToPageDto(page);
     }
 
-    public UserDto updateUser(Integer id, CreateUserDto dto) {
+    public UserDto updateUser(Integer id, UserDto dto) {
+        if (dto.getRoleId() == null) {
+            throw new IllegalArgumentException("Role ID cannot be null");
+        }
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
 
@@ -101,8 +230,8 @@ public class UserService {
             throw new DuplicateResourceException("User with name '" + dto.getName() + "' already exists");
         }
 
-        if (dto.getTgId() != null && !dto.getTgId().equals(user.getTgId()) && 
-            userRepository.existsByTgId(dto.getTgId())) {
+        if (dto.getTgId() != null && !dto.getTgId().equals(user.getTgId())
+                && userRepository.existsByTgId(dto.getTgId())) {
             throw new DuplicateResourceException("User with Telegram ID '" + dto.getTgId() + "' already exists");
         }
 
@@ -112,7 +241,7 @@ public class UserService {
         user.setRole(role);
         user.setName(dto.getName());
         user.setEmail(dto.getEmail());
-        user.setPassword(dto.getPassword());
+        user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setBio(dto.getBio());
         user.setPhoto(dto.getPhoto());
         user.setTgId(dto.getTgId());
@@ -127,12 +256,28 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    private void validateUserCreateCommon(UserDto dto) {
+        if (userRepository.existsByEmail(dto.getEmail())) {
+            throw new DuplicateResourceException("User with email '" + dto.getEmail() + "' already exists");
+        }
+
+        if (userRepository.existsByName(dto.getName())) {
+            throw new DuplicateResourceException("User with name '" + dto.getName() + "' already exists");
+        }
+
+        if (dto.getTgId() != null && userRepository.existsByTgId(dto.getTgId())) {
+            throw new DuplicateResourceException("User with Telegram ID '" + dto.getTgId() + "' already exists");
+        }
+    }
+
     private UserDto convertToDto(User user) {
+        // Do NOT expose password.
         return new UserDto(
                 user.getId(),
-                user.getRole().getId(),
+                user.getRole() != null ? user.getRole().getId() : null,
                 user.getName(),
                 user.getEmail(),
+                null,
                 user.getBio(),
                 user.getPhoto(),
                 user.getTgId()

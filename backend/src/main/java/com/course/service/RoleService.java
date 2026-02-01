@@ -1,6 +1,5 @@
 package com.course.service;
 
-import com.course.dto.CreateRoleDto;
 import com.course.dto.PageDto;
 import com.course.dto.RoleDto;
 import com.course.entity.Role;
@@ -23,7 +22,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
 
-    public RoleDto createRole(CreateRoleDto dto) {
+    public RoleDto createRole(RoleDto dto) {
         if (roleRepository.existsByRolename(dto.getRolename())) {
             throw new DuplicateResourceException("Role with name '" + dto.getRolename() + "' already exists");
         }
@@ -63,12 +62,11 @@ public class RoleService {
         return convertPageToPageDto(page);
     }
 
-    public RoleDto updateRole(Integer id, CreateRoleDto dto) {
+    public RoleDto updateRole(Integer id, RoleDto dto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role with id " + id + " not found"));
 
-        if (!role.getRolename().equals(dto.getRolename()) && 
-            roleRepository.existsByRolename(dto.getRolename())) {
+        if (!role.getRolename().equals(dto.getRolename()) && roleRepository.existsByRolename(dto.getRolename())) {
             throw new DuplicateResourceException("Role with name '" + dto.getRolename() + "' already exists");
         }
 

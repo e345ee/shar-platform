@@ -3,8 +3,8 @@
 ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS
-    "user",
-    "role".
+    "users",
+    "role"
     CASCADE;
 
 ----------------------------------------------------------------------
@@ -16,7 +16,7 @@ CREATE TABLE "role" (
     description TEXT
 );
 
-CREATE TABLE "user" (
+CREATE TABLE "users" (
     id          SERIAL PRIMARY KEY,
     role_id     INT NOT NULL REFERENCES "role"(id),
     name        VARCHAR(63)  NOT NULL UNIQUE,
@@ -36,6 +36,5 @@ INSERT INTO "role"(rolename, description) VALUES
  ('TEACHER', 'Преподаватель'),
  ('STUDENT', 'Студент');
 
- INSERT INTO "user"(role_id, name, email, password) VALUES
- (1, 'admin',   'admin@example.com',   'hash_admin'),
- (2, 'methodist',   'methodist@example.com',   'hash_methodist');
+-- Пользователей не хардкодим: ADMIN создаётся при первом старте приложения
+-- (login: admin, password: admin). Методистов/преподавателей создаёт ADMIN/METHODIST через API.
