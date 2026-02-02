@@ -44,21 +44,24 @@ public class UserService {
      * Business operation:
      * TEACHER, METHODIST or STUDENT can update own profile.
      * Email and Telegram ID cannot be changed yet.
+     * Password is changed via changeOwnPassword().
      */
     public UserDto updateOwnProfile(User currentUser, UpdateProfileDto dto) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        // Only TEACHER, METHODIST or STUDENT
+        // Only ADMIN, TEACHER, METHODIST or STUDENT
+        boolean isAdmin = currentUser.getRole() != null
+                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isTeacher = currentUser.getRole() != null
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isStudent = currentUser.getRole() != null
                 && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist && !isStudent) {
-            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can update profile");
+        if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can update profile");
         }
 
         // name
@@ -79,17 +82,43 @@ public class UserService {
         }
         // photo is managed via S3 avatar endpoints, not via profile update
 
-        // password (optional)
+        // Password is changed via dedicated endpoint.
         if (dto.getPassword() != null) {
-            String newPassword = dto.getPassword();
-            if (newPassword.isBlank()) {
-                throw new IllegalArgumentException("Password cannot be blank");
-            }
-            currentUser.setPassword(passwordEncoder.encode(newPassword));
+            throw new IllegalArgumentException("Password cannot be changed via profile update. Use /api/users/me/password");
         }
 
         User saved = userRepository.save(currentUser);
         return convertToDto(saved);
+    }
+
+    /**
+     * Business operation:
+     * Any authenticated user can change own password.
+     * Requires current password verification.
+     */
+    public void changeOwnPassword(User currentUser, String currentPassword, String newPassword) {
+        if (currentUser == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new IllegalArgumentException("Current password cannot be blank");
+        }
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("New password cannot be blank");
+        }
+        if (newPassword.length() > 127) {
+            throw new IllegalArgumentException("Password must be between 1 and 127 characters");
+        }
+
+        // verify current password
+        if (currentUser.getPassword() == null || !passwordEncoder.matches(currentPassword, currentUser.getPassword())) {
+            throw new ForbiddenOperationException("Current password is incorrect");
+        }
+
+        currentUser.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(currentUser);
     }
 
     /**
@@ -101,14 +130,16 @@ public class UserService {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
+        boolean isAdmin = currentUser.getRole() != null
+                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isTeacher = currentUser.getRole() != null
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isStudent = currentUser.getRole() != null
                 && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist && !isStudent) {
-            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can upload avatar");
+        if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can upload avatar");
         }
 
         // delete previous avatar if it was stored in our S3 bucket
@@ -127,14 +158,16 @@ public class UserService {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
+        boolean isAdmin = currentUser.getRole() != null
+                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isTeacher = currentUser.getRole() != null
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isStudent = currentUser.getRole() != null
                 && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist && !isStudent) {
-            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can delete avatar");
+        if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can delete avatar");
         }
 
         avatarStorageService.deleteByPublicUrl(currentUser.getPhoto());

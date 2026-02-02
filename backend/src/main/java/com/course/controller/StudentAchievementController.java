@@ -1,0 +1,86 @@
+package com.course.controller;
+
+import com.course.dto.StudentAchievementDto;
+import com.course.entity.Achievement;
+import com.course.entity.User;
+import com.course.exception.ForbiddenOperationException;
+import com.course.service.AuthService;
+import com.course.service.ClassStudentService;
+import com.course.service.AchievementService;
+import com.course.service.StudentAchievementService;
+import com.course.service.UserService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+public class StudentAchievementController {
+    private static final String ROLE_TEACHER = "TEACHER";
+    private static final String ROLE_METHODIST = "METHODIST";
+
+    private final StudentAchievementService studentAchievementService;
+    private final AchievementService achievementService;
+    private final AuthService authService;
+    private final UserService userService;
+    private final ClassStudentService classStudentService;
+
+    @PostMapping("/api/achievements/{achievementId}/award/{studentId}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<StudentAchievementDto> award(
+            @PathVariable Integer achievementId,
+            @PathVariable Integer studentId) {
+        Achievement achievement = achievementService.getEntityById(achievementId);
+        return ResponseEntity.ok(studentAchievementService.awardToStudent(achievement, studentId));
+    }
+
+    @DeleteMapping("/api/achievements/{achievementId}/award/{studentId}")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> revoke(
+            @PathVariable Integer achievementId,
+            @PathVariable Integer studentId) {
+        Achievement achievement = achievementService.getEntityById(achievementId);
+        studentAchievementService.revokeFromStudent(achievement, studentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/users/me/achievements")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<List<StudentAchievementDto>> getMyAchievements() {
+        return ResponseEntity.ok(studentAchievementService.getMyAchievements());
+    }
+
+    /**
+     * View achievements of a specific student.
+     *
+     * Access rules:
+     * - ADMIN: can view any student
+     * - TEACHER: can view only students from own classes
+     * - METHODIST: can view students who are enrolled in methodist's courses
+     */
+    @GetMapping("/api/students/{studentId}/achievements")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
+    public ResponseEntity<List<StudentAchievementDto>> getStudentAchievements(@PathVariable Integer studentId) {
+        User current = authService.getCurrentUserEntity();
+        String role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
+        if (role == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+            userService.assertUserEntityHasRole(current, ROLE_TEACHER);
+            classStudentService.assertStudentInTeacherClasses(studentId, current.getId(),
+                    "Teacher can view achievements only for own students");
+        } else if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+            userService.assertUserEntityHasRole(current, ROLE_METHODIST);
+            classStudentService.assertStudentInMethodistCourses(studentId, current.getId(),
+                    "Methodist can view achievements only for students in own courses");
+        }
+
+        return ResponseEntity.ok(studentAchievementService.listByStudent(studentId));
+    }
+
+}

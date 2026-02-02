@@ -101,3 +101,40 @@ CREATE TABLE "class_students" (
 
     CONSTRAINT uq_class_student UNIQUE (class_id, student_id)
 );
+
+----------------------------------------------------------------------
+-- 1.3. ACHIEVEMENTS / STUDENT ACHIEVEMENTS
+----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS
+    "student_achievements",
+    "achievements"
+    CASCADE;
+
+CREATE TABLE "achievements" (
+    id                SERIAL PRIMARY KEY,
+    course_id          INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
+    created_by         INT NOT NULL REFERENCES "users"(id),
+    title              VARCHAR(127) NOT NULL,
+    joke_description   VARCHAR(1024) NOT NULL,
+    description        VARCHAR(2048) NOT NULL,
+    photo_url          VARCHAR(512) NOT NULL,
+    created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_achievement_title_in_course UNIQUE (course_id, title),
+    CONSTRAINT chk_achievement_title_len CHECK (char_length(title) BETWEEN 1 AND 127),
+    CONSTRAINT chk_achievement_joke_len CHECK (char_length(joke_description) BETWEEN 1 AND 1024),
+    CONSTRAINT chk_achievement_desc_len CHECK (char_length(description) BETWEEN 1 AND 2048),
+    CONSTRAINT chk_achievement_photo_len CHECK (char_length(photo_url) BETWEEN 1 AND 512)
+);
+
+CREATE TABLE "student_achievements" (
+    id                SERIAL PRIMARY KEY,
+    student_id        INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    achievement_id    INT NOT NULL REFERENCES "achievements"(id) ON DELETE CASCADE,
+    awarded_by        INT NOT NULL REFERENCES "users"(id),
+    awarded_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_student_achievement UNIQUE (student_id, achievement_id)
+);

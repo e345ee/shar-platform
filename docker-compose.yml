@@ -79,13 +79,13 @@ services:
       APP_S3_SECRET_KEY: minioadmin
       APP_S3_BUCKET: avatars
       APP_S3_MAX_AVATAR_BYTES: 2097152
+      APP_S3_MAX_ACHIEVEMENT_PHOTO_BYTES: 5242880
     ports:
       - "8080:8080"
     networks:
       - course_network
 
 
-  #   добавил сервис для frontend
   frontend:
     build:
       context: ./front

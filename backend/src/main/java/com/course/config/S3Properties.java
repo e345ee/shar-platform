@@ -29,4 +29,7 @@ public class S3Properties {
     private String publicUrl;
 
     private long maxAvatarBytes = 2L * 1024L * 1024L;
+
+    // Used for achievement photos (defaults to avatar size limit if not configured)
+    private long maxAchievementPhotoBytes = 2L * 1024L * 1024L;
 }

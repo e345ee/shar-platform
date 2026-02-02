@@ -123,6 +123,21 @@ public class StudyClassService {
         throw new ForbiddenOperationException("User must have role TEACHER or METHODIST");
     }
 
+    @Transactional(readOnly = true)
+    public void assertTeacherCanManageCourse(Integer courseId, User teacher) {
+        if (teacher == null || teacher.getId() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
+
+        boolean ok = classRepository.findAllByTeacherId(teacher.getId()).stream()
+                .anyMatch(c -> c.getCourse() != null && c.getCourse().getId() != null && c.getCourse().getId().equals(courseId));
+        if (!ok) {
+            throw new ForbiddenOperationException("Teacher can manage only own courses");
+        }
+    }
+
     public StudyClassDto update(Integer id, StudyClassDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);

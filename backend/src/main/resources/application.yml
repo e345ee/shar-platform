@@ -20,8 +20,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 2MB
-      max-request-size: 2MB
+      max-file-size: 5MB
+      max-request-size: 5MB
 
   server:
     port: 8080
@@ -42,3 +42,4 @@ app:
     bucket: avatars
     public-url: http://localhost:9000
     max-avatar-bytes: 2097152
+    max-achievement-photo-bytes: 5242880

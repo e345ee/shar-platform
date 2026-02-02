@@ -2,8 +2,10 @@ package com.course.controller;
 
 import com.course.dto.PageDto;
 import com.course.dto.UpdateProfileDto;
+import com.course.dto.ChangePasswordDto;
 import com.course.dto.UserDto;
 import com.course.entity.User;
+import com.course.exception.ForbiddenOperationException;
 import com.course.service.AuthService;
 import com.course.service.UserService;
 import jakarta.validation.Valid;
@@ -28,28 +30,36 @@ public class UserController {
     private final AuthService authService;
 
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> getMe() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.getUserById(current.getId()));
     }
 
     @PutMapping("/me")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> updateMe(@Valid @RequestBody UpdateProfileDto dto) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.updateOwnProfile(current, dto));
     }
 
+    @PutMapping("/me/password")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
+    public ResponseEntity<Void> changeMyPassword(@Valid @RequestBody ChangePasswordDto dto) {
+        User current = authService.getCurrentUserEntity();
+        userService.changeOwnPassword(current, dto.getCurrentPassword(), dto.getNewPassword());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping(value = "/me/avatar", consumes = {"multipart/form-data"})
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> uploadMyAvatar(@RequestPart("file") MultipartFile file) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.uploadOwnAvatar(current, file));
     }
 
     @DeleteMapping("/me/avatar")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> deleteMyAvatar() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.deleteOwnAvatar(current));
@@ -90,6 +100,10 @@ public class UserController {
     public ResponseEntity<UserDto> createTeacherByMethodist(
             @PathVariable Integer methodistId,
             @Valid @RequestBody UserDto dto) {
+        User current = authService.getCurrentUserEntity();
+        if (current.getId() == null || !current.getId().equals(methodistId)) {
+            throw new ForbiddenOperationException("Methodist can manage only own teachers");
+        }
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(userService.createTeacherByMethodist(methodistId, dto));
     }
@@ -137,6 +151,10 @@ public class UserController {
     public ResponseEntity<Void> deleteTeacherByMethodist(
             @PathVariable Integer methodistId,
             @PathVariable Integer teacherId) {
+        User current = authService.getCurrentUserEntity();
+        if (current.getId() == null || !current.getId().equals(methodistId)) {
+            throw new ForbiddenOperationException("Methodist can manage only own teachers");
+        }
         userService.deleteTeacherByMethodist(methodistId, teacherId);
         return ResponseEntity.noContent().build();
     }
