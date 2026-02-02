@@ -18,6 +18,11 @@ spring:
         use_sql_comments: true
     show-sql: false
 
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 2MB
+
   server:
     port: 8080
 
@@ -27,3 +32,13 @@ logging:
     com.course: DEBUG
     org.springframework.web: DEBUG
     org.hibernate.SQL: DEBUG
+
+app:
+  s3:
+    endpoint: http://localhost:9000
+    region: us-east-1
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: avatars
+    public-url: http://localhost:9000
+    max-avatar-bytes: 2097152

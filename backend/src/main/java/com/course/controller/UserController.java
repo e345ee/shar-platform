@@ -1,7 +1,10 @@
 package com.course.controller;
 
 import com.course.dto.PageDto;
+import com.course.dto.UpdateProfileDto;
 import com.course.dto.UserDto;
+import com.course.entity.User;
+import com.course.service.AuthService;
 import com.course.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -21,6 +25,49 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final AuthService authService;
+
+    /**
+     * TEACHER/METHODIST: read own profile.
+     */
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    public ResponseEntity<UserDto> getMe() {
+        User current = authService.getCurrentUserEntity();
+        return ResponseEntity.ok(userService.getUserById(current.getId()));
+    }
+
+    /**
+     * TEACHER/METHODIST: update own profile.
+     * Email and tgId cannot be changed yet.
+     */
+    @PutMapping("/me")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    public ResponseEntity<UserDto> updateMe(@Valid @RequestBody UpdateProfileDto dto) {
+        User current = authService.getCurrentUserEntity();
+        return ResponseEntity.ok(userService.updateOwnProfile(current, dto));
+    }
+
+    /**
+     * TEACHER/METHODIST: upload or replace own avatar.
+     * Uses S3-compatible storage (MinIO).
+     */
+    @PostMapping(value = "/me/avatar", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    public ResponseEntity<UserDto> uploadMyAvatar(@RequestPart("file") MultipartFile file) {
+        User current = authService.getCurrentUserEntity();
+        return ResponseEntity.ok(userService.uploadOwnAvatar(current, file));
+    }
+
+    /**
+     * TEACHER/METHODIST: delete own avatar (only if it was stored in our S3 bucket).
+     */
+    @DeleteMapping("/me/avatar")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    public ResponseEntity<UserDto> deleteMyAvatar() {
+        User current = authService.getCurrentUserEntity();
+        return ResponseEntity.ok(userService.deleteOwnAvatar(current));
+    }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")

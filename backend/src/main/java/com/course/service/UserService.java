@@ -1,6 +1,7 @@
 package com.course.service;
 
 import com.course.dto.PageDto;
+import com.course.dto.UpdateProfileDto;
 import com.course.dto.UserDto;
 import com.course.entity.Role;
 import com.course.entity.User;
@@ -27,10 +28,107 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AvatarStorageService avatarStorageService;
 
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_METHODIST = "METHODIST";
     private static final String ROLE_TEACHER = "TEACHER";
+
+    /**
+     * Business operation:
+     * TEACHER or METHODIST can update own profile.
+     * Email and Telegram ID cannot be changed yet.
+     */
+    public UserDto updateOwnProfile(User currentUser, UpdateProfileDto dto) {
+        if (currentUser == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        // Only TEACHER or METHODIST
+        boolean isTeacher = currentUser.getRole() != null
+                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+        boolean isMethodist = currentUser.getRole() != null
+                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist) {
+            throw new ForbiddenOperationException("Only TEACHER or METHODIST can update profile");
+        }
+
+        // name
+        if (dto.getName() != null) {
+            String newName = dto.getName().trim();
+            if (newName.isBlank()) {
+                throw new IllegalArgumentException("Name cannot be blank");
+            }
+            if (!newName.equals(currentUser.getName()) && userRepository.existsByName(newName)) {
+                throw new DuplicateResourceException("User with name '" + newName + "' already exists");
+            }
+            currentUser.setName(newName);
+        }
+
+        // bio (can be set to empty string if needed)
+        if (dto.getBio() != null) {
+            currentUser.setBio(dto.getBio());
+        }
+        // photo is managed via S3 avatar endpoints, not via profile update
+
+        // password (optional)
+        if (dto.getPassword() != null) {
+            String newPassword = dto.getPassword();
+            if (newPassword.isBlank()) {
+                throw new IllegalArgumentException("Password cannot be blank");
+            }
+            currentUser.setPassword(passwordEncoder.encode(newPassword));
+        }
+
+        User saved = userRepository.save(currentUser);
+        return convertToDto(saved);
+    }
+
+    /**
+     * TEACHER/METHODIST: upload (or replace) own avatar.
+     * Validates file format & size in AvatarStorageService.
+     */
+    public UserDto uploadOwnAvatar(User currentUser, org.springframework.web.multipart.MultipartFile file) {
+        if (currentUser == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        boolean isTeacher = currentUser.getRole() != null
+                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+        boolean isMethodist = currentUser.getRole() != null
+                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist) {
+            throw new ForbiddenOperationException("Only TEACHER or METHODIST can upload avatar");
+        }
+
+        // delete previous avatar if it was stored in our S3 bucket
+        avatarStorageService.deleteByPublicUrl(currentUser.getPhoto());
+
+        String publicUrl = avatarStorageService.uploadAvatar(currentUser.getId(), file);
+        currentUser.setPhoto(publicUrl);
+        return convertToDto(userRepository.save(currentUser));
+    }
+
+    /**
+     * TEACHER/METHODIST: delete own avatar (only if it was stored in our S3 bucket).
+     */
+    public UserDto deleteOwnAvatar(User currentUser) {
+        if (currentUser == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        boolean isTeacher = currentUser.getRole() != null
+                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+        boolean isMethodist = currentUser.getRole() != null
+                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist) {
+            throw new ForbiddenOperationException("Only TEACHER or METHODIST can delete avatar");
+        }
+
+        avatarStorageService.deleteByPublicUrl(currentUser.getPhoto());
+        currentUser.setPhoto(null);
+        return convertToDto(userRepository.save(currentUser));
+    }
 
     /**
      * Business operation:
@@ -255,6 +353,31 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
         userRepository.delete(user);
     }
+
+    // -----------------------------
+    // Entity-level helpers (used by other services)
+    // -----------------------------
+
+    @Transactional(readOnly = true)
+    public User getUserEntityById(Integer id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public User getUserEntityByUsernameOrEmail(String usernameOrEmail) {
+        return userRepository.findByEmail(usernameOrEmail)
+                .or(() -> userRepository.findByName(usernameOrEmail))
+                .orElseThrow(() -> new ResourceNotFoundException("User '" + usernameOrEmail + "' not found"));
+    }
+
+    public void assertUserEntityHasRole(User user, String requiredRole) {
+        if (user == null || user.getRole() == null || user.getRole().getRolename() == null
+                || !requiredRole.equalsIgnoreCase(user.getRole().getRolename())) {
+            throw new ForbiddenOperationException("User must have role " + requiredRole);
+        }
+    }
+
 
     private void validateUserCreateCommon(UserDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {

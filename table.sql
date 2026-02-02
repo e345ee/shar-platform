@@ -36,5 +36,38 @@ INSERT INTO "role"(rolename, description) VALUES
  ('TEACHER', 'Преподаватель'),
  ('STUDENT', 'Студент');
 
+
+
+
 -- Пользователей не хардкодим: ADMIN создаётся при первом старте приложения
 -- (login: admin, password: admin). Методистов/преподавателей создаёт ADMIN/METHODIST через API.
+
+----------------------------------------------------------------------
+-- 1.1. COURSE / CLASSES
+----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS
+    "classes",
+    "courses"
+    CASCADE;
+
+CREATE TABLE "courses" (
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(127) NOT NULL,
+    description  TEXT,
+    created_by   INT NOT NULL REFERENCES "users"(id),
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE "classes" (
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(127) NOT NULL,
+    course_id    INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
+    teacher_id   INT REFERENCES "users"(id),
+    created_by   INT NOT NULL REFERENCES "users"(id),
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_class_name_in_course UNIQUE (course_id, name)
+);

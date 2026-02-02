@@ -39,8 +39,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/users/methodists/*/teachers").hasRole("METHODIST")
                         .requestMatchers(HttpMethod.DELETE, "/api/users/methodists/*/teachers/*").hasRole("METHODIST")
 
+                        // Self-profile (teacher/methodist)
+                        .requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("TEACHER", "METHODIST")
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me").hasAnyRole("TEACHER", "METHODIST")
+
                         // Users CRUD: only ADMIN
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
+
+                        
+                        // Courses & classes: only METHODIST
+                        .requestMatchers("/api/courses/**").hasRole("METHODIST")
+                        .requestMatchers("/api/classes/**").hasRole("METHODIST")
+                        .requestMatchers("/api/courses/*/classes").hasRole("METHODIST")
 
                         .anyRequest().authenticated()
                 )
