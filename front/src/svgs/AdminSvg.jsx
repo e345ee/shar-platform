@@ -1,0 +1,67 @@
+export default {
+    p1bf79e00:
+        "M5.83333 9.16667V5.83333C5.83333 4.72826 6.27232 3.66846 7.05372 2.88706C7.83512 2.10565 8.89493 1.66667 10 1.66667C11.1051 1.66667 12.1649 2.10565 12.9463 2.88706C13.7277 3.66846 14.1667 4.72826 14.1667 5.83333V9.16667",
+    p2566d000:
+        "M15.8333 9.16667H4.16667C3.24619 9.16667 2.5 9.91286 2.5 10.8333V16.6667C2.5 17.5871 3.24619 18.3333 4.16667 18.3333H15.8333C16.7538 18.3333 17.5 17.5871 17.5 16.6667V10.8333C17.5 9.91286 16.7538 9.16667 15.8333 9.16667Z",
+    p27365a00:
+        "M16.6667 17.5V15.8333C16.6667 14.9493 16.3155 14.1014 15.6904 13.4763C15.0652 12.8512 14.2174 12.5 13.3333 12.5H6.66667C5.78261 12.5 4.93477 12.8512 4.30964 13.4763C3.68452 14.1014 3.33333 14.9493 3.33333 15.8333V17.5",
+    p6f5b580:
+        "M10 9.16667C11.841 9.16667 13.3333 7.67428 13.3333 5.83333C13.3333 3.99238 11.841 2.5 10 2.5C8.15905 2.5 6.66667 3.99238 6.66667 5.83333C6.66667 7.67428 8.15905 9.16667 10 9.16667Z",
+    pc36d500:
+        "M1034.5 140C898.9 152.8 806.667 52 777.5 0L1641.5 3.5V721.5H1545C1246.2 683.5 1296.5 532 1359 461C1395.5 411.167 1461.5 291.1 1433.5 209.5C1398.5 107.5 1204 124 1034.5 140Z",
+};
+
+// Registration background SVGs
+export const BackgroundCircles = () => (
+    <svg className="bg-circles" fill="none" viewBox="0 0 1641.5 1083">
+        <circle cx="362" cy="721" r="362" fill="#283541" />
+        <circle cx="362" cy="721" r="286" fill="#3A4C5D" />
+        <circle cx="362" cy="721" r="219" fill="#4C6275" />
+    </svg>
+);
+
+export const BackgroundRight = () => (
+    <svg className="bg-right" fill="none" viewBox="0 0 864 722">
+        <path
+            d="M257 140C121.4 152.8 29.1667 52 0 0L864 3.5V721.5H767.5C468.7 683.5 519 532 581.5 461C618 411.167 684 291.1 656 209.5C621 107.5 426.5 124 257 140Z"
+            fill="#283541"
+        />
+    </svg>
+);
+
+// Registration input icons
+export const UserInputIcon = ({ svgPaths }) => (
+    <svg className="input-icon" fill="none" viewBox="0 0 20 20">
+        <path
+            d={svgPaths.p27365a00}
+            stroke="white"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <path
+            d={svgPaths.p6f5b580}
+            stroke="white"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
+export const LockInputIcon = ({ svgPaths }) => (
+    <svg className="input-icon" fill="none" viewBox="0 0 20 20">
+        <path
+            d={svgPaths.p2566d000}
+            stroke="white"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+        <path
+            d={svgPaths.p1bf79e00}
+            stroke="white"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
+
