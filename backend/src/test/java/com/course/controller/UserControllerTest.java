@@ -1,6 +1,5 @@
 package com.course.controller;
 
-import com.course.dto.CreateUserDto;
 import com.course.dto.UserDto;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ResourceNotFoundException;
@@ -10,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @DisplayName("UserController Tests")
 class UserControllerTest {
 
@@ -38,25 +39,19 @@ class UserControllerTest {
     private UserService userService;
 
     private UserDto testUserDto;
-    private CreateUserDto createUserDto;
+    private UserDto createUserDto;
 
     @BeforeEach
     void setUp() {
         testUserDto = new UserDto(1, 1, "John Doe", "john@example.com", "A student", "photo.jpg", "john_doe");
         
-        createUserDto = new CreateUserDto();
-        createUserDto.setRoleId(1);
-        createUserDto.setName("John Doe");
-        createUserDto.setEmail("john@example.com");
-        createUserDto.setPassword("password123");
-        createUserDto.setBio("A student");
-        createUserDto.setTgId("john_doe");
+        createUserDto = new UserDto(1, 1, "John Doe", "john@example.com", "A student", "photo.jpg", "john_doe");
     }
 
     @Test
     @DisplayName("Should create user and return 201")
     void testCreateUser() throws Exception {
-        when(userService.createUser(any(CreateUserDto.class))).thenReturn(testUserDto);
+        when(userService.createUser(any(UserDto.class))).thenReturn(testUserDto);
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -65,7 +60,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("John Doe"));
 
-        verify(userService, times(1)).createUser(any(CreateUserDto.class));
+        verify(userService, times(1)).createUser(any(UserDto.class));
     }
 
     @Test
@@ -133,13 +128,9 @@ class UserControllerTest {
     @Test
     @DisplayName("Should update user and return 200")
     void testUpdateUser() throws Exception {
-        CreateUserDto updateDto = new CreateUserDto();
-        updateDto.setRoleId(1);
-        updateDto.setName("John Doe");
-        updateDto.setEmail("john@example.com");
-        updateDto.setPassword("password123");
+        UserDto updateDto = new UserDto(1, 1, "John Doe", "john@example.com", null, null, null);
         
-        when(userService.updateUser(eq(1), any(CreateUserDto.class))).thenReturn(testUserDto);
+        when(userService.updateUser(eq(1), any(UserDto.class))).thenReturn(testUserDto);
 
         mockMvc.perform(put("/api/users/1")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -147,7 +138,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1));
 
-        verify(userService, times(1)).updateUser(eq(1), any(CreateUserDto.class));
+        verify(userService, times(1)).updateUser(eq(1), any(UserDto.class));
     }
 
     @Test
@@ -164,7 +155,7 @@ class UserControllerTest {
     @Test
     @DisplayName("Should return 409 when creating duplicate user email")
     void testCreateDuplicateUserEmail() throws Exception {
-        when(userService.createUser(any(CreateUserDto.class)))
+        when(userService.createUser(any(UserDto.class)))
                 .thenThrow(new DuplicateResourceException("Email already exists"));
 
         mockMvc.perform(post("/api/users")
@@ -176,11 +167,7 @@ class UserControllerTest {
     @Test
     @DisplayName("Should return 400 when email is invalid")
     void testCreateUserInvalidEmail() throws Exception {
-        CreateUserDto invalidDto = new CreateUserDto();
-        invalidDto.setRoleId(1);
-        invalidDto.setName("John Doe");
-        invalidDto.setEmail("invalid-email");
-        invalidDto.setPassword("password123");
+        UserDto invalidDto = new UserDto(1, 1, "John Doe", "invalid-email", null, null, null);
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -191,11 +178,7 @@ class UserControllerTest {
     @Test
     @DisplayName("Should return 400 when name is blank")
     void testCreateUserBlankName() throws Exception {
-        CreateUserDto invalidDto = new CreateUserDto();
-        invalidDto.setRoleId(1);
-        invalidDto.setName("");
-        invalidDto.setEmail("john@example.com");
-        invalidDto.setPassword("password123");
+        UserDto invalidDto = new UserDto(1, 1, "", "john@example.com", null, null, null);
 
         mockMvc.perform(post("/api/users")
                 .contentType(MediaType.APPLICATION_JSON)

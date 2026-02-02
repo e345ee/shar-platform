@@ -1,6 +1,42 @@
 services:
+  minio:
+    image: minio/minio:latest
+    container_name: course_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - course_network
+
+  minio_init:
+    image: minio/mc:latest
+    container_name: course_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb -p local/avatars || true;
+      mc anonymous set download local/avatars || true;
+      exit 0;
+      "
+    networks:
+      - course_network
   postgres:
     image: postgres:15-alpine
+    platform: linux/amd64
     container_name: course_db
     environment:
       POSTGRES_DB: course_db
@@ -27,12 +63,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/course_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+
+      APP_S3_ENDPOINT: http://minio:9000
+      APP_S3_PUBLIC_URL: http://localhost:9000
+      APP_S3_REGION: us-east-1
+      APP_S3_ACCESS_KEY: minioadmin
+      APP_S3_SECRET_KEY: minioadmin
+      APP_S3_BUCKET: avatars
+      APP_S3_MAX_AVATAR_BYTES: 2097152
     ports:
       - "8080:8080"
     networks:
@@ -54,6 +100,7 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:
 
 networks:
   course_network:

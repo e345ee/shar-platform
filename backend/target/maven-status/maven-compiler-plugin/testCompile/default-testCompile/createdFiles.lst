@@ -1,8 +1,0 @@
-com\course\controller\RoleControllerTest.class
-com\course\service\UserServiceTest.class
-com\course\repository\RoleRepositoryTest.class
-com\course\exception\GlobalExceptionHandlerTest.class
-com\course\service\RoleServiceTest.class
-com\course\repository\UserRepositoryTest.class
-com\course\controller\UserControllerTest.class
-com\course\exception\GlobalExceptionHandlerTest$TestController.class
