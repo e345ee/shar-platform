@@ -33,10 +33,11 @@ public class UserService {
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_METHODIST = "METHODIST";
     private static final String ROLE_TEACHER = "TEACHER";
+    private static final String ROLE_STUDENT = "STUDENT";
 
     /**
      * Business operation:
-     * TEACHER or METHODIST can update own profile.
+     * TEACHER, METHODIST or STUDENT can update own profile.
      * Email and Telegram ID cannot be changed yet.
      */
     public UserDto updateOwnProfile(User currentUser, UpdateProfileDto dto) {
@@ -44,13 +45,15 @@ public class UserService {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        // Only TEACHER or METHODIST
+        // Only TEACHER, METHODIST or STUDENT
         boolean isTeacher = currentUser.getRole() != null
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist) {
-            throw new ForbiddenOperationException("Only TEACHER or METHODIST can update profile");
+        boolean isStudent = currentUser.getRole() != null
+                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can update profile");
         }
 
         // name
@@ -85,7 +88,7 @@ public class UserService {
     }
 
     /**
-     * TEACHER/METHODIST: upload (or replace) own avatar.
+     * TEACHER/METHODIST/STUDENT: upload (or replace) own avatar.
      * Validates file format & size in AvatarStorageService.
      */
     public UserDto uploadOwnAvatar(User currentUser, org.springframework.web.multipart.MultipartFile file) {
@@ -97,8 +100,10 @@ public class UserService {
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist) {
-            throw new ForbiddenOperationException("Only TEACHER or METHODIST can upload avatar");
+        boolean isStudent = currentUser.getRole() != null
+                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can upload avatar");
         }
 
         // delete previous avatar if it was stored in our S3 bucket
@@ -110,7 +115,7 @@ public class UserService {
     }
 
     /**
-     * TEACHER/METHODIST: delete own avatar (only if it was stored in our S3 bucket).
+     * TEACHER/METHODIST/STUDENT: delete own avatar (only if it was stored in our S3 bucket).
      */
     public UserDto deleteOwnAvatar(User currentUser) {
         if (currentUser == null) {
@@ -121,8 +126,10 @@ public class UserService {
                 && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
         boolean isMethodist = currentUser.getRole() != null
                 && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
-        if (!isTeacher && !isMethodist) {
-            throw new ForbiddenOperationException("Only TEACHER or METHODIST can delete avatar");
+        boolean isStudent = currentUser.getRole() != null
+                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+        if (!isTeacher && !isMethodist && !isStudent) {
+            throw new ForbiddenOperationException("Only TEACHER, METHODIST or STUDENT can delete avatar");
         }
 
         avatarStorageService.deleteByPublicUrl(currentUser.getPhoto());
@@ -250,6 +257,13 @@ public class UserService {
                 || !requiredRole.equalsIgnoreCase(user.getRole().getRolename())) {
             throw new ForbiddenOperationException("User with id " + userId + " must have role " + requiredRole);
         }
+    }
+
+    /**
+     * Helper for other services: convert entity to safe DTO (password is always null).
+     */
+    public UserDto toDto(User user) {
+        return convertToDto(user);
     }
 
     /**

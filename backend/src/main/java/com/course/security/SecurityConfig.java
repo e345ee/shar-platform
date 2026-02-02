@@ -32,6 +32,9 @@ public class SecurityConfig {
                         // Public endpoint
                         .requestMatchers("/api/health/**").permitAll()
 
+                        // Public join requests (submitted by external service)
+                        .requestMatchers(HttpMethod.POST, "/api/join-requests").permitAll()
+
                         // Role management: only ADMIN
                         .requestMatchers("/api/roles/**").hasRole("ADMIN")
 
@@ -39,9 +42,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/users/methodists/*/teachers").hasRole("METHODIST")
                         .requestMatchers(HttpMethod.DELETE, "/api/users/methodists/*/teachers/*").hasRole("METHODIST")
 
-                        // Self-profile (teacher/methodist)
-                        .requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("TEACHER", "METHODIST")
-                        .requestMatchers(HttpMethod.PUT, "/api/users/me").hasAnyRole("TEACHER", "METHODIST")
+                        // Self-profile & avatar (teacher/methodist/student)
+                        .requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("TEACHER", "METHODIST", "STUDENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me").hasAnyRole("TEACHER", "METHODIST", "STUDENT")
+                        .requestMatchers(HttpMethod.POST, "/api/users/me/avatar").hasAnyRole("TEACHER", "METHODIST", "STUDENT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/users/me/avatar").hasAnyRole("TEACHER", "METHODIST", "STUDENT")
 
                         // Users CRUD: only ADMIN
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
@@ -49,6 +54,8 @@ public class SecurityConfig {
                         
                         // Courses & classes: only METHODIST
                         .requestMatchers("/api/courses/**").hasRole("METHODIST")
+                        // join requests management: TEACHER or METHODIST
+                        .requestMatchers("/api/classes/*/join-requests/**").hasAnyRole("TEACHER", "METHODIST")
                         .requestMatchers("/api/classes/**").hasRole("METHODIST")
                         .requestMatchers("/api/courses/*/classes").hasRole("METHODIST")
 

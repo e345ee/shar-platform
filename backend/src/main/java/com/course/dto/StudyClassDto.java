@@ -24,6 +24,9 @@ public class StudyClassDto {
     private Integer createdById;
     private String createdByName;
 
+    // 8-char code for student join requests
+    private String joinCode;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

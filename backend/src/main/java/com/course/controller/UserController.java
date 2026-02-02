@@ -28,42 +28,42 @@ public class UserController {
     private final AuthService authService;
 
     /**
-     * TEACHER/METHODIST: read own profile.
+     * TEACHER/METHODIST/STUDENT: read own profile.
      */
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> getMe() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.getUserById(current.getId()));
     }
 
     /**
-     * TEACHER/METHODIST: update own profile.
+     * TEACHER/METHODIST/STUDENT: update own profile.
      * Email and tgId cannot be changed yet.
      */
     @PutMapping("/me")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> updateMe(@Valid @RequestBody UpdateProfileDto dto) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.updateOwnProfile(current, dto));
     }
 
     /**
-     * TEACHER/METHODIST: upload or replace own avatar.
+     * TEACHER/METHODIST/STUDENT: upload or replace own avatar.
      * Uses S3-compatible storage (MinIO).
      */
     @PostMapping(value = "/me/avatar", consumes = {"multipart/form-data"})
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> uploadMyAvatar(@RequestPart("file") MultipartFile file) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.uploadOwnAvatar(current, file));
     }
 
     /**
-     * TEACHER/METHODIST: delete own avatar (only if it was stored in our S3 bucket).
+     * TEACHER/METHODIST/STUDENT: delete own avatar (only if it was stored in our S3 bucket).
      */
     @DeleteMapping("/me/avatar")
-    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> deleteMyAvatar() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.deleteOwnAvatar(current));

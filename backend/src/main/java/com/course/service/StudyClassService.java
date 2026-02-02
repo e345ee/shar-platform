@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
 
 @Service
@@ -27,6 +28,9 @@ public class StudyClassService {
     private final CourseService courseService;
     private final UserService userService;
     private final AuthService authService;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final char[] JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
     public StudyClassDto create(StudyClassDto dto) {
         User current = authService.getCurrentUserEntity();
@@ -45,6 +49,7 @@ public class StudyClassService {
         sc.setCourse(course);
         sc.setTeacher(teacher);
         sc.setCreatedBy(current);
+        sc.setJoinCode(generateUniqueJoinCode());
 
         return toDto(classRepository.save(sc));
     }
@@ -58,6 +63,12 @@ public class StudyClassService {
     public StudyClass getEntityById(Integer id) {
         return classRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public StudyClass getEntityByJoinCode(String joinCode) {
+        return classRepository.findByJoinCode(joinCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Class with code " + joinCode + " not found"));
     }
 
     @Transactional(readOnly = true)
@@ -109,6 +120,8 @@ public class StudyClassService {
         dto.setId(sc.getId());
         dto.setName(sc.getName());
 
+        dto.setJoinCode(sc.getJoinCode());
+
         if (sc.getCourse() != null) dto.setCourseId(sc.getCourse().getId());
 
         if (sc.getTeacher() != null) {
@@ -121,9 +134,26 @@ public class StudyClassService {
             dto.setCreatedByName(sc.getCreatedBy().getName());
         }
 
+        dto.setJoinCode(sc.getJoinCode());
+
         dto.setCreatedAt(sc.getCreatedAt());
         dto.setUpdatedAt(sc.getUpdatedAt());
         return dto;
+    }
+
+    private String generateUniqueJoinCode() {
+        // 8 chars, no 0/1/I/O to reduce confusion when typing
+        for (int attempt = 0; attempt < 20; attempt++) {
+            char[] buf = new char[8];
+            for (int i = 0; i < buf.length; i++) {
+                buf[i] = JOIN_CODE_ALPHABET[SECURE_RANDOM.nextInt(JOIN_CODE_ALPHABET.length)];
+            }
+            String code = new String(buf);
+            if (!classRepository.existsByJoinCode(code)) {
+                return code;
+            }
+        }
+        throw new IllegalStateException("Unable to generate unique class code");
     }
 
     private void assertOwner(User owner, User current, String message) {

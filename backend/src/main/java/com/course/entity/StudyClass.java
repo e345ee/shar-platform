@@ -30,6 +30,14 @@ public class StudyClass {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
+    /**
+     * 8-char code for student join requests (generated on class creation).
+     */
+    @Column(name = "join_code", length = 8, nullable = false, unique = true)
+    @NotBlank
+    @Size(min = 8, max = 8)
+    private String joinCode;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id")
     private User teacher;
