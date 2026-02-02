@@ -24,7 +24,6 @@ public class StudyClassService {
 
     private final StudyClassRepository classRepository;
 
-    // "чужие" сущности берём через сервисы, а не репозитории
     private final CourseService courseService;
     private final UserService userService;
     private final AuthService authService;
@@ -76,6 +75,52 @@ public class StudyClassService {
         // optional: validate that course exists using CourseService
         courseService.getEntityById(courseId);
         return classRepository.findAllByCourseId(courseId).stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StudyClassDto> getMyClasses() {
+        User current = authService.getCurrentUserEntity();
+        String role = current.getRole() != null ? current.getRole().getRolename() : null;
+
+        if (role == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+            return classRepository.findAllByTeacherId(current.getId()).stream().map(this::toDto).toList();
+        }
+
+        if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+            return classRepository.findAllByCreatedById(current.getId()).stream().map(this::toDto).toList();
+        }
+
+        throw new ForbiddenOperationException("User must have role TEACHER or METHODIST");
+    }
+
+
+    @Transactional(readOnly = true)
+    public StudyClassDto getMyClassById(Integer id) {
+        User current = authService.getCurrentUserEntity();
+        String role = current.getRole() != null ? current.getRole().getRolename() : null;
+
+        if (role == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        StudyClass sc;
+        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+            sc = classRepository.findByIdAndTeacherId(id, current.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+            return toDto(sc);
+        }
+
+        if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+            sc = classRepository.findByIdAndCreatedById(id, current.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+            return toDto(sc);
+        }
+
+        throw new ForbiddenOperationException("User must have role TEACHER or METHODIST");
     }
 
     public StudyClassDto update(Integer id, StudyClassDto dto) {

@@ -27,9 +27,6 @@ public class UserController {
     private final UserService userService;
     private final AuthService authService;
 
-    /**
-     * TEACHER/METHODIST/STUDENT: read own profile.
-     */
     @GetMapping("/me")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> getMe() {
@@ -37,10 +34,6 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(current.getId()));
     }
 
-    /**
-     * TEACHER/METHODIST/STUDENT: update own profile.
-     * Email and tgId cannot be changed yet.
-     */
     @PutMapping("/me")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> updateMe(@Valid @RequestBody UpdateProfileDto dto) {
@@ -48,10 +41,6 @@ public class UserController {
         return ResponseEntity.ok(userService.updateOwnProfile(current, dto));
     }
 
-    /**
-     * TEACHER/METHODIST/STUDENT: upload or replace own avatar.
-     * Uses S3-compatible storage (MinIO).
-     */
     @PostMapping(value = "/me/avatar", consumes = {"multipart/form-data"})
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> uploadMyAvatar(@RequestPart("file") MultipartFile file) {
@@ -59,9 +48,6 @@ public class UserController {
         return ResponseEntity.ok(userService.uploadOwnAvatar(current, file));
     }
 
-    /**
-     * TEACHER/METHODIST/STUDENT: delete own avatar (only if it was stored in our S3 bucket).
-     */
     @DeleteMapping("/me/avatar")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<UserDto> deleteMyAvatar() {
@@ -75,22 +61,13 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(dto));
     }
 
-    /**
-     * Admin business endpoint:
-     * create a new METHODIST.
-     *
-     * Role is enforced on the backend; roleId in DTO (if provided) is ignored.
-     */
     @PostMapping("/admin/methodists")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserDto> createMethodist(@Valid @RequestBody UserDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createMethodist(dto));
     }
 
-    /**
-     * Admin business endpoint:
-     * delete only METHODIST users.
-     */
+
     @DeleteMapping("/admin/methodists/{methodistId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteMethodist(@PathVariable Integer methodistId) {
@@ -98,12 +75,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Admin business endpoint:
-     * change password of the currently authenticated ADMIN.
-     *
-     * Body is plain text (e.g. "newPassword") to avoid introducing extra DTOs.
-     */
+
     @PutMapping("/admin/password")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> changeAdminPassword(@RequestBody String newPassword) {
@@ -113,12 +85,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Business endpoint (no auth yet):
-     * METHODIST can register a new TEACHER.
-     *
-     * Role is enforced on the backend.
-     */
     @PostMapping("/methodists/{methodistId}/teachers")
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<UserDto> createTeacherByMethodist(
@@ -166,10 +132,6 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Business endpoint (no auth yet):
-     * METHODIST can delete only TEACHER users.
-     */
     @DeleteMapping("/methodists/{methodistId}/teachers/{teacherId}")
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<Void> deleteTeacherByMethodist(

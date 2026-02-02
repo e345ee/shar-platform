@@ -35,7 +35,6 @@ public class AdminInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        // Ensure ADMIN role exists (helps when DB is created without initial inserts)
         Role adminRole = roleRepository.findByRolename(ROLE_ADMIN)
                 .orElseGet(() -> {
                     log.warn("Role '{}' not found. Creating it automatically.", ROLE_ADMIN);

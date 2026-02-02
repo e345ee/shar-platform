@@ -14,9 +14,7 @@ public class AuthService {
 
     private final UserService userService;
 
-    /**
-     * Resolve currently authenticated user as an ENTITY.
-     */
+
     @Transactional(readOnly = true)
     public User getCurrentUserEntity() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

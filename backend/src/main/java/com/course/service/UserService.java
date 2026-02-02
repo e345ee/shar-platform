@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,10 @@ public class UserService {
     private static final String ROLE_METHODIST = "METHODIST";
     private static final String ROLE_TEACHER = "TEACHER";
     private static final String ROLE_STUDENT = "STUDENT";
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final char[] TEMP_PASSWORD_ALPHABET =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%".toCharArray();
 
     /**
      * Business operation:
@@ -393,6 +398,67 @@ public class UserService {
     }
 
 
+    // -----------------------------
+    // Lightweight checks for other services (avoid direct repository injection)
+    // -----------------------------
+
+    @Transactional(readOnly = true)
+    public boolean existsByEmail(String email) {
+        return userRepository.existsByEmail(email);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsByName(String name) {
+        return userRepository.existsByName(name);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean existsByTgId(String tgId) {
+        return tgId != null && userRepository.existsByTgId(tgId);
+    }
+
+    /**
+     * Business operation used by ClassJoinRequestService:
+     * create a new STUDENT user from an approved join request.
+     *
+     * - validates uniqueness of email and tgId
+     * - if name already exists, makes it unique
+     * - generates a temporary password (encoded)
+     */
+    public User createStudentFromJoinRequest(String requestedName, String email, String tgId) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email cannot be blank");
+        }
+        if (requestedName == null || requestedName.isBlank()) {
+            throw new IllegalArgumentException("Name cannot be blank");
+        }
+
+        if (existsByEmail(email)) {
+            throw new DuplicateResourceException("User with email '" + email + "' already exists");
+        }
+        if (tgId != null && existsByTgId(tgId)) {
+            throw new DuplicateResourceException("User with Telegram ID '" + tgId + "' already exists");
+        }
+
+        Role studentRole = roleRepository.findByRolename(ROLE_STUDENT)
+                .orElseThrow(() -> new ResourceNotFoundException("Role '" + ROLE_STUDENT + "' not found"));
+
+        String name = requestedName.trim();
+        if (existsByName(name)) {
+            name = makeUniqueName(name);
+        }
+
+        User student = new User();
+        student.setRole(studentRole);
+        student.setName(name);
+        student.setEmail(email);
+        student.setTgId(tgId);
+        student.setPassword(passwordEncoder.encode(generateTemporaryPassword(12)));
+
+        return userRepository.save(student);
+    }
+
+
     private void validateUserCreateCommon(UserDto dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new DuplicateResourceException("User with email '" + dto.getEmail() + "' already exists");
@@ -405,6 +471,24 @@ public class UserService {
         if (dto.getTgId() != null && userRepository.existsByTgId(dto.getTgId())) {
             throw new DuplicateResourceException("User with Telegram ID '" + dto.getTgId() + "' already exists");
         }
+    }
+
+    private String generateTemporaryPassword(int len) {
+        StringBuilder sb = new StringBuilder(len);
+        for (int i = 0; i < len; i++) {
+            sb.append(TEMP_PASSWORD_ALPHABET[SECURE_RANDOM.nextInt(TEMP_PASSWORD_ALPHABET.length)]);
+        }
+        return sb.toString();
+    }
+
+    private String makeUniqueName(String base) {
+        for (int i = 1; i <= 50; i++) {
+            String candidate = base + "_" + i;
+            if (!existsByName(candidate)) {
+                return candidate;
+            }
+        }
+        throw new DuplicateResourceException("Unable to generate unique user name");
     }
 
     private UserDto convertToDto(User user) {
