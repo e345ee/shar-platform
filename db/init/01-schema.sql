@@ -187,8 +187,15 @@ DROP TABLE IF EXISTS
 
 CREATE TABLE "tests" (
     id           SERIAL PRIMARY KEY,
-    lesson_id    INT NOT NULL REFERENCES "lessons"(id) ON DELETE CASCADE,
+    -- lesson attachment is optional (for WEEKLY_STAR lesson_id is NULL)
+    lesson_id    INT REFERENCES "lessons"(id) ON DELETE CASCADE,
+    -- course is always required (for lesson activities it matches lesson.course_id)
+    course_id    INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
     created_by   INT NOT NULL REFERENCES "users"(id),
+
+    activity_type      VARCHAR(32) NOT NULL DEFAULT 'HOMEWORK_TEST',
+    weight_multiplier  INT NOT NULL DEFAULT 1,
+    assigned_week_start DATE,
 
     title        VARCHAR(127) NOT NULL,
     description  VARCHAR(2048),
@@ -201,11 +208,20 @@ CREATE TABLE "tests" (
     created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMP NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT uq_test_lesson UNIQUE (lesson_id),
+    -- for lesson-attached activities we allow at most one per (lesson, type)
+    CONSTRAINT uq_activity_lesson_kind UNIQUE (lesson_id, activity_type),
+    CONSTRAINT chk_activity_type CHECK (activity_type IN ('HOMEWORK_TEST','CONTROL_WORK','WEEKLY_STAR')),
+    CONSTRAINT chk_weight_multiplier CHECK (weight_multiplier BETWEEN 1 AND 100),
+    CONSTRAINT chk_weekly_requires_no_lesson CHECK (activity_type <> 'WEEKLY_STAR' OR lesson_id IS NULL),
+    CONSTRAINT chk_weekly_requires_week_monday CHECK (
+        assigned_week_start IS NULL OR EXTRACT(ISODOW FROM assigned_week_start) = 1
+    ),
+
     CONSTRAINT chk_test_title_len CHECK (char_length(title) BETWEEN 1 AND 127),
     CONSTRAINT chk_test_topic_len CHECK (char_length(topic) BETWEEN 1 AND 127),
     CONSTRAINT chk_test_desc_len CHECK (description IS NULL OR char_length(description) <= 2048)
 );
+
 
 CREATE TABLE "test_questions" (
     id             SERIAL PRIMARY KEY,

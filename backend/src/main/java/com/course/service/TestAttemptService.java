@@ -63,11 +63,12 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Only SUBMITTED or GRADED attempts can be graded");
         }
 
-        if (attempt.getTest() == null || attempt.getTest().getLesson() == null || attempt.getTest().getLesson().getCourse() == null) {
+        // Weekly activities are not bound to a lesson, so course must be taken from test.course
+        if (attempt.getTest() == null || attempt.getTest().getCourse() == null) {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
 
-        Integer courseId = attempt.getTest().getLesson().getCourse().getId();
+        Integer courseId = attempt.getTest().getCourse().getId();
         Integer studentId = attempt.getStudent() != null ? attempt.getStudent().getId() : null;
         if (studentId == null || courseId == null) {
             throw new TestAttemptValidationException("Attempt data is invalid");
@@ -79,7 +80,7 @@ public class TestAttemptService {
         }
 
         // methodists/admins can view course/lesson, but grading is only teacher/admin
-        lessonService.getEntityByIdForCurrentUser(attempt.getTest().getLesson().getId());
+        testService.getEntityForCurrentUser(attempt.getTest().getId());
 
         List<TestAttemptAnswer> answers = answerRepository.findAllByAttempt_IdOrderByIdAsc(attemptId);
         if (answers.isEmpty()) {
@@ -268,13 +269,15 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
 
         Test test = testService.getEntityById(testId);
-        // ensure the caller can view the lesson (students check; others allowed)
-        if (test.getLesson() == null || test.getLesson().getId() == null) {
-            throw new TestAttemptValidationException("Test lesson is missing");
-        }
-        lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
+        // ensure the caller can view the activity (lesson gating for lesson-attached; course membership for weekly)
+        testService.getEntityForCurrentUser(testId);
 
-        Integer courseId = test.getLesson().getCourse() != null ? test.getLesson().getCourse().getId() : null;
+        Integer courseId = null;
+        if (test.getLesson() != null && test.getLesson().getCourse() != null) {
+            courseId = test.getLesson().getCourse().getId();
+        } else if (test.getCourse() != null) {
+            courseId = test.getCourse().getId();
+        }
 
         // TEACHER: only attempts of own students (in teacher's classes within the course)
         if (isRole(current, ROLE_TEACHER)) {
@@ -476,6 +479,10 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 dto.setLessonId(attempt.getTest().getLesson().getId());
                 if (attempt.getTest().getLesson().getCourse() != null) {
                     dto.setCourseId(attempt.getTest().getLesson().getCourse().getId());
+                } else if (attempt.getTest().getCourse() != null) {
+                    dto.setCourseId(attempt.getTest().getCourse().getId());
+                } else if (attempt.getTest().getCourse() != null) {
+                    dto.setCourseId(attempt.getTest().getCourse().getId());
                 }
             }
         }
@@ -492,6 +499,13 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         dto.setScore(attempt.getScore());
         dto.setMaxScore(attempt.getMaxScore());
         dto.setPercent(calcPercent(attempt.getScore(), attempt.getMaxScore()));
+
+        int w = (attempt.getTest() != null && attempt.getTest().getWeightMultiplier() != null) ? attempt.getTest().getWeightMultiplier() : 1;
+        int ws = attempt.getScore() != null ? attempt.getScore() * w : 0;
+        int wm = attempt.getMaxScore() != null ? attempt.getMaxScore() * w : 0;
+        dto.setWeightedScore(ws);
+        dto.setWeightedMaxScore(wm);
+        dto.setWeightedPercent(calcPercent(ws, wm));
         dto.setCreatedAt(attempt.getCreatedAt());
         dto.setUpdatedAt(attempt.getUpdatedAt());
 
@@ -577,6 +591,13 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         dto.setScore(attempt.getScore());
         dto.setMaxScore(attempt.getMaxScore());
         dto.setPercent(calcPercent(attempt.getScore(), attempt.getMaxScore()));
+
+        int w = (attempt.getTest() != null && attempt.getTest().getWeightMultiplier() != null) ? attempt.getTest().getWeightMultiplier() : 1;
+        int ws = attempt.getScore() != null ? attempt.getScore() * w : 0;
+        int wm = attempt.getMaxScore() != null ? attempt.getMaxScore() * w : 0;
+        dto.setWeightedScore(ws);
+        dto.setWeightedMaxScore(wm);
+        dto.setWeightedPercent(calcPercent(ws, wm));
         dto.setCreatedAt(attempt.getCreatedAt());
         dto.setUpdatedAt(attempt.getUpdatedAt());
         return dto;
@@ -591,6 +612,10 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 dto.setLessonId(attempt.getTest().getLesson().getId());
                 if (attempt.getTest().getLesson().getCourse() != null) {
                     dto.setCourseId(attempt.getTest().getLesson().getCourse().getId());
+                } else if (attempt.getTest().getCourse() != null) {
+                    dto.setCourseId(attempt.getTest().getCourse().getId());
+                } else if (attempt.getTest().getCourse() != null) {
+                    dto.setCourseId(attempt.getTest().getCourse().getId());
                 }
             }
         }
@@ -603,6 +628,13 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         dto.setScore(attempt.getScore());
         dto.setMaxScore(attempt.getMaxScore());
         dto.setPercent(calcPercent(attempt.getScore(), attempt.getMaxScore()));
+
+        int w = (attempt.getTest() != null && attempt.getTest().getWeightMultiplier() != null) ? attempt.getTest().getWeightMultiplier() : 1;
+        int ws = attempt.getScore() != null ? attempt.getScore() * w : 0;
+        int wm = attempt.getMaxScore() != null ? attempt.getMaxScore() * w : 0;
+        dto.setWeightedScore(ws);
+        dto.setWeightedMaxScore(wm);
+        dto.setWeightedPercent(calcPercent(ws, wm));
         dto.setSubmittedAt(attempt.getSubmittedAt());
         dto.setCreatedAt(attempt.getCreatedAt());
         return dto;
@@ -660,7 +692,8 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
     }
 
     private void assertCanViewAttempt(TestAttempt attempt) {
-        if (attempt == null || attempt.getTest() == null || attempt.getTest().getLesson() == null) {
+        // Weekly activities are not bound to a lesson, so don't require test.lesson here.
+        if (attempt == null || attempt.getTest() == null || attempt.getTest().getCourse() == null) {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
 
@@ -672,7 +705,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
         if (isRole(current, ROLE_TEACHER)) {
             Integer studentId = attempt.getStudent() != null ? attempt.getStudent().getId() : null;
-            Integer courseId = attempt.getTest().getLesson().getCourse() != null ? attempt.getTest().getLesson().getCourse().getId() : null;
+            Integer courseId = attempt.getTest().getCourse() != null ? attempt.getTest().getCourse().getId() : null;
             if (studentId == null || courseId == null) {
                 throw new TestAttemptValidationException("Attempt data is invalid");
             }
@@ -685,7 +718,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         }
 
         // ensures course/lesson access for everyone (students checked above; others pass)
-        lessonService.getEntityByIdForCurrentUser(attempt.getTest().getLesson().getId());
+        testService.getEntityForCurrentUser(attempt.getTest().getId());
     }
 
     private void assertAnyRole(User user, String... roles) {

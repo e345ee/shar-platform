@@ -19,6 +19,10 @@ public class CourseTestAttemptSummaryDto {
     private Integer score;
     private Integer maxScore;
     private Double percent;
+
+    private Integer weightedScore;
+    private Integer weightedMaxScore;
+    private Double weightedPercent;
     private LocalDateTime submittedAt;
     private LocalDateTime createdAt;
 }

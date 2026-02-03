@@ -11,6 +11,10 @@ public class TestDto {
     private Integer lessonId;
     private Integer courseId;
 
+    private String activityType;
+    private Integer weightMultiplier;
+    private java.time.LocalDate assignedWeekStart;
+
     private String title;
     private String description;
     private String topic;

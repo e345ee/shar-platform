@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -20,10 +21,15 @@ public class TestService {
 
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_METHODIST = "METHODIST";
+    private static final String ROLE_TEACHER = "TEACHER";
+    private static final String ROLE_STUDENT = "STUDENT";
 
     private final TestRepository testRepository;
     private final TestQuestionRepository questionRepository;
     private final LessonService lessonService;
+    private final CourseService courseService;
+    private final ClassStudentService classStudentService;
+    private final StudyClassService studyClassService;
     private final UserService userService;
     private final AuthService authService;
 
@@ -39,7 +45,7 @@ public class TestService {
             throw new TestValidationException("Test data is required");
         }
 
-        if (testRepository.existsByLesson_Id(lessonId)) {
+        if (testRepository.existsByLesson_IdAndActivityType(lessonId, ActivityType.HOMEWORK_TEST)) {
             throw new DuplicateResourceException("Test for lesson " + lessonId + " already exists");
         }
 
@@ -60,6 +66,9 @@ public class TestService {
 
         Test test = new Test();
         test.setLesson(lesson);
+        test.setCourse(lesson.getCourse());
+        test.setActivityType(ActivityType.HOMEWORK_TEST);
+        test.setWeightMultiplier(1);
         test.setCreatedBy(current);
         test.setTitle(title);
         test.setDescription(description);
@@ -70,6 +79,154 @@ public class TestService {
 
         return toDto(testRepository.save(test), true);
     }
+
+    /**
+     * Creates a generic activity in a course.
+     * HOMEWORK_TEST is lesson-attached (lessonId required) - use create(lessonId, ...) normally.
+     * CONTROL_WORK can be lesson-attached (lessonId optional).
+     * WEEKLY_STAR is course-level (lessonId must be null) and must be assigned to a week separately.
+     */
+    public TestDto createActivity(Integer courseId, CreateActivityDto dto) {
+        User current = authService.getCurrentUserEntity();
+        // allow methodists (course owners) to create activities; teachers may create only in their courses in future
+        userService.assertUserEntityHasRole(current, ROLE_METHODIST);
+
+        Course course = courseService.getEntityById(courseId);
+        assertOwner(course.getCreatedBy(), current, "Only course creator can create activities");
+
+        if (dto == null) {
+            throw new TestValidationException("Activity data is required");
+        }
+
+        ActivityType type;
+        try {
+            type = ActivityType.valueOf(safeTrim(dto.getActivityType()));
+        } catch (Exception e) {
+            throw new TestValidationException("Unknown activityType");
+        }
+
+        Integer lessonId = dto.getLessonId();
+        Lesson lesson = null;
+        if (type == ActivityType.HOMEWORK_TEST) {
+            if (lessonId == null) {
+                throw new TestValidationException("lessonId is required for HOMEWORK_TEST");
+            }
+            lesson = lessonService.getEntityById(lessonId);
+            if (!lesson.getCourse().getId().equals(courseId)) {
+                throw new TestValidationException("Lesson does not belong to course");
+            }
+            if (testRepository.existsByLesson_IdAndActivityType(lessonId, ActivityType.HOMEWORK_TEST)) {
+                throw new DuplicateResourceException("Homework test for lesson " + lessonId + " already exists");
+            }
+        } else if (type == ActivityType.CONTROL_WORK) {
+            if (lessonId != null) {
+                lesson = lessonService.getEntityById(lessonId);
+                if (!lesson.getCourse().getId().equals(courseId)) {
+                    throw new TestValidationException("Lesson does not belong to course");
+                }
+                if (testRepository.existsByLesson_IdAndActivityType(lessonId, ActivityType.CONTROL_WORK)) {
+                    throw new DuplicateResourceException("Control work for lesson " + lessonId + " already exists");
+                }
+            }
+        } else if (type == ActivityType.WEEKLY_STAR) {
+            if (lessonId != null) {
+                throw new TestValidationException("lessonId must be null for WEEKLY_STAR");
+            }
+        }
+
+        String title = safeTrim(dto.getTitle());
+        String description = safeTrim(dto.getDescription());
+        String topic = safeTrim(dto.getTopic());
+        LocalDateTime deadline = dto.getDeadline();
+
+        if (!StringUtils.hasText(title)) {
+            throw new TestValidationException("Activity title must not be empty");
+        }
+        if (!StringUtils.hasText(topic)) {
+            throw new TestValidationException("Activity topic must not be empty");
+        }
+        if (deadline == null) {
+            throw new TestValidationException("Activity deadline is required");
+        }
+
+        int defaultWeight = (type == ActivityType.HOMEWORK_TEST) ? 1 : 2;
+        Integer weight = dto.getWeightMultiplier() != null ? dto.getWeightMultiplier() : defaultWeight;
+        if (weight == null || weight < 1 || weight > 100) {
+            throw new TestValidationException("weightMultiplier must be between 1 and 100");
+        }
+
+        Test test = new Test();
+        test.setCourse(course);
+        test.setLesson(lesson);
+        test.setCreatedBy(current);
+        test.setTitle(title);
+        test.setDescription(description);
+        test.setTopic(topic);
+        test.setDeadline(deadline);
+        test.setActivityType(type);
+        test.setWeightMultiplier(weight);
+        test.setStatus(TestStatus.DRAFT);
+        test.setPublishedAt(null);
+        test.setAssignedWeekStart(null);
+
+        return toDto(testRepository.save(test), true);
+    }
+
+    /**
+     * Assigns a WEEKLY_STAR activity to a course week (Monday date).
+     * After assignment and READY, it becomes visible to students on course page.
+     */
+    public TestDto assignWeeklyActivity(Integer activityId, AssignWeeklyActivityDto dto) {
+        User current = authService.getCurrentUserEntity();
+        userService.assertUserEntityHasRole(current, ROLE_METHODIST);
+
+        Test test = getEntityById(activityId);
+        if (test.getActivityType() != ActivityType.WEEKLY_STAR) {
+            throw new TestValidationException("Only WEEKLY_STAR can be assigned to a week");
+        }
+        assertOwner(test.getCourse().getCreatedBy(), current, "Only course creator can assign weekly activity");
+
+        if (dto == null || dto.getWeekStart() == null) {
+            throw new TestValidationException("weekStart is required");
+        }
+        LocalDate weekStart = dto.getWeekStart();
+        // normalize to Monday
+        if (weekStart.getDayOfWeek().getValue() != 1) {
+            throw new TestValidationException("weekStart must be a Monday date");
+        }
+
+        if (test.getStatus() != TestStatus.READY) {
+            throw new TestValidationException("Weekly activity must be READY before assigning");
+        }
+
+        test.setAssignedWeekStart(weekStart);
+        return toDto(testRepository.save(test), true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TestSummaryDto> listWeeklyActivitiesForCourse(Integer courseId) {
+        // Access: course participants or admins/methodists
+        User current = authService.getCurrentUserEntity();
+        Course course = courseService.getEntityById(courseId);
+
+        boolean canSeeDrafts = isRole(current, ROLE_METHODIST) || isRole(current, ROLE_ADMIN);
+        if (isRole(current, ROLE_METHODIST)) {
+            assertOwner(course.getCreatedBy(), current, "Only course creator can view this course activities");
+        }
+        if (isRole(current, "STUDENT")) {
+            classStudentService.assertStudentInCourse(current.getId(), courseId, "Student is not enrolled in this course");
+        }
+        if (isRole(current, ROLE_TEACHER)) {
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+        }
+
+        List<Test> tests = canSeeDrafts
+                ? testRepository.findAllByCourse_IdAndActivityTypeAndStatusAndAssignedWeekStartNotNullOrderByAssignedWeekStartDesc(courseId, ActivityType.WEEKLY_STAR, TestStatus.READY)
+                : testRepository.findAllByCourse_IdAndActivityTypeAndStatusAndAssignedWeekStartNotNullOrderByAssignedWeekStartDesc(courseId, ActivityType.WEEKLY_STAR, TestStatus.READY);
+
+        return tests.stream().map(this::toSummaryDto).toList();
+    }
+
 
     @Transactional(readOnly = true)
     public List<TestSummaryDto> listByLesson(Integer lessonId) {
@@ -330,11 +487,25 @@ public class TestService {
     public Test getEntityForCurrentUser(Integer testId) {
         Test test = getEntityById(testId);
 
-        if (test.getLesson() == null || test.getLesson().getId() == null) {
-            throw new TestValidationException("Test lesson is missing");
+        if (test.getLesson() != null && test.getLesson().getId() != null) {
+            // ensures lesson access (incl. student-in-course + lesson opened gating)
+            lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
+        } else {
+            // course-level activity (e.g. WEEKLY_STAR) - not bound to a lesson
+            if (test.getCourse() == null || test.getCourse().getId() == null) {
+                throw new TestValidationException("Test course is missing");
+            }
+            User currentUser = authService.getCurrentUserEntity();
+            Integer courseId = test.getCourse().getId();
+
+            if (isRole(currentUser, ROLE_METHODIST)) {
+                assertOwner(test.getCourse().getCreatedBy(), currentUser, "Methodist can access only own courses");
+            } else if (isRole(currentUser, ROLE_TEACHER)) {
+                studyClassService.assertTeacherCanManageCourse(courseId, currentUser);
+            } else if (isRole(currentUser, ROLE_STUDENT)) {
+                classStudentService.assertStudentInCourse(currentUser.getId(), courseId, "Student is not enrolled in this course");
+            }
         }
-        // ensures lesson access (incl. student-in-course)
-        lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
 
         User current = authService.getCurrentUserEntity();
         boolean canSeeDrafts = isRole(current, ROLE_METHODIST) || isRole(current, ROLE_ADMIN);
@@ -350,11 +521,21 @@ public class TestService {
         TestDto dto = new TestDto();
         dto.setId(test.getId());
 
+        dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
+        dto.setWeightMultiplier(test.getWeightMultiplier());
+        dto.setAssignedWeekStart(test.getAssignedWeekStart());
+
         if (test.getLesson() != null) {
             dto.setLessonId(test.getLesson().getId());
             if (test.getLesson().getCourse() != null) {
                 dto.setCourseId(test.getLesson().getCourse().getId());
             }
+        }
+        if (dto.getCourseId() == null && test.getCourse() != null) {
+            dto.setCourseId(test.getCourse().getId());
+        }
+        if (dto.getCourseId() == null && test.getCourse() != null) {
+            dto.setCourseId(test.getCourse().getId());
         }
 
         dto.setTitle(test.getTitle());
@@ -388,11 +569,18 @@ public class TestService {
         TestPublicDto dto = new TestPublicDto();
         dto.setId(test.getId());
 
+        dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
+        dto.setWeightMultiplier(test.getWeightMultiplier());
+        dto.setAssignedWeekStart(test.getAssignedWeekStart());
+
         if (test.getLesson() != null) {
             dto.setLessonId(test.getLesson().getId());
             if (test.getLesson().getCourse() != null) {
                 dto.setCourseId(test.getLesson().getCourse().getId());
             }
+        }
+        if (dto.getCourseId() == null && test.getCourse() != null) {
+            dto.setCourseId(test.getCourse().getId());
         }
 
         dto.setTitle(test.getTitle());
@@ -407,15 +595,25 @@ public class TestService {
         return dto;
     }
 
-    private TestSummaryDto toSummaryDto(Test test) {
+    /**
+     * Internal mapper used by controllers/services that need a light-weight view.
+     */
+    public TestSummaryDto toSummaryDto(Test test) {
         TestSummaryDto dto = new TestSummaryDto();
         dto.setId(test.getId());
+
+        dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
+        dto.setWeightMultiplier(test.getWeightMultiplier());
+        dto.setAssignedWeekStart(test.getAssignedWeekStart());
 
         if (test.getLesson() != null) {
             dto.setLessonId(test.getLesson().getId());
             if (test.getLesson().getCourse() != null) {
                 dto.setCourseId(test.getLesson().getCourse().getId());
             }
+        }
+        if (dto.getCourseId() == null && test.getCourse() != null) {
+            dto.setCourseId(test.getCourse().getId());
         }
 
         dto.setTitle(test.getTitle());

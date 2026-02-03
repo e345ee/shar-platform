@@ -2,9 +2,11 @@ package com.course.controller;
 
 import com.course.dto.CourseDto;
 import com.course.dto.LessonDto;
+import com.course.dto.StudentCoursePageDto;
 import com.course.dto.TestAttemptDto;
 import com.course.dto.TestSummaryDto;
 import com.course.service.StudentContentService;
+import com.course.service.StudentCoursePageService;
 import com.course.service.TestAttemptService;
 import com.course.service.TestService;
 import jakarta.validation.constraints.NotNull;
@@ -21,8 +23,20 @@ import java.util.List;
 public class StudentController {
 
     private final StudentContentService studentContentService;
+    private final StudentCoursePageService studentCoursePageService;
     private final TestAttemptService testAttemptService;
     private final TestService testService;
+
+    /**
+     * Aggregated course page payload for the student:
+     * opened lessons + lesson-bound activities (HOMEWORK/CONTROL) + weekly activity of current week
+     * with latest attempt status per activity.
+     */
+    @GetMapping("/courses/{courseId}/page")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<StudentCoursePageDto> getCoursePage(@PathVariable Integer courseId) {
+        return ResponseEntity.ok(studentCoursePageService.getCoursePage(courseId));
+    }
 
     /**
      * Student gets all courses where they are enrolled (via any class in the course).

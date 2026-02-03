@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,7 +17,7 @@ import java.util.List;
 @Table(
         name = "tests",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_test_lesson", columnNames = {"lesson_id"})
+                @UniqueConstraint(name = "uq_activity_lesson_kind", columnNames = {"lesson_id","activity_type"})
         }
 )
 @Data
@@ -29,11 +30,39 @@ public class Test {
     private Integer id;
 
     /**
-     * Test is a homework attached to a lesson.
+     * Lesson attachment (optional): for HOMEWORK_TEST and CONTROL_WORK.
+     * WEEKLY_STAR is not attached to a lesson.
      */
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "lesson_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lesson_id")
     private Lesson lesson;
+
+    /**
+     * Course owner of the activity (always present).
+     * For lesson-attached activities it is derived from the lesson's course.
+     */
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "course_id", nullable = false)
+    private Course course;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "activity_type", length = 32, nullable = false)
+    private ActivityType activityType = ActivityType.HOMEWORK_TEST;
+
+    /**
+     * Weight multiplier applied to score/maxScore when calculating weighted results.
+     * For CONTROL_WORK and WEEKLY_STAR it is typically > 1.
+     */
+    @Column(name = "weight_multiplier", nullable = false)
+    private Integer weightMultiplier = 1;
+
+    /**
+     * For WEEKLY_STAR: week start date (Monday) when this activity is assigned/visible.
+     * Null means not assigned yet.
+     */
+    @Column(name = "assigned_week_start")
+    private java.time.LocalDate assignedWeekStart;
+
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "created_by", nullable = false)
@@ -81,6 +110,12 @@ public class Test {
         updatedAt = now;
         if (status == null) {
             status = TestStatus.DRAFT;
+        }
+        if (activityType == null) {
+            activityType = ActivityType.HOMEWORK_TEST;
+        }
+        if (weightMultiplier == null || weightMultiplier < 1) {
+            weightMultiplier = 1;
         }
     }
 

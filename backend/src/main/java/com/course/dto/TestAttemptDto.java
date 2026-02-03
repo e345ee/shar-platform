@@ -26,6 +26,10 @@ public class TestAttemptDto {
     private Integer maxScore;
     private Double percent;
 
+    private Integer weightedScore;
+    private Integer weightedMaxScore;
+    private Double weightedPercent;
+
     private List<TestAttemptAnswerDto> answers;
 
     private LocalDateTime createdAt;

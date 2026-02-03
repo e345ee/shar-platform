@@ -281,6 +281,16 @@ pass "Student password set"
 STUDENT_AUTH="$STUDENT_EMAIL:$STUDENT_PASS"
 
 # ------------------------------------------------------------
+# 7b) Student COURSE PAGE aggregated endpoint (initially empty)
+# ------------------------------------------------------------
+log "Student COURSE PAGE (before lessons/tests): should return empty lessons and empty weekly"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page"
+echo "$HTTP_BODY" | grep -q '"course"' || fail "course page must contain course"
+echo "$HTTP_BODY" | grep -q '"lessons"' || fail "course page must contain lessons"
+pass "Course page endpoint works"
+
+# ------------------------------------------------------------
 # 8) Prepare a tiny 2-page PDF for upload
 # ------------------------------------------------------------
 PDF_FILE="$WORKDIR/test_presentation.pdf"
@@ -525,6 +535,50 @@ TEST2_READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$TEST2_READY_STATUS" == "READY" ]] || fail "Expected READY for test2 after publish, got $TEST2_READY_STATUS"
 pass "Second test published"
 
+# ------------------------------------------------------------
+# WEEKLY_STAR activity: create -> add questions -> publish -> assign current week
+# ------------------------------------------------------------
+WEEK_START=$(date -d "$(date +%F) -$(( $(date +%u) - 1 )) days" +%F)
+log "Create WEEKLY_STAR activity (DRAFT) as METHODIST"
+request_json POST "/api/courses/$COURSE_ID/activities" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"activityType\":\"WEEKLY_STAR\",\"title\":\"Weekly Star $SUF\",\"description\":\"Hard task\",\"topic\":\"WeekTopic\",\"deadline\":\"$DEADLINE\",\"weightMultiplier\":2}"
+expect_code 201 "create weekly activity"
+WEEKLY_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Weekly activity created: id=$WEEKLY_ID"
+
+log "Add WEEKLY question #1 (OPEN, points=8)"
+request_json POST "/api/tests/$WEEKLY_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionType\":\"OPEN\",\"points\":8,\"questionText\":\"Explain your reasoning\"}"
+expect_code 201 "create weekly open question"
+WQ1_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Add WEEKLY question #2 (TEXT, points=2)"
+request_json POST "/api/tests/$WEEKLY_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionType\":\"TEXT\",\"points\":2,\"questionText\":\"Capital of Germany?\",\"correctTextAnswer\":\"Berlin\"}"
+expect_code 201 "create weekly text question"
+WQ2_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Publish WEEKLY activity: DRAFT -> READY"
+request_json POST "/api/tests/$WEEKLY_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish weekly ready"
+
+log "Assign WEEKLY activity to current week (weekStart=$WEEK_START)"
+request_json POST "/api/activities/$WEEKLY_ID/assign-week" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"weekStart\":\"$WEEK_START\"}"
+expect_code 200 "assign weekly"
+pass "Weekly activity published and assigned"
+
+log "Student COURSE PAGE should now include weeklyThisWeek with WEEKLY_ID"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page with weekly"
+echo "$HTTP_BODY" | grep -q "\"weeklyThisWeek\"" || fail "course page missing weeklyThisWeek"
+echo "$HTTP_BODY" | grep -q "\"id\":$WEEKLY_ID" || fail "course page does not include weekly id=$WEEKLY_ID"
+pass "Course page includes weekly activity"
+
 log "TEACHER opens lesson2 for the class (required for student visibility)"
 request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code_one_of "teacher open lesson2" 200 201 204
@@ -594,6 +648,22 @@ if ! echo "$HTTP_BODY" | grep -q "\"isCorrect\""; then
 fi
 pass "Student can view graded attempt with correctness flags"
 
+# ---------------- Weekly attempt flow ----------------
+log "Student START WEEKLY attempt"
+request_json POST "/api/tests/$WEEKLY_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start weekly attempt"
+WATT_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Weekly attempt started: id=$WATT_ID"
+
+log "Student SUBMIT WEEKLY attempt (TEXT correct, OPEN pending)"
+request_json POST "/api/attempts/$WATT_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$WQ1_ID,\"textAnswer\":\"Because...\"},{\"questionId\":$WQ2_ID,\"textAnswer\":\"berlin\"}]}"
+expect_code 200 "submit weekly attempt"
+WSTATUS=$(json_get "$HTTP_BODY" '.status')
+[[ "$WSTATUS" == "SUBMITTED" ]] || fail "Expected WEEKLY attempt SUBMITTED, got $WSTATUS ($HTTP_BODY)"
+pass "Weekly attempt submitted (pending manual grading)"
+
 # ---------------- Teacher can view results ----------------
 log "Teacher LIST attempts for test: should include student's attempt with score"
 request_json GET "/api/tests/$TEST_ID/attempts" "$TEACHER_AUTH" -H "Accept: application/json"
@@ -614,6 +684,9 @@ expect_code 200 "teacher pending attempts"
 # must contain ATTEMPT_ID somewhere
 if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
   fail "Expected pending list to contain attemptId=$ATTEMPT_ID, got: $HTTP_BODY"
+fi
+if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID"; then
+  fail "Expected pending list to contain weekly attemptId=$WATT_ID, got: $HTTP_BODY"
 fi
 pass "Pending queue contains submitted attempt"
 
@@ -643,7 +716,64 @@ expect_code 200 "teacher pending attempts after grade"
 if echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
   fail "Attempt still appears in pending after grading: $HTTP_BODY"
 fi
-pass "Pending queue cleared after grading"
+if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID"; then
+  fail "Weekly attempt should still be pending after grading homework: $HTTP_BODY"
+fi
+pass "Pending queue updated after grading homework"
+
+log "Teacher grades WEEKLY OPEN question with feedback"
+request_json PUT "/api/attempts/$WATT_ID/grade" "$TEACHER_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"grades\":[{\"questionId\":$WQ1_ID,\"pointsAwarded\":6,\"feedback\":\"Nice attempt\"}]}"
+expect_code 200 "grade weekly open"
+W_STATUS_G=$(json_get "$HTTP_BODY" '.status')
+[[ "$W_STATUS_G" == "GRADED" ]] || fail "Expected weekly status GRADED, got $W_STATUS_G ($HTTP_BODY)"
+pass "Weekly attempt graded"
+
+log "Teacher PENDING attempts list should now be empty for this course"
+request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher pending after weekly grade"
+if echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID"; then
+  fail "Weekly attempt still appears in pending after grading: $HTTP_BODY"
+fi
+pass "Pending queue cleared after grading weekly"
+
+log "Student GET WEEKLY attempt detail: should contain feedback and pointsAwarded"
+request_json GET "/api/attempts/$WATT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get weekly attempt detail"
+if ! echo "$HTTP_BODY" | grep -q "\"feedback\""; then
+  fail "Expected feedback field in weekly attempt detail: $HTTP_BODY"
+fi
+if ! echo "$HTTP_BODY" | grep -q "\"pointsAwarded\""; then
+  fail "Expected pointsAwarded field in weekly attempt detail: $HTTP_BODY"
+fi
+pass "Student sees weekly feedback and awarded points"
+
+log "Student COURSE PAGE should include latestAttempt status for weekly and homework"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page with attempts"
+echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID" || fail "Course page missing weekly latestAttempt"
+echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID" || fail "Course page missing homework latestAttempt"
+pass "Course page includes latest attempt statuses"
+
+log "Methodist COURSE results should include weekly attempt summary"
+request_json GET "/api/methodist/courses/$COURSE_ID/test-attempts" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist course attempts"
+echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID" || fail "Methodist results missing weekly attemptId=$WATT_ID"
+pass "Methodist sees weekly attempt in course results"
+
+log "Student COURSE PAGE should include latestAttempt for weekly (status GRADED)"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page after weekly grade"
+echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID" || fail "Course page must include latestAttempt attemptId=$WATT_ID: $HTTP_BODY"
+echo "$HTTP_BODY" | grep -q "\"status\":\"GRADED\"" || fail "Course page must include GRADED status: $HTTP_BODY"
+pass "Course page includes graded weekly attempt status"
+
+log "Methodist RESULTS for course should include weekly attempt summary"
+request_json GET "/api/methodist/courses/$COURSE_ID/test-attempts" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist course attempts"
+echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID" || fail "Methodist results must include weekly attemptId=$WATT_ID: $HTTP_BODY"
+pass "Methodist sees weekly attempt in results"
 
 log "Student GET attempt detail: should contain feedback and pointsAwarded for OPEN answer"
 request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"

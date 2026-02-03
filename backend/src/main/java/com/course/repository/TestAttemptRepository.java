@@ -47,7 +47,7 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Intege
             @Param("courseId") Integer courseId
     );
 
-    @Query("select ta from TestAttempt ta where ta.test.lesson.course.id = :courseId order by ta.createdAt desc")
+    @Query("select ta from TestAttempt ta where ta.test.course.id = :courseId order by ta.createdAt desc")
     List<TestAttempt> findAllByCourseIdOrderByCreatedAtDesc(@Param("courseId") Integer courseId);
 
     @Query(value = """
@@ -71,13 +71,13 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Intege
               ta.submitted_at AS submittedAt
             FROM test_attempts ta
             JOIN tests t ON t.id = ta.test_id
-            JOIN lessons l ON l.id = t.lesson_id
+            LEFT JOIN lessons l ON l.id = t.lesson_id
             JOIN users u ON u.id = ta.student_id
             JOIN class_students cs ON cs.student_id = ta.student_id
-            JOIN classes c ON c.id = cs.class_id AND c.course_id = l.course_id
+            JOIN classes c ON c.id = cs.class_id AND c.course_id = t.course_id
             WHERE ta.status = 'SUBMITTED'
               AND c.teacher_id = :teacherId
-              AND (:courseId IS NULL OR l.course_id = :courseId)
+              AND (:courseId IS NULL OR t.course_id = :courseId)
               AND (:testId IS NULL OR ta.test_id = :testId)
               AND (:classId IS NULL OR c.id = :classId)
               AND EXISTS (
@@ -95,5 +95,32 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Intege
             @Param("courseId") Integer courseId,
             @Param("testId") Integer testId,
             @Param("classId") Integer classId
+    );
+
+    /**
+     * For a student and a list of tests, returns the latest attempt per test.
+     */
+    @Query(value = """
+            SELECT
+              x.test_id AS testId,
+              x.id AS attemptId,
+              x.status AS status,
+              x.score AS score,
+              x.max_score AS maxScore,
+              (COALESCE(x.score, 0) * COALESCE(t.weight_multiplier, 1)) AS weightedScore,
+              (COALESCE(x.max_score, 0) * COALESCE(t.weight_multiplier, 1)) AS weightedMaxScore,
+              x.submitted_at AS submittedAt
+            FROM (
+              SELECT ta.*, ROW_NUMBER() OVER (PARTITION BY ta.test_id ORDER BY ta.created_at DESC, ta.id DESC) rn
+              FROM test_attempts ta
+              WHERE ta.student_id = :studentId
+                AND ta.test_id IN (:testIds)
+            ) x
+            JOIN tests t ON t.id = x.test_id
+            WHERE x.rn = 1
+            """, nativeQuery = true)
+    List<LatestAttemptProjection> findLatestAttemptsForStudent(
+            @Param("studentId") Integer studentId,
+            @Param("testIds") List<Integer> testIds
     );
 }
