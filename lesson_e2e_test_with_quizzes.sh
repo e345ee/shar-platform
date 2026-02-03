@@ -12,6 +12,11 @@ set -euo pipefail
 # - access: METHODIST/TEACHER/STUDENT can view lessons in their course;
 #           STUDENT cannot view lessons from another course
 # - PDF slide paging: /presentation/info and /presentation/pages/{n}
+# - TESTS (homework) + QUESTIONS:
+#     * METHODIST: create draft test, update, add/update/delete questions
+#     * METHODIST: publish (ready)
+#     * STUDENT: start attempt, submit answers, auto-grading
+#     * TEACHER: can view student's results (attempts list + attempt detail)
 #
 # Prereqs:
 # - backend is running (default: http://localhost:8080)
@@ -46,7 +51,7 @@ cleanup() {
 trap cleanup EXIT
 
 log() { printf "\n==> %s\n" "$*"; }
-fail() { echo "\n[FAIL] $*" >&2; exit 1; }
+fail() { echo -e "\n[FAIL] $*" >&2; exit 1; }
 pass() { echo "[OK] $*"; }
 
 need_tool() {
@@ -64,7 +69,6 @@ json_get() {
     return 0
   fi
   if command -v python3 >/dev/null 2>&1; then
-    # Minimal jq-like evaluator for common cases: .a, .a.b, .a[0].b
     python3 - "$expr" <<'PY' <<<"$json"
 import json,sys,re
 expr=sys.argv[1].strip()
@@ -73,7 +77,6 @@ if expr.startswith('.'): expr=expr[1:]
 if expr=='':
     print(json.dumps(obj))
     sys.exit(0)
-# split by '.' but keep [idx] parts
 parts=[]
 buf=''
 for ch in expr:
@@ -83,7 +86,6 @@ for ch in expr:
     buf+=ch
 if buf: parts.append(buf)
 for p in parts:
-    # handle root indexes like [0] or [0][1]
     if p.startswith('['):
         for im in re.finditer(r'\[(\d+)\]', p):
             obj=obj[int(im.group(1))]
@@ -95,13 +97,11 @@ for p in parts:
     if isinstance(obj, dict):
         obj=obj[key]
     else:
-        # allow numeric keys when current is list
         obj=obj[int(key)]
     idx_part=m.group(2)
     if idx_part:
         for im in re.finditer(r'\[(\d+)\]', idx_part):
             obj=obj[int(im.group(1))]
-# print scalar
 if obj is None:
     print('')
 elif isinstance(obj,(dict,list)):
@@ -152,12 +152,23 @@ expect_code() {
   }
 }
 
+expect_code_one_of() {
+  local ctx="$1"; shift
+  local got="$HTTP_CODE"
+  for e in "$@"; do
+    if [[ "$got" == "$e" ]]; then return 0; fi
+  done
+  echo "--- response body ---" >&2
+  echo "$HTTP_BODY" >&2
+  echo "---------------------" >&2
+  fail "$ctx (expected one of: $*, got $got)"
+}
+
 # ------------------------------------------------------------
 # 0) Health
 # ------------------------------------------------------------
 log "Health check"
-request_json GET "/actuator/health" "" \
-  -H "Accept: application/json"
+request_json GET "/actuator/health" "" -H "Accept: application/json"
 expect_code 200 "health check"
 pass "Backend is up"
 
@@ -344,7 +355,6 @@ log "Verify lesson order by listing lessons in course"
 request_json GET "/api/courses/$COURSE_ID/lessons" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "list lessons as methodist"
 
-# Expect first lesson in list is B (orderIndex=1), second is A (orderIndex=2)
 FIRST_ID=$(json_get "$HTTP_BODY" '.[0].id')
 FIRST_ORDER=$(json_get "$HTTP_BODY" '.[0].orderIndex')
 SECOND_ID=$(json_get "$HTTP_BODY" '.[1].id')
@@ -354,7 +364,6 @@ SECOND_ORDER=$(json_get "$HTTP_BODY" '.[1].orderIndex')
 [[ "$SECOND_ID" == "$LESSON_A_ID" && "$SECOND_ORDER" == "2" ]] || fail "Expected second lesson to be A with orderIndex=2"
 pass "Lesson ordering is correct"
 
-# We'll use LESSON_B for slide paging tests
 LESSON_ID="$LESSON_B_ID"
 
 # ------------------------------------------------------------
@@ -376,7 +385,161 @@ expect_code 200 "student get lesson"
 pass "Student can view lesson (belongs to course)"
 
 # ------------------------------------------------------------
-# 12) Negative access: STUDENT cannot view lesson from another course
+# 12) TESTS: create draft test + questions + update/delete + publish + attempt submit
+# ------------------------------------------------------------
+DEADLINE="$(date -u -d "+3 days" +"%Y-%m-%dT%H:%M:%S")"
+# (macOS users can export DEADLINE manually or adjust date command)
+
+log "Student list tests in lesson: should be empty initially"
+request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list lesson tests (initial)"
+# should be [] (or empty array)
+if [[ "$(echo "$HTTP_BODY" | tr -d ' \n\r\t')" != "[]" ]]; then
+  fail "Expected empty list for student before test is created/published, got: $HTTP_BODY"
+fi
+pass "Student sees no tests initially"
+
+log "Create TEST (DRAFT) as METHODIST"
+request_json POST "/api/lessons/$LESSON_ID/tests" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Test_$SUF\",\"description\":\"Desc_$SUF\",\"topic\":\"Topic_$SUF\",\"deadline\":\"$DEADLINE\"}"
+expect_code 201 "create test draft"
+TEST_ID=$(json_get "$HTTP_BODY" '.id')
+TEST_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ -n "$TEST_ID" && "$TEST_ID" != "null" ]] || fail "No test id"
+[[ "$TEST_STATUS" == "DRAFT" ]] || fail "Expected status DRAFT, got $TEST_STATUS"
+pass "Test draft created: id=$TEST_ID"
+
+log "Student list tests in lesson: still empty because test is DRAFT"
+request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list lesson tests (draft hidden)"
+if [[ "$(echo "$HTTP_BODY" | tr -d ' \n\r\t')" != "[]" ]]; then
+  fail "Expected empty list for student while test is DRAFT, got: $HTTP_BODY"
+fi
+pass "Draft test is hidden from student"
+
+log "Update TEST (still DRAFT) as METHODIST"
+request_json PUT "/api/tests/$TEST_ID" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"TestUpdated_$SUF\",\"description\":\"DescUpdated_$SUF\",\"topic\":\"TopicUpdated_$SUF\",\"deadline\":\"$DEADLINE\"}"
+expect_code 200 "update test"
+NEW_TITLE=$(json_get "$HTTP_BODY" '.title')
+[[ "$NEW_TITLE" == "TestUpdated_$SUF" ]] || fail "Expected updated title"
+pass "Test updated"
+
+log "Create QUESTION #1 as METHODIST"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionText\":\"2+2=?\",\"option1\":\"3\",\"option2\":\"4\",\"option3\":\"5\",\"option4\":\"22\",\"correctOption\":2}"
+expect_code 201 "create question 1"
+Q1_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Question 1 created: id=$Q1_ID"
+
+log "Create QUESTION #2 as METHODIST"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionText\":\"Capital of France?\",\"option1\":\"Berlin\",\"option2\":\"Paris\",\"option3\":\"Rome\",\"option4\":\"Madrid\",\"correctOption\":2}"
+expect_code 201 "create question 2"
+Q2_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Question 2 created: id=$Q2_ID"
+
+log "Update QUESTION #2 text as METHODIST"
+request_json PUT "/api/tests/$TEST_ID/questions/$Q2_ID" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionText\":\"What is the capital of France?\",\"option1\":\"Berlin\",\"option2\":\"Paris\",\"option3\":\"Rome\",\"option4\":\"Madrid\",\"correctOption\":2}"
+expect_code 200 "update question 2"
+pass "Question 2 updated"
+
+log "Create and DELETE a QUESTION #3 as METHODIST (delete path check)"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":3,\"questionText\":\"Temp question\",\"option1\":\"A\",\"option2\":\"B\",\"option3\":\"C\",\"option4\":\"D\",\"correctOption\":1}"
+expect_code 201 "create question 3"
+Q3_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json DELETE "/api/tests/$TEST_ID/questions/$Q3_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+# could be 204 or 200 depending on implementation
+expect_code_one_of "delete question 3" 200 204
+pass "Question 3 deleted"
+
+log "Publish TEST: DRAFT -> READY"
+request_json POST "/api/tests/$TEST_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish test ready"
+READY_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ "$READY_STATUS" == "READY" ]] || fail "Expected READY after publish, got $READY_STATUS"
+pass "Test published"
+
+log "Student list tests in lesson: should include READY test"
+request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list lesson tests (ready visible)"
+LIST_COUNT=$(json_get "$HTTP_BODY" 'length')
+[[ "$LIST_COUNT" == "1" ]] || fail "Expected 1 visible test, got $LIST_COUNT: $HTTP_BODY"
+pass "Student sees published test"
+
+log "Student GET test (public view): should NOT contain correctOption"
+request_json GET "/api/tests/$TEST_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get test"
+# Expect questions exist and correctOption not present; easiest check: grep for 'correctOption'
+if echo "$HTTP_BODY" | grep -q "correctOption"; then
+  fail "Public test view leaked correctOption: $HTTP_BODY"
+fi
+pass "Public view doesn't leak correctOption"
+
+log "Attempt to EDIT published test as METHODIST should fail"
+request_json PUT "/api/tests/$TEST_ID" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"ShouldFail_$SUF\",\"description\":\"x\",\"topic\":\"x\",\"deadline\":\"$DEADLINE\"}"
+# depending on your exception mapping it might be 400/409/403
+expect_code_one_of "edit published test" 400 403 409
+pass "Editing published test is blocked"
+
+# ---------------- Student attempt flow ----------------
+log "Student START attempt"
+request_json POST "/api/tests/$TEST_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start attempt"
+ATTEMPT_ID=$(json_get "$HTTP_BODY" '.id')
+ATT_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ -n "$ATTEMPT_ID" && "$ATTEMPT_ID" != "null" ]] || fail "No attempt id"
+[[ "$ATT_STATUS" == "IN_PROGRESS" ]] || fail "Expected IN_PROGRESS, got $ATT_STATUS"
+pass "Attempt started: id=$ATTEMPT_ID"
+
+log "Student SUBMIT attempt (1 correct, 1 wrong) -> score should be 1/2"
+request_json POST "/api/attempts/$ATTEMPT_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$Q1_ID,\"selectedOption\":2},{\"questionId\":$Q2_ID,\"selectedOption\":1}]}"
+expect_code 200 "submit attempt"
+SCORE=$(json_get "$HTTP_BODY" '.score')
+MAXS=$(json_get "$HTTP_BODY" '.maxScore')
+STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ "$SCORE" == "1" ]] || fail "Expected score=1, got $SCORE ($HTTP_BODY)"
+[[ "$MAXS" == "2" ]] || fail "Expected maxScore=2, got $MAXS ($HTTP_BODY)"
+[[ "$STATUS" == "GRADED" || "$STATUS" == "SUBMITTED" ]] || fail "Expected status GRADED/SUBMITTED, got $STATUS"
+pass "Attempt auto-graded: $SCORE/$MAXS"
+
+log "Student GET attempt detail: should show isCorrect flags"
+request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get attempt detail"
+# Ensure at least one isCorrect present
+if ! echo "$HTTP_BODY" | grep -q "\"isCorrect\""; then
+  fail "Expected isCorrect fields in attempt detail: $HTTP_BODY"
+fi
+pass "Student can view graded attempt with correctness flags"
+
+# ---------------- Teacher can view results ----------------
+log "Teacher LIST attempts for test: should include student's attempt with score"
+request_json GET "/api/tests/$TEST_ID/attempts" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher list attempts"
+TEACHER_COUNT=$(json_get "$HTTP_BODY" 'length')
+[[ "$TEACHER_COUNT" -ge 1 ]] || fail "Expected >=1 attempt in teacher view, got: $HTTP_BODY"
+pass "Teacher can list attempts"
+
+log "Teacher GET attempt detail"
+request_json GET "/api/attempts/$ATTEMPT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher get attempt detail"
+pass "Teacher can view attempt detail"
+
+# ------------------------------------------------------------
+# 13) Negative access: STUDENT cannot view lesson from another course
 # ------------------------------------------------------------
 log "Create another course+lesson (METHODIST) to test forbidden access for student"
 request_json POST "/api/courses" "$METHODIST_AUTH" \
@@ -403,7 +566,21 @@ request_json GET "/api/lessons/$OTHER_LESSON_ID" "$STUDENT_AUTH" -H "Accept: app
 pass "Student is correctly forbidden from other course lesson"
 
 # ------------------------------------------------------------
-# 13) PDF paging: info + pages 1..2 for METHODIST / TEACHER / STUDENT
+# 14) Optional: create + delete a DRAFT test on other lesson (delete endpoint check)
+# ------------------------------------------------------------
+log "Create DRAFT test on other lesson and DELETE it (METHODIST)"
+request_json POST "/api/lessons/$OTHER_LESSON_ID/tests" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"TempDelete_$SUF\",\"description\":\"x\",\"topic\":\"x\",\"deadline\":\"$DEADLINE\"}"
+expect_code 201 "create temp test"
+TEMP_TEST_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json DELETE "/api/tests/$TEMP_TEST_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "delete temp test" 200 204
+pass "Draft test deleted successfully"
+
+# ------------------------------------------------------------
+# 15) PDF paging: info + pages 1..2 for METHODIST / TEACHER / STUDENT
 # ------------------------------------------------------------
 log "PDF: presentation info (METHODIST)"
 request_json GET "/api/lessons/$LESSON_ID/presentation/info" "$METHODIST_AUTH" -H "Accept: application/json"
@@ -435,4 +612,4 @@ echo "Users created:"
 echo "  METHODIST: $METHODIST_EMAIL / $METHODIST_PASS"
 echo "  TEACHER:   $TEACHER_EMAIL / $TEACHER_PASS"
 echo "  STUDENT:   $STUDENT_EMAIL / $STUDENT_PASS"
-echo "Course id: $COURSE_ID, Class id: $CLASS_ID, Lesson id: $LESSON_ID"
+echo "Course id: $COURSE_ID, Class id: $CLASS_ID, Lesson id: $LESSON_ID, Test id: $TEST_ID"

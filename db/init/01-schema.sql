@@ -158,3 +158,100 @@ CREATE TABLE "student_achievements" (
 
     CONSTRAINT uq_student_achievement UNIQUE (student_id, achievement_id)
 );
+
+----------------------------------------------------------------------
+-- 1.4. TESTS / TEST QUESTIONS (Домашка к уроку)
+----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS
+    "test_questions",
+    "tests"
+    CASCADE;
+
+CREATE TABLE "tests" (
+    id           SERIAL PRIMARY KEY,
+    lesson_id    INT NOT NULL REFERENCES "lessons"(id) ON DELETE CASCADE,
+    created_by   INT NOT NULL REFERENCES "users"(id),
+
+    title        VARCHAR(127) NOT NULL,
+    description  VARCHAR(2048),
+    topic        VARCHAR(127) NOT NULL,
+    deadline     TIMESTAMP NOT NULL,
+
+    status       VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    published_at TIMESTAMP,
+
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_test_lesson UNIQUE (lesson_id),
+    CONSTRAINT chk_test_title_len CHECK (char_length(title) BETWEEN 1 AND 127),
+    CONSTRAINT chk_test_topic_len CHECK (char_length(topic) BETWEEN 1 AND 127),
+    CONSTRAINT chk_test_desc_len CHECK (description IS NULL OR char_length(description) <= 2048)
+);
+
+CREATE TABLE "test_questions" (
+    id             SERIAL PRIMARY KEY,
+    test_id        INT NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
+    order_index    INT NOT NULL,
+
+    question_text  VARCHAR(2048) NOT NULL,
+    option_1       VARCHAR(512) NOT NULL,
+    option_2       VARCHAR(512) NOT NULL,
+    option_3       VARCHAR(512) NOT NULL,
+    option_4       VARCHAR(512) NOT NULL,
+    correct_option INT NOT NULL,
+
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_test_question_order UNIQUE (test_id, order_index),
+    CONSTRAINT chk_test_q_order_idx CHECK (order_index >= 1),
+    CONSTRAINT chk_test_q_text_len CHECK (char_length(question_text) BETWEEN 1 AND 2048),
+    CONSTRAINT chk_test_q_opt1_len CHECK (char_length(option_1) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt2_len CHECK (char_length(option_2) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt3_len CHECK (char_length(option_3) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt4_len CHECK (char_length(option_4) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_correct CHECK (correct_option BETWEEN 1 AND 4)
+);
+
+----------------------------------------------------------------------
+-- 1.5. TEST ATTEMPTS / TEST ATTEMPT ANSWERS (сдача теста студентом)
+----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS
+    "test_attempt_answers",
+    "test_attempts"
+    CASCADE;
+
+CREATE TABLE "test_attempts" (
+    id             SERIAL PRIMARY KEY,
+    test_id        INT NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
+    student_id     INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    attempt_number INT NOT NULL,
+
+    status         VARCHAR(16) NOT NULL DEFAULT 'IN_PROGRESS',
+    started_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    submitted_at   TIMESTAMP,
+
+    score          INT,
+    max_score      INT,
+
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_test_attempt_student_num UNIQUE (test_id, student_id, attempt_number)
+);
+
+CREATE TABLE "test_attempt_answers" (
+    id              SERIAL PRIMARY KEY,
+    attempt_id      INT NOT NULL REFERENCES "test_attempts"(id) ON DELETE CASCADE,
+    question_id     INT NOT NULL REFERENCES "test_questions"(id) ON DELETE CASCADE,
+    selected_option INT NOT NULL,
+    is_correct      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id),
+    CONSTRAINT chk_attempt_selected CHECK (selected_option BETWEEN 1 AND 4)
+);
