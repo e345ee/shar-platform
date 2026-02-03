@@ -19,5 +19,12 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, Inte
 
     @Query("select (count(cs) > 0) from ClassStudent cs where cs.student.id = :studentId and cs.studyClass.course.createdBy.id = :methodistId")
     boolean existsStudentInMethodistCourses(@Param("studentId") Integer studentId, @Param("methodistId") Integer methodistId);
+
+
+@Query("select distinct c from ClassStudent cs join cs.studyClass sc join sc.course c " +
+        "where cs.student.id = :studentId order by c.name asc")
+java.util.List<com.course.entity.Course> findDistinctCoursesByStudentId(@Param("studentId") Integer studentId);
+
 }
+
 

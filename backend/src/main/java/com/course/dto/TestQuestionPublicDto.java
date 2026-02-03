@@ -8,6 +8,8 @@ public class TestQuestionPublicDto {
     private Integer testId;
     private Integer orderIndex;
     private String questionText;
+    private String questionType;
+    private Integer points;
     private String option1;
     private String option2;
     private String option3;

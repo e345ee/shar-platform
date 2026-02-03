@@ -199,11 +199,35 @@ public class TestService {
         q.setTest(test);
         q.setOrderIndex(orderIndex);
         q.setQuestionText(safeTrim(dto.getQuestionText()));
-        q.setOption1(safeTrim(dto.getOption1()));
-        q.setOption2(safeTrim(dto.getOption2()));
-        q.setOption3(safeTrim(dto.getOption3()));
-        q.setOption4(safeTrim(dto.getOption4()));
-        q.setCorrectOption(dto.getCorrectOption());
+
+        TestQuestionType type = parseQuestionType(dto.getQuestionType(), TestQuestionType.SINGLE_CHOICE);
+        q.setQuestionType(type);
+        q.setPoints(dto.getPoints() == null ? 1 : dto.getPoints());
+
+        if (type == TestQuestionType.SINGLE_CHOICE) {
+            q.setOption1(safeTrim(dto.getOption1()));
+            q.setOption2(safeTrim(dto.getOption2()));
+            q.setOption3(safeTrim(dto.getOption3()));
+            q.setOption4(safeTrim(dto.getOption4()));
+            q.setCorrectOption(dto.getCorrectOption());
+            q.setCorrectTextAnswer(null);
+        } else if (type == TestQuestionType.TEXT) {
+            // for TEXT questions, options/correctOption are not used
+            q.setOption1(null);
+            q.setOption2(null);
+            q.setOption3(null);
+            q.setOption4(null);
+            q.setCorrectOption(null);
+            q.setCorrectTextAnswer(safeTrim(dto.getCorrectTextAnswer()));
+        } else if (type == TestQuestionType.OPEN) {
+            // open-ended: no auto-correct answers
+            q.setOption1(null);
+            q.setOption2(null);
+            q.setOption3(null);
+            q.setOption4(null);
+            q.setCorrectOption(null);
+            q.setCorrectTextAnswer(null);
+        }
 
         validateQuestionEntity(q);
         return toQuestionDto(questionRepository.save(q));
@@ -241,11 +265,36 @@ public class TestService {
         }
 
         q.setQuestionText(safeTrim(dto.getQuestionText()));
-        q.setOption1(safeTrim(dto.getOption1()));
-        q.setOption2(safeTrim(dto.getOption2()));
-        q.setOption3(safeTrim(dto.getOption3()));
-        q.setOption4(safeTrim(dto.getOption4()));
-        q.setCorrectOption(dto.getCorrectOption());
+
+        if (dto.getQuestionType() != null) {
+            q.setQuestionType(parseQuestionType(dto.getQuestionType(), q.getQuestionType()));
+        }
+        if (dto.getPoints() != null) {
+            q.setPoints(dto.getPoints());
+        }
+
+        if (q.getQuestionType() == TestQuestionType.SINGLE_CHOICE) {
+            q.setOption1(safeTrim(dto.getOption1()));
+            q.setOption2(safeTrim(dto.getOption2()));
+            q.setOption3(safeTrim(dto.getOption3()));
+            q.setOption4(safeTrim(dto.getOption4()));
+            q.setCorrectOption(dto.getCorrectOption());
+            q.setCorrectTextAnswer(null);
+        } else if (q.getQuestionType() == TestQuestionType.TEXT) {
+            q.setOption1(null);
+            q.setOption2(null);
+            q.setOption3(null);
+            q.setOption4(null);
+            q.setCorrectOption(null);
+            q.setCorrectTextAnswer(safeTrim(dto.getCorrectTextAnswer()));
+        } else if (q.getQuestionType() == TestQuestionType.OPEN) {
+            q.setOption1(null);
+            q.setOption2(null);
+            q.setOption3(null);
+            q.setOption4(null);
+            q.setCorrectOption(null);
+            q.setCorrectTextAnswer(null);
+        }
 
         validateQuestionEntity(q);
         return toQuestionDto(questionRepository.save(q));
@@ -395,11 +444,14 @@ public class TestService {
         }
         dto.setOrderIndex(q.getOrderIndex());
         dto.setQuestionText(q.getQuestionText());
+        dto.setQuestionType(q.getQuestionType() != null ? q.getQuestionType().name() : null);
+        dto.setPoints(q.getPoints());
         dto.setOption1(q.getOption1());
         dto.setOption2(q.getOption2());
         dto.setOption3(q.getOption3());
         dto.setOption4(q.getOption4());
         dto.setCorrectOption(q.getCorrectOption());
+        dto.setCorrectTextAnswer(q.getCorrectTextAnswer());
         dto.setCreatedAt(q.getCreatedAt());
         dto.setUpdatedAt(q.getUpdatedAt());
         return dto;
@@ -413,6 +465,8 @@ public class TestService {
         }
         dto.setOrderIndex(q.getOrderIndex());
         dto.setQuestionText(q.getQuestionText());
+        dto.setQuestionType(q.getQuestionType() != null ? q.getQuestionType().name() : null);
+        dto.setPoints(q.getPoints());
         dto.setOption1(q.getOption1());
         dto.setOption2(q.getOption2());
         dto.setOption3(q.getOption3());
@@ -429,13 +483,50 @@ public class TestService {
         if (!StringUtils.hasText(q.getQuestionText())) {
             throw new TestQuestionValidationException("Question text must not be empty");
         }
-        if (!StringUtils.hasText(q.getOption1()) || !StringUtils.hasText(q.getOption2())
-                || !StringUtils.hasText(q.getOption3()) || !StringUtils.hasText(q.getOption4())) {
-            throw new TestQuestionValidationException("All 4 options must be provided");
+        if (q.getPoints() == null || q.getPoints() < 1) {
+            throw new TestQuestionValidationException("points must be >= 1");
         }
-        Integer co = q.getCorrectOption();
-        if (co == null || co < 1 || co > 4) {
-            throw new TestQuestionValidationException("correctOption must be between 1 and 4");
+
+        TestQuestionType type = q.getQuestionType() == null ? TestQuestionType.SINGLE_CHOICE : q.getQuestionType();
+        if (type == TestQuestionType.SINGLE_CHOICE) {
+            if (!StringUtils.hasText(q.getOption1()) || !StringUtils.hasText(q.getOption2())
+                    || !StringUtils.hasText(q.getOption3()) || !StringUtils.hasText(q.getOption4())) {
+                throw new TestQuestionValidationException("All 4 options must be provided for SINGLE_CHOICE");
+            }
+            Integer co = q.getCorrectOption();
+            if (co == null || co < 1 || co > 4) {
+                throw new TestQuestionValidationException("correctOption must be between 1 and 4");
+            }
+        } else if (type == TestQuestionType.TEXT) {
+            if (!StringUtils.hasText(q.getCorrectTextAnswer())) {
+                throw new TestQuestionValidationException("correctTextAnswer must be provided for TEXT");
+            }
+        } else if (type == TestQuestionType.OPEN) {
+            // OPEN: student writes an open-ended answer, teacher grades it manually.
+            // No options, no correct answer.
+            if (StringUtils.hasText(q.getOption1()) || StringUtils.hasText(q.getOption2())
+                    || StringUtils.hasText(q.getOption3()) || StringUtils.hasText(q.getOption4())) {
+                throw new TestQuestionValidationException("Options must not be provided for OPEN");
+            }
+            if (q.getCorrectOption() != null) {
+                throw new TestQuestionValidationException("correctOption must be null for OPEN");
+            }
+            if (StringUtils.hasText(q.getCorrectTextAnswer())) {
+                throw new TestQuestionValidationException("correctTextAnswer must be null for OPEN");
+            }
+        } else {
+            throw new TestQuestionValidationException("Unsupported questionType: " + type);
+        }
+    }
+
+    private TestQuestionType parseQuestionType(String raw, TestQuestionType defaultValue) {
+        if (!StringUtils.hasText(raw)) {
+            return defaultValue;
+        }
+        try {
+            return TestQuestionType.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new TestQuestionValidationException("Invalid questionType: " + raw + ". Supported: SINGLE_CHOICE, TEXT, OPEN");
         }
     }
 

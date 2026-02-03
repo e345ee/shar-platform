@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ------------------------------------------------------------
-# v5: allow multi-attempt policy (2nd start may return 201) + json_len + 2 tests across 2 lessons
+# v6: add TEXT + OPEN questions, manual grading, teacher pending queue, lesson open gating (2nd start may return 201) + json_len + 2 tests across 2 lessons
 # E2E smoke-test for:
 # - roles/users: ADMIN -> create METHODIST; METHODIST -> create TEACHER
 # - METHODIST: create COURSE + CLASS
@@ -374,7 +374,7 @@ LESSON_ID="$LESSON_B_ID"
 LESSON2_ID="$LESSON_A_ID"
 
 # ------------------------------------------------------------
-# 11) Access tests: METHODIST / TEACHER / STUDENT can view lesson in course
+# 11) Access tests + gating: STUDENT cannot view lesson until TEACHER opens it for the class
 # ------------------------------------------------------------
 log "Access: METHODIST can GET lesson"
 request_json GET "/api/lessons/$LESSON_ID" "$METHODIST_AUTH" -H "Accept: application/json"
@@ -386,13 +386,23 @@ request_json GET "/api/lessons/$LESSON_ID" "$TEACHER_AUTH" -H "Accept: applicati
 expect_code 200 "teacher get lesson"
 pass "Teacher can view lesson"
 
-log "Access: STUDENT (in class) can GET lesson"
+log "Access: STUDENT cannot GET lesson before teacher opens it (should be 403)"
 request_json GET "/api/lessons/$LESSON_ID" "$STUDENT_AUTH" -H "Accept: application/json"
-expect_code 200 "student get lesson"
-pass "Student can view lesson (belongs to course)"
+expect_code_one_of "student get lesson blocked before open" 403 404
+pass "Student is blocked until lesson is opened by teacher"
+
+log "TEACHER opens lesson for the class"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher open lesson" 200 201 204
+pass "Lesson opened for class"
+
+log "Access: STUDENT can GET lesson after open"
+request_json GET "/api/lessons/$LESSON_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get lesson after open"
+pass "Student can view opened lesson"
 
 # ------------------------------------------------------------
-# 12) TESTS: create draft test + questions + update/delete + publish + attempt submit
+# 12) TESTS: create draft test + questions (SINGLE_CHOICE + TEXT + OPEN) + publish + attempt submit + manual grade
 # ------------------------------------------------------------
 DEADLINE="$(date -u -d "+3 days" +"%Y-%m-%dT%H:%M:%S")"
 # (macOS users can export DEADLINE manually or adjust date command)
@@ -434,40 +444,37 @@ NEW_TITLE=$(json_get "$HTTP_BODY" '.title')
 [[ "$NEW_TITLE" == "TestUpdated_$SUF" ]] || fail "Expected updated title"
 pass "Test updated"
 
-log "Create QUESTION #1 as METHODIST"
-request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
-  -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":1,\"questionText\":\"2+2=?\",\"option1\":\"3\",\"option2\":\"4\",\"option3\":\"5\",\"option4\":\"22\",\"correctOption\":2}"
+log "Create QUESTION #1 (SINGLE_CHOICE, points=2) as METHODIST"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"orderIndex\":1,\"questionText\":\"2+2=?\",\"questionType\":\"SINGLE_CHOICE\",\"points\":2,\"option1\":\"3\",\"option2\":\"4\",\"option3\":\"5\",\"option4\":\"22\",\"correctOption\":2}"
 expect_code 201 "create question 1"
 Q1_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Question 1 created: id=$Q1_ID"
 
-log "Create QUESTION #2 as METHODIST"
-request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
-  -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":2,\"questionText\":\"Capital of France?\",\"option1\":\"Berlin\",\"option2\":\"Paris\",\"option3\":\"Rome\",\"option4\":\"Madrid\",\"correctOption\":2}"
-expect_code 201 "create question 2"
+log "Create QUESTION #2 (TEXT, points=3) as METHODIST"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"orderIndex\":2,\"questionText\":\"Capital of France? (type answer)\",\"questionType\":\"TEXT\",\"points\":3,\"correctTextAnswer\":\"Paris\"}"
+expect_code 201 "create text question"
 Q2_ID=$(json_get "$HTTP_BODY" '.id')
-pass "Question 2 created: id=$Q2_ID"
+pass "Question 2 (TEXT) created: id=$Q2_ID"
+
+log "Create QUESTION #3 (OPEN, points=5) as METHODIST"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"orderIndex\":3,\"questionText\":\"Explain why testing matters (2-3 sentences).\",\"questionType\":\"OPEN\",\"points\":5}"
+expect_code 201 "create open question"
+Q3_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Question 3 (OPEN) created: id=$Q3_ID"
 
 log "Update QUESTION #2 text as METHODIST"
-request_json PUT "/api/tests/$TEST_ID/questions/$Q2_ID" "$METHODIST_AUTH" \
-  -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":2,\"questionText\":\"What is the capital of France?\",\"option1\":\"Berlin\",\"option2\":\"Paris\",\"option3\":\"Rome\",\"option4\":\"Madrid\",\"correctOption\":2}"
-expect_code 200 "update question 2"
+request_json PUT "/api/tests/$TEST_ID/questions/$Q2_ID" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"orderIndex\":2,\"questionText\":\"What is the capital of France? (type answer)\",\"questionType\":\"TEXT\",\"points\":3,\"correctTextAnswer\":\"Paris\"}"
+expect_code 200 "update text question"
 pass "Question 2 updated"
 
-log "Create and DELETE a QUESTION #3 as METHODIST (delete path check)"
-request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH" \
-  -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":3,\"questionText\":\"Temp question\",\"option1\":\"A\",\"option2\":\"B\",\"option3\":\"C\",\"option4\":\"D\",\"correctOption\":1}"
-expect_code 201 "create question 3"
-Q3_ID=$(json_get "$HTTP_BODY" '.id')
+log "Create and DELETE a temp QUESTION #4 as METHODIST (delete path check)"
+request_json POST "/api/tests/$TEST_ID/questions" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"orderIndex\":4,\"questionText\":\"Temp question\",\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"option1\":\"A\",\"option2\":\"B\",\"option3\":\"C\",\"option4\":\"D\",\"correctOption\":1}"
+expect_code 201 "create temp question"
+Q4_ID=$(json_get "$HTTP_BODY" '.id')
 
-request_json DELETE "/api/tests/$TEST_ID/questions/$Q3_ID" "$METHODIST_AUTH" -H "Accept: application/json"
-# could be 204 or 200 depending on implementation
-expect_code_one_of "delete question 3" 200 204
-pass "Question 3 deleted"
+request_json DELETE "/api/tests/$TEST_ID/questions/$Q4_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "delete temp question" 200 204
+pass "Temp question deleted"
 
 log "Publish TEST: DRAFT -> READY"
 request_json POST "/api/tests/$TEST_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
@@ -494,19 +501,19 @@ pass "Second test draft created: id=$TEST2_ID"
 log "Add 3 questions to SECOND TEST as METHODIST"
 request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":1,\"questionText\":\"1+1=?\",\"option1\":\"1\",\"option2\":\"2\",\"option3\":\"3\",\"option4\":\"4\",\"correctOption\":2}"
+  -d "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"1+1=?\",\"option1\":\"1\",\"option2\":\"2\",\"option3\":\"3\",\"option4\":\"4\",\"correctOption\":2}"
 expect_code 201 "create test2 q1"
 T2Q1_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":2,\"questionText\":\"Select the vowel\",\"option1\":\"b\",\"option2\":\"c\",\"option3\":\"a\",\"option4\":\"d\",\"correctOption\":3}"
+  -d "{\"orderIndex\":2,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"Select the vowel\",\"option1\":\"b\",\"option2\":\"c\",\"option3\":\"a\",\"option4\":\"d\",\"correctOption\":3}"
 expect_code 201 "create test2 q2"
 T2Q2_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
-  -d "{\"orderIndex\":3,\"questionText\":\"HTTP status for forbidden?\",\"option1\":\"200\",\"option2\":\"401\",\"option3\":\"403\",\"option4\":\"500\",\"correctOption\":3}"
+  -d "{\"orderIndex\":3,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"HTTP status for forbidden?\",\"option1\":\"200\",\"option2\":\"401\",\"option3\":\"403\",\"option4\":\"500\",\"correctOption\":3}"
 expect_code 201 "create test2 q3"
 T2Q3_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Second test questions created"
@@ -517,6 +524,11 @@ expect_code 200 "publish test2 ready"
 TEST2_READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$TEST2_READY_STATUS" == "READY" ]] || fail "Expected READY for test2 after publish, got $TEST2_READY_STATUS"
 pass "Second test published"
+
+log "TEACHER opens lesson2 for the class (required for student visibility)"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher open lesson2" 200 201 204
+pass "Lesson2 opened for class"
 
 log "Student list tests in lesson2: should include READY test2"
 request_json GET "/api/lessons/$LESSON2_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -533,14 +545,16 @@ LIST_COUNT=$(json_get "$HTTP_BODY" 'length')
 [[ "$LIST_COUNT" == "1" ]] || fail "Expected 1 visible test, got $LIST_COUNT: $HTTP_BODY"
 pass "Student sees published test"
 
-log "Student GET test (public view): should NOT contain correctOption"
+log "Student GET test (public view): should NOT contain correctOption/correctTextAnswer"
 request_json GET "/api/tests/$TEST_ID" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student get test"
-# Expect questions exist and correctOption not present; easiest check: grep for 'correctOption'
 if echo "$HTTP_BODY" | grep -q "correctOption"; then
   fail "Public test view leaked correctOption: $HTTP_BODY"
 fi
-pass "Public view doesn't leak correctOption"
+if echo "$HTTP_BODY" | grep -q "correctTextAnswer"; then
+  fail "Public test view leaked correctTextAnswer: $HTTP_BODY"
+fi
+pass "Public view doesn't leak answers"
 
 log "Attempt to EDIT published test as METHODIST should fail"
 request_json PUT "/api/tests/$TEST_ID" "$METHODIST_AUTH" \
@@ -560,18 +574,16 @@ ATT_STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$ATT_STATUS" == "IN_PROGRESS" ]] || fail "Expected IN_PROGRESS, got $ATT_STATUS"
 pass "Attempt started: id=$ATTEMPT_ID"
 
-log "Student SUBMIT attempt (1 correct, 1 wrong) -> score should be 1/2"
-request_json POST "/api/attempts/$ATTEMPT_ID/submit" "$STUDENT_AUTH" \
-  -H "Content-Type: application/json" \
-  -d "{\"answers\":[{\"questionId\":$Q1_ID,\"selectedOption\":2},{\"questionId\":$Q2_ID,\"selectedOption\":1}]}"
+log "Student SUBMIT attempt (SINGLE_CHOICE correct, TEXT correct, OPEN requires manual grading)"
+request_json POST "/api/attempts/$ATTEMPT_ID/submit" "$STUDENT_AUTH"   -H "Content-Type: application/json"   -d "{\"answers\":[{\"questionId\":$Q1_ID,\"selectedOption\":2},{\"questionId\":$Q2_ID,\"textAnswer\":\"  paris  \"},{\"questionId\":$Q3_ID,\"textAnswer\":\"Testing matters because it catches bugs early and protects users. It also makes changes safer.\"}]}"
 expect_code 200 "submit attempt"
 SCORE=$(json_get "$HTTP_BODY" '.score')
 MAXS=$(json_get "$HTTP_BODY" '.maxScore')
 STATUS=$(json_get "$HTTP_BODY" '.status')
-[[ "$SCORE" == "1" ]] || fail "Expected score=1, got $SCORE ($HTTP_BODY)"
-[[ "$MAXS" == "2" ]] || fail "Expected maxScore=2, got $MAXS ($HTTP_BODY)"
-[[ "$STATUS" == "GRADED" || "$STATUS" == "SUBMITTED" ]] || fail "Expected status GRADED/SUBMITTED, got $STATUS"
-pass "Attempt auto-graded: $SCORE/$MAXS"
+[[ "$SCORE" == "5" ]] || fail "Expected score=5 (2+3), got $SCORE ($HTTP_BODY)"
+[[ "$MAXS" == "10" ]] || fail "Expected maxScore=10 (2+3+5), got $MAXS ($HTTP_BODY)"
+[[ "$STATUS" == "SUBMITTED" ]] || fail "Expected status SUBMITTED (needs manual grading), got $STATUS"
+pass "Attempt submitted: $SCORE/$MAXS (manual grading pending)"
 
 log "Student GET attempt detail: should show isCorrect flags"
 request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -594,6 +606,67 @@ log "Teacher GET attempt detail"
 request_json GET "/api/attempts/$ATTEMPT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "teacher get attempt detail"
 pass "Teacher can view attempt detail"
+
+# ---------------- Teacher pending queue + partial manual grading ----------------
+log "Teacher PENDING attempts list (should include our SUBMITTED attempt with 1 ungraded OPEN answer)"
+request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher pending attempts"
+# must contain ATTEMPT_ID somewhere
+if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
+  fail "Expected pending list to contain attemptId=$ATTEMPT_ID, got: $HTTP_BODY"
+fi
+pass "Pending queue contains submitted attempt"
+
+log "Negative: Teacher grade with too-long feedback should fail (validation max=2048)"
+LONG_FEEDBACK="$(python3 - <<'PY'
+print('x'*2050)
+PY
+)"
+request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$TEACHER_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"$LONG_FEEDBACK\"}]}"
+expect_code_one_of "too-long feedback rejected" 400 422
+pass "Feedback length validation works"
+
+log "Teacher PARTIAL grade: grade only OPEN question with pointsAwarded=4 and feedback"
+request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$TEACHER_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"Good explanation, but add an example.\"}]}"
+expect_code 200 "grade open question"
+STATUS_G=$(json_get "$HTTP_BODY" '.status')
+SCORE_G=$(json_get "$HTTP_BODY" '.score')
+MAXS_G=$(json_get "$HTTP_BODY" '.maxScore')
+[[ "$STATUS_G" == "GRADED" ]] || fail "Expected status GRADED after grading all OPEN, got $STATUS_G ($HTTP_BODY)"
+[[ "$SCORE_G" == "9" ]] || fail "Expected score=9 after grading (5+4), got $SCORE_G ($HTTP_BODY)"
+[[ "$MAXS_G" == "10" ]] || fail "Expected maxScore=10, got $MAXS_G ($HTTP_BODY)"
+pass "Attempt graded: $SCORE_G/$MAXS_G"
+
+log "Teacher PENDING attempts list should NOT include attempt anymore"
+request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher pending attempts after grade"
+if echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
+  fail "Attempt still appears in pending after grading: $HTTP_BODY"
+fi
+pass "Pending queue cleared after grading"
+
+log "Student GET attempt detail: should contain feedback and pointsAwarded for OPEN answer"
+request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get attempt detail after grade"
+if ! echo "$HTTP_BODY" | grep -q "\"feedback\""; then
+  fail "Expected feedback field in attempt detail: $HTTP_BODY"
+fi
+if ! echo "$HTTP_BODY" | grep -q "\"pointsAwarded\""; then
+  fail "Expected pointsAwarded field in attempt detail: $HTTP_BODY"
+fi
+pass "Student sees feedback and awarded points after grading"
+
+log "Negative: Student submit with too-long OPEN answer should fail (validation max=4096)"
+request_json POST "/api/tests/$TEST_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "start second attempt (platform dependent)" 200 201
+ATT3_ID=$(json_get "$HTTP_BODY" '.id')
+HUGE_ANSWER="$(python3 - <<'PY'
+print('a'*4100)
+PY
+)"
+request_json POST "/api/attempts/$ATT3_ID/submit" "$STUDENT_AUTH"   -H "Content-Type: application/json"   -d "{\"answers\":[{\"questionId\":$Q1_ID,\"selectedOption\":2},{\"questionId\":$Q2_ID,\"textAnswer\":\"Paris\"},{\"questionId\":$Q3_ID,\"textAnswer\":\"$HUGE_ANSWER\"}]}"
+expect_code_one_of "too-long student answer rejected" 400 409 422
+pass "Student answer length validation works"
 
 # ------------------------------------------------------------
 # 13) Negative access: STUDENT cannot view lesson from another course

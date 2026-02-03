@@ -42,34 +42,49 @@ public class TestQuestion {
     @Size(min = 1, max = 2048)
     private String questionText;
 
-    @Column(name = "option_1", length = 512, nullable = false)
-    @NotBlank
-    @Size(min = 1, max = 512)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_type", length = 32, nullable = false)
+    private TestQuestionType questionType = TestQuestionType.SINGLE_CHOICE;
+
+    /**
+     * How many points the question is worth.
+     */
+    @Column(name = "points", nullable = false)
+    @NotNull
+    @Min(1)
+    private Integer points = 1;
+
+    @Column(name = "option_1", length = 512)
+    @Size(max = 512)
     private String option1;
 
-    @Column(name = "option_2", length = 512, nullable = false)
-    @NotBlank
-    @Size(min = 1, max = 512)
+    @Column(name = "option_2", length = 512)
+    @Size(max = 512)
     private String option2;
 
-    @Column(name = "option_3", length = 512, nullable = false)
-    @NotBlank
-    @Size(min = 1, max = 512)
+    @Column(name = "option_3", length = 512)
+    @Size(max = 512)
     private String option3;
 
-    @Column(name = "option_4", length = 512, nullable = false)
-    @NotBlank
-    @Size(min = 1, max = 512)
+    @Column(name = "option_4", length = 512)
+    @Size(max = 512)
     private String option4;
 
     /**
      * 1..4 (index of the correct option).
      */
-    @Column(name = "correct_option", nullable = false)
-    @NotNull
+    @Column(name = "correct_option")
     @Min(1)
     @Max(4)
     private Integer correctOption;
+
+    /**
+     * Correct answer for TEXT questions.
+     * Stored trimmed; matching is done with trim + case-insensitive compare.
+     */
+    @Column(name = "correct_text_answer", length = 512)
+    @Size(max = 512)
+    private String correctTextAnswer;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

@@ -94,6 +94,23 @@ CREATE TABLE "classes" (
 );
 
 ----------------------------------------------------------------------
+-- 1.1.1. CLASS OPENED LESSONS (Teacher opens lessons for a class)
+----------------------------------------------------------------------
+
+DROP TABLE IF EXISTS
+    "class_opened_lessons"
+    CASCADE;
+
+CREATE TABLE "class_opened_lessons" (
+    id         SERIAL PRIMARY KEY,
+    class_id   INT NOT NULL REFERENCES "classes"(id) ON DELETE CASCADE,
+    lesson_id  INT NOT NULL REFERENCES "lessons"(id) ON DELETE CASCADE,
+    opened_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_class_opened_lesson UNIQUE (class_id, lesson_id)
+);
+
+----------------------------------------------------------------------
 -- 1.2. JOIN REQUESTS / CLASS STUDENTS
 ----------------------------------------------------------------------
 
@@ -196,11 +213,18 @@ CREATE TABLE "test_questions" (
     order_index    INT NOT NULL,
 
     question_text  VARCHAR(2048) NOT NULL,
-    option_1       VARCHAR(512) NOT NULL,
-    option_2       VARCHAR(512) NOT NULL,
-    option_3       VARCHAR(512) NOT NULL,
-    option_4       VARCHAR(512) NOT NULL,
-    correct_option INT NOT NULL,
+    question_type  VARCHAR(32) NOT NULL DEFAULT 'SINGLE_CHOICE',
+    points         INT NOT NULL DEFAULT 1,
+
+    -- for SINGLE_CHOICE
+    option_1       VARCHAR(512),
+    option_2       VARCHAR(512),
+    option_3       VARCHAR(512),
+    option_4       VARCHAR(512),
+    correct_option INT,
+
+    -- for TEXT
+    correct_text_answer VARCHAR(512),
 
     created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -208,11 +232,14 @@ CREATE TABLE "test_questions" (
     CONSTRAINT uq_test_question_order UNIQUE (test_id, order_index),
     CONSTRAINT chk_test_q_order_idx CHECK (order_index >= 1),
     CONSTRAINT chk_test_q_text_len CHECK (char_length(question_text) BETWEEN 1 AND 2048),
-    CONSTRAINT chk_test_q_opt1_len CHECK (char_length(option_1) BETWEEN 1 AND 512),
-    CONSTRAINT chk_test_q_opt2_len CHECK (char_length(option_2) BETWEEN 1 AND 512),
-    CONSTRAINT chk_test_q_opt3_len CHECK (char_length(option_3) BETWEEN 1 AND 512),
-    CONSTRAINT chk_test_q_opt4_len CHECK (char_length(option_4) BETWEEN 1 AND 512),
-    CONSTRAINT chk_test_q_correct CHECK (correct_option BETWEEN 1 AND 4)
+    CONSTRAINT chk_test_q_points CHECK (points >= 1),
+    CONSTRAINT chk_test_q_type CHECK (question_type IN ('SINGLE_CHOICE','TEXT','OPEN')),
+    CONSTRAINT chk_test_q_opt1_len CHECK (option_1 IS NULL OR char_length(option_1) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt2_len CHECK (option_2 IS NULL OR char_length(option_2) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt3_len CHECK (option_3 IS NULL OR char_length(option_3) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_opt4_len CHECK (option_4 IS NULL OR char_length(option_4) BETWEEN 1 AND 512),
+    CONSTRAINT chk_test_q_correct CHECK (correct_option IS NULL OR correct_option BETWEEN 1 AND 4),
+    CONSTRAINT chk_test_q_correct_text_len CHECK (correct_text_answer IS NULL OR char_length(correct_text_answer) BETWEEN 1 AND 512)
 );
 
 ----------------------------------------------------------------------
@@ -247,11 +274,18 @@ CREATE TABLE "test_attempt_answers" (
     id              SERIAL PRIMARY KEY,
     attempt_id      INT NOT NULL REFERENCES "test_attempts"(id) ON DELETE CASCADE,
     question_id     INT NOT NULL REFERENCES "test_questions"(id) ON DELETE CASCADE,
-    selected_option INT NOT NULL,
+    selected_option INT,
+    text_answer     VARCHAR(4096),
     is_correct      BOOLEAN NOT NULL DEFAULT FALSE,
+    points_awarded  INT NOT NULL DEFAULT 0,
+    feedback        VARCHAR(2048),
+    graded_at       TIMESTAMP,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_attempt_question UNIQUE (attempt_id, question_id),
-    CONSTRAINT chk_attempt_selected CHECK (selected_option BETWEEN 1 AND 4)
+    CONSTRAINT chk_attempt_selected CHECK (selected_option IS NULL OR selected_option BETWEEN 1 AND 4),
+    CONSTRAINT chk_attempt_text_len CHECK (text_answer IS NULL OR char_length(text_answer) <= 4096),
+    CONSTRAINT chk_attempt_feedback_len CHECK (feedback IS NULL OR char_length(feedback) <= 2048),
+    CONSTRAINT chk_attempt_points_awarded CHECK (points_awarded >= 0)
 );

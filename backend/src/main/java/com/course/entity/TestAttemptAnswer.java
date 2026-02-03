@@ -38,11 +38,39 @@ public class TestAttemptAnswer {
     @JoinColumn(name = "question_id", nullable = false)
     private TestQuestion question;
 
-    @Column(name = "selected_option", nullable = false)
+    /**
+     * Selected option for SINGLE_CHOICE questions (1..4). Null for TEXT questions.
+     */
+    @Column(name = "selected_option")
     private Integer selectedOption;
+
+    /**
+     * Student's answer for TEXT / OPEN questions. Null for SINGLE_CHOICE questions.
+     */
+    @Column(name = "text_answer", length = 4096)
+    private String textAnswer;
 
     @Column(name = "is_correct", nullable = false)
     private Boolean isCorrect = false;
+
+    /**
+     * Points awarded for this answer (0..question.points). Stored to keep grading stable
+     * even if methodist changes question points later.
+     */
+    @Column(name = "points_awarded", nullable = false)
+    private Integer pointsAwarded = 0;
+
+    /**
+     * Teacher feedback for OPEN questions (optional).
+     */
+    @Column(name = "feedback", length = 2048)
+    private String feedback;
+
+    /**
+     * When the teacher graded this answer (OPEN questions). Null means not graded yet.
+     */
+    @Column(name = "graded_at")
+    private LocalDateTime gradedAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -57,6 +85,9 @@ public class TestAttemptAnswer {
         updatedAt = now;
         if (isCorrect == null) {
             isCorrect = false;
+        }
+        if (pointsAwarded == null) {
+            pointsAwarded = 0;
         }
     }
 

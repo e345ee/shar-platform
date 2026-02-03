@@ -14,19 +14,12 @@ public class LessonPresentationController {
 
     private final LessonPresentationSlideService slideService;
 
-    /**
-     * Returns page count for the lesson presentation (used by frontend to know max slide number).
-     */
     @GetMapping("/api/lessons/{id}/presentation/info")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<LessonPresentationInfoDto> getPresentationInfo(@PathVariable Integer id) {
         return ResponseEntity.ok(slideService.getPresentationInfo(id));
     }
 
-    /**
-     * Returns a single PDF page rendered as PNG.
-     * Page numbering is 1-based.
-     */
     @GetMapping(value = "/api/lessons/{id}/presentation/pages/{page}", produces = MediaType.IMAGE_PNG_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<byte[]> getPresentationPage(

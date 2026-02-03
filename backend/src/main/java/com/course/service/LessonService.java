@@ -34,6 +34,7 @@ public class LessonService {
     private final UserService userService;
     private final AuthService authService;
     private final ClassStudentService classStudentService;
+    private final ClassOpenedLessonService classOpenedLessonService;
     private final StudyClassService studyClassService;
     private final LessonPresentationStorageService presentationStorageService;
 
@@ -330,6 +331,14 @@ public class LessonService {
                     current.getId(),
                     courseId,
                     "Student does not belong to this course"
+            );
+
+            // Lesson content (and associated tests) becomes visible to a student only after
+            // the responsible teacher opens the lesson for the student's class.
+            classOpenedLessonService.assertLessonOpenedForStudent(
+                    current.getId(),
+                    lesson.getId(),
+                    "Lesson is not opened for your class yet"
             );
         }
     }

@@ -64,4 +64,31 @@ public class TestAttemptController {
     ) {
         return ResponseEntity.ok(attemptService.submit(attemptId, dto));
     }
+
+    /**
+     * Teacher grades an attempt with OPEN questions.
+     * Only the responsible teacher for the student's class (or ADMIN) can grade.
+     */
+    @PutMapping(value = "/api/attempts/{attemptId}/grade", consumes = {"application/json"})
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
+    public ResponseEntity<TestAttemptDto> gradeOpenAttempt(
+            @PathVariable Integer attemptId,
+            @Valid @RequestBody GradeTestAttemptDto dto
+    ) {
+        return ResponseEntity.ok(attemptService.gradeOpenAttempt(attemptId, dto));
+    }
+
+    /**
+     * Teacher lists attempts that are waiting for manual grading (have OPEN answers not graded yet).
+     * Optional filters: courseId, testId, classId.
+     */
+    @GetMapping("/api/teachers/me/attempts/pending")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<List<PendingTestAttemptDto>> listPendingAttempts(
+            @RequestParam(required = false) Integer courseId,
+            @RequestParam(required = false) Integer testId,
+            @RequestParam(required = false) Integer classId
+    ) {
+        return ResponseEntity.ok(attemptService.listPendingAttemptsForTeacher(courseId, testId, classId));
+    }
 }
