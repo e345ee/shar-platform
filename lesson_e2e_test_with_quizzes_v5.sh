@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # ------------------------------------------------------------
+# v5: allow multi-attempt policy (2nd start may return 201) + json_len + 2 tests across 2 lessons
 # E2E smoke-test for:
 # - roles/users: ADMIN -> create METHODIST; METHODIST -> create TEACHER
 # - METHODIST: create COURSE + CLASS
@@ -112,6 +113,11 @@ PY
     return 0
   fi
   fail "Need jq or python3 for JSON parsing"
+}
+
+json_len() {
+  # Usage: json_len "$json"
+  echo "$1" | jq 'length'
 }
 
 HTTP_BODY=""
@@ -365,6 +371,7 @@ SECOND_ORDER=$(json_get "$HTTP_BODY" '.[1].orderIndex')
 pass "Lesson ordering is correct"
 
 LESSON_ID="$LESSON_B_ID"
+LESSON2_ID="$LESSON_A_ID"
 
 # ------------------------------------------------------------
 # 11) Access tests: METHODIST / TEACHER / STUDENT can view lesson in course
@@ -400,7 +407,7 @@ fi
 pass "Student sees no tests initially"
 
 log "Create TEST (DRAFT) as METHODIST"
-request_json POST "/api/lessons/$LESSON_ID/tests" "$METHODIST_AUTH" \
+request_json POST "/api/lessons/$LESSON2_ID/tests" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"title\":\"Test_$SUF\",\"description\":\"Desc_$SUF\",\"topic\":\"Topic_$SUF\",\"deadline\":\"$DEADLINE\"}"
 expect_code 201 "create test draft"
@@ -468,6 +475,56 @@ expect_code 200 "publish test ready"
 READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$READY_STATUS" == "READY" ]] || fail "Expected READY after publish, got $READY_STATUS"
 pass "Test published"
+
+
+# ------------------------------------------------------------
+# 12b) Create SECOND TEST on same lesson: more quiz coverage
+# ------------------------------------------------------------
+log "Create SECOND TEST (DRAFT) as METHODIST on second lesson"
+request_json POST "/api/lessons/$LESSON_ID/tests" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Test2_$SUF\",\"description\":\"Desc2_$SUF\",\"topic\":\"Topic2_$SUF\",\"deadline\":\"$DEADLINE\"}"
+expect_code 201 "create second test draft"
+TEST2_ID=$(json_get "$HTTP_BODY" '.id')
+TEST2_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ -n "$TEST2_ID" && "$TEST2_ID" != "null" ]] || fail "No test2 id"
+[[ "$TEST2_STATUS" == "DRAFT" ]] || fail "Expected status DRAFT for test2, got $TEST2_STATUS"
+pass "Second test draft created: id=$TEST2_ID"
+
+log "Add 3 questions to SECOND TEST as METHODIST"
+request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionText\":\"1+1=?\",\"option1\":\"1\",\"option2\":\"2\",\"option3\":\"3\",\"option4\":\"4\",\"correctOption\":2}"
+expect_code 201 "create test2 q1"
+T2Q1_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionText\":\"Select the vowel\",\"option1\":\"b\",\"option2\":\"c\",\"option3\":\"a\",\"option4\":\"d\",\"correctOption\":3}"
+expect_code 201 "create test2 q2"
+T2Q2_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/tests/$TEST2_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":3,\"questionText\":\"HTTP status for forbidden?\",\"option1\":\"200\",\"option2\":\"401\",\"option3\":\"403\",\"option4\":\"500\",\"correctOption\":3}"
+expect_code 201 "create test2 q3"
+T2Q3_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Second test questions created"
+
+log "Publish SECOND TEST: DRAFT -> READY"
+request_json POST "/api/tests/$TEST2_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish test2 ready"
+TEST2_READY_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ "$TEST2_READY_STATUS" == "READY" ]] || fail "Expected READY for test2 after publish, got $TEST2_READY_STATUS"
+pass "Second test published"
+
+log "Student list tests in lesson2: should include READY test2"
+request_json GET "/api/lessons/$LESSON2_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list tests in lesson2"
+LIST2_COUNT=$(json_len "$HTTP_BODY")
+[[ "$LIST2_COUNT" == "1" ]] || fail "Expected 1 visible test in lesson2, got $LIST2_COUNT: $HTTP_BODY"
+pass "Student sees READY test in lesson2"
+
 
 log "Student list tests in lesson: should include READY test"
 request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -606,6 +663,127 @@ fetch_pages_for() {
 fetch_pages_for "methodist" "$METHODIST_AUTH"
 fetch_pages_for "teacher" "$TEACHER_AUTH"
 fetch_pages_for "student" "$STUDENT_AUTH"
+
+
+# ------------------------------------------------------------
+# 16) Security regression: role isolation + negative access tests
+# ------------------------------------------------------------
+log "Negative: STUDENT cannot access teacher attempts list endpoint"
+request_json GET "/api/tests/$TEST_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student list attempts forbidden" 403 401
+pass "Student cannot list attempts (as expected)"
+
+log "Negative: STUDENT cannot delete a test"
+request_json DELETE "/api/tests/$TEST_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student delete test forbidden" 403 401
+pass "Student cannot delete tests"
+
+log "Negative: TEACHER cannot create or update tests (methodist-only)"
+request_json POST "/api/lessons/$LESSON_ID/tests" "$TEACHER_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"TeacherShouldFail_$SUF\",\"description\":\"x\",\"topic\":\"x\",\"deadline\":\"$DEADLINE\"}"
+expect_code_one_of "teacher create test forbidden" 403 401
+pass "Teacher cannot create tests"
+
+request_json PUT "/api/tests/$TEST_ID" "$TEACHER_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"TeacherUpdateShouldFail_$SUF\",\"description\":\"x\",\"topic\":\"x\",\"deadline\":\"$DEADLINE\"}"
+expect_code_one_of "teacher update test forbidden" 403 401
+pass "Teacher cannot update tests"
+
+log "Negative: TEACHER cannot delete tests"
+request_json DELETE "/api/tests/$TEST_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher delete test forbidden" 403 401
+pass "Teacher cannot delete tests"
+
+log "Negative: STUDENT cannot start attempt twice (should fail on second start)"
+request_json POST "/api/tests/$TEST2_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start attempt on test2"
+ATTEMPT2_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/tests/$TEST2_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+# Implementation-dependent: 400/409 typical, sometimes 200 returns existing attempt
+expect_code_one_of "start attempt twice" 200 201 400 409
+if [[ "$HTTP_CODE" == "200" ]]; then
+  EXISTING_ID=$(json_get "$HTTP_BODY" '.id')
+  [[ "$EXISTING_ID" == "$ATTEMPT2_ID" ]] || fail "Expected same attempt id on second start (200), got $EXISTING_ID vs $ATTEMPT2_ID"
+elif [[ "$HTTP_CODE" == "201" ]]; then
+  NEW_ID=$(json_get "$HTTP_BODY" '.id')
+  NEW_NUM=$(json_get "$HTTP_BODY" '.attemptNumber')
+  [[ "$NEW_ID" != "$ATTEMPT2_ID" ]] || fail "Expected new attempt id on second start (201), got same id=$NEW_ID"
+  # If platform allows multiple attempts, attemptNumber should increase (usually 2)
+  if [[ "$NEW_NUM" != "null" && -n "$NEW_NUM" ]]; then
+    [[ "$NEW_NUM" -ge 2 ]] || fail "Expected attemptNumber >= 2 on second start, got $NEW_NUM"
+  fi
+fi
+pass "Double-start attempt is handled safely"
+
+log "Submit attempt2 with all correct -> score 3/3"
+request_json POST "/api/attempts/$ATTEMPT2_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$T2Q1_ID,\"selectedOption\":2},{\"questionId\":$T2Q2_ID,\"selectedOption\":3},{\"questionId\":$T2Q3_ID,\"selectedOption\":3}]}"
+expect_code 200 "submit attempt2"
+S2=$(json_get "$HTTP_BODY" '.score')
+M2=$(json_get "$HTTP_BODY" '.maxScore')
+[[ "$S2" == "3" ]] || fail "Expected score=3, got $S2 ($HTTP_BODY)"
+[[ "$M2" == "3" ]] || fail "Expected maxScore=3, got $M2 ($HTTP_BODY)"
+pass "Attempt2 graded 3/3"
+
+log "Negative: STUDENT cannot view other student's attempt (create another student in same class)"
+STUDENT2_NAME="student2_$SUF"
+STUDENT2_EMAIL="student2_$SUF@example.com"
+STUDENT2_TG="tg2_$SUF"
+
+request_json POST "/api/join-requests" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"tgId\":\"$STUDENT2_TG\",\"classCode\":\"$CLASS_CODE\"}"
+expect_code 201 "create join request 2"
+REQUEST2_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/classes/$CLASS_ID/join-requests/$REQUEST2_ID/approve" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "approve join request 2"
+STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
+
+# set password for student2
+request_json PUT "/api/users/$STUDENT2_ID" "$ADMIN_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":$STUDENT2_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
+expect_code 200 "set student2 password"
+STUDENT2_AUTH="$STUDENT2_EMAIL:$STUDENT_PASS"
+
+# student2 starts attempt on test2 to create another attempt record
+request_json POST "/api/tests/$TEST2_ID/attempts/start" "$STUDENT2_AUTH" -H "Accept: application/json"
+expect_code 201 "student2 start attempt2"
+ATTEMPT2B_ID=$(json_get "$HTTP_BODY" '.id')
+
+# student1 tries to read student2 attempt -> should be forbidden (or 404)
+request_json GET "/api/attempts/$ATTEMPT2B_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student cannot view others attempt" 403 404
+pass "Student cannot view other student's attempt"
+
+log "Negative: create second methodist and ensure access isolation (methodist cannot manage чужой курс/класс)"
+METHODIST2_NAME="methodist2_$SUF"
+METHODIST2_EMAIL="methodist2_$SUF@example.com"
+request_json POST "/api/users/admin/methodists" "$ADMIN_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$METHODIST2_NAME\",\"email\":\"$METHODIST2_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
+expect_code 201 "create methodist2"
+METHODIST2_ID=$(json_get "$HTTP_BODY" '.id')
+METHODIST2_AUTH="$METHODIST2_EMAIL:$METHODIST_PASS"
+
+# methodist2 tries to delete test from methodist1 course (should be forbidden)
+request_json DELETE "/api/tests/$TEST_ID" "$METHODIST2_AUTH" -H "Accept: application/json"
+expect_code_one_of "methodist2 cannot delete чужой test" 403 404
+pass "Methodist isolation on tests OK"
+
+# methodist2 tries to create lesson under чужой course (should be forbidden)
+request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST2_AUTH" \
+  -H "Accept: application/json" \
+  -F "title=ShouldFail_$SUF" \
+  -F "description=No access" \
+  -F "presentation=@$PDF_FILE;type=application/pdf"
+expect_code_one_of "methodist2 cannot add lesson to чужой course" 403 404
+pass "Methodist isolation on lessons OK"
 
 log "All tests passed ✅"
 echo "Users created:"

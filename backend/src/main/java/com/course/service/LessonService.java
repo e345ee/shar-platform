@@ -26,6 +26,7 @@ import java.util.List;
 public class LessonService {
 
     private static final String ROLE_METHODIST = "METHODIST";
+    private static final String ROLE_TEACHER = "TEACHER";
     private static final String ROLE_STUDENT = "STUDENT";
 
     private final LessonRepository lessonRepository;
@@ -33,6 +34,7 @@ public class LessonService {
     private final UserService userService;
     private final AuthService authService;
     private final ClassStudentService classStudentService;
+    private final StudyClassService studyClassService;
     private final LessonPresentationStorageService presentationStorageService;
 
     public LessonDto create(Integer courseId, CreateLessonForm form) {
@@ -103,11 +105,17 @@ public class LessonService {
 
     @Transactional(readOnly = true)
     public List<LessonDto> listByCourse(Integer courseId) {
-        // ensure course exists
-        courseService.getEntityById(courseId);
+        Course course = courseService.getEntityById(courseId);
 
         User current = authService.getCurrentUserEntity();
-        if (isRole(current, ROLE_STUDENT)) {
+        if (isRole(current, ROLE_METHODIST)) {
+            User owner = course.getCreatedBy();
+            if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
+                throw new LessonAccessDeniedException("Methodist can access only own courses");
+            }
+        } else if (isRole(current, ROLE_TEACHER)) {
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+        } else if (isRole(current, ROLE_STUDENT)) {
             classStudentService.assertStudentInCourse(
                     current.getId(),
                     courseId,
@@ -298,6 +306,22 @@ public class LessonService {
     private void assertCanViewLesson(User current, Lesson lesson) {
         if (current == null || lesson == null || lesson.getCourse() == null) {
             throw new LessonAccessDeniedException("Forbidden");
+        }
+
+        // METHODIST can view only lessons inside own courses
+        if (isRole(current, ROLE_METHODIST)) {
+            User owner = lesson.getCourse().getCreatedBy();
+            if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
+                throw new LessonAccessDeniedException("Methodist can access only own courses");
+            }
+            return;
+        }
+
+        // TEACHER can view only lessons inside courses they teach (have at least one class)
+        if (isRole(current, ROLE_TEACHER)) {
+            Integer courseId = lesson.getCourse().getId();
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+            return;
         }
 
         if (isRole(current, ROLE_STUDENT)) {

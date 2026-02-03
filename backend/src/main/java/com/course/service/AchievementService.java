@@ -26,11 +26,15 @@ import java.util.List;
 public class AchievementService {
 
     private static final String ROLE_METHODIST = "METHODIST";
+    private static final String ROLE_TEACHER = "TEACHER";
+    private static final String ROLE_STUDENT = "STUDENT";
 
     private final AchievementRepository achievementRepository;
     private final CourseService courseService;
     private final UserService userService;
     private final AuthService authService;
+    private final ClassStudentService classStudentService;
+    private final StudyClassService studyClassService;
     private final AchievementPhotoStorageService photoStorageService;
     private final StudentAchievementService studentAchievementService;
 
@@ -73,7 +77,9 @@ public class AchievementService {
 
     @Transactional(readOnly = true)
     public AchievementDto getById(Integer id) {
-        return toDto(getEntityById(id));
+        Achievement a = getEntityById(id);
+        assertCanViewAchievement(authService.getCurrentUserEntity(), a);
+        return toDto(a);
     }
 
     @Transactional(readOnly = true)
@@ -84,7 +90,19 @@ public class AchievementService {
 
     @Transactional(readOnly = true)
     public List<AchievementDto> listByCourse(Integer courseId) {
-        courseService.getEntityById(courseId);
+        Course course = courseService.getEntityById(courseId);
+        User current = authService.getCurrentUserEntity();
+
+        if (isRole(current, ROLE_METHODIST)) {
+            User owner = course.getCreatedBy();
+            if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
+                throw new AchievementAccessDeniedException("Methodist can access only own courses");
+            }
+        } else if (isRole(current, ROLE_TEACHER)) {
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+        } else if (isRole(current, ROLE_STUDENT)) {
+            classStudentService.assertStudentInCourse(current.getId(), courseId, "Student does not belong to this course");
+        }
         return achievementRepository.findAllByCourse_IdOrderByCreatedAtDesc(courseId)
                 .stream().map(this::toDto).toList();
     }
@@ -233,6 +251,32 @@ public class AchievementService {
                 || !owner.getId().equals(current.getId())) {
             throw new AchievementAccessDeniedException(message);
         }
+    }
+
+    private void assertCanViewAchievement(User current, Achievement a) {
+        if (current == null || a == null || a.getCourse() == null) {
+            throw new AchievementAccessDeniedException("Forbidden");
+        }
+
+        Integer courseId = a.getCourse().getId();
+
+        if (isRole(current, ROLE_METHODIST)) {
+            User owner = a.getCourse().getCreatedBy();
+            if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
+                throw new AchievementAccessDeniedException("Methodist can access only own courses");
+            }
+        } else if (isRole(current, ROLE_TEACHER)) {
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+        } else if (isRole(current, ROLE_STUDENT)) {
+            classStudentService.assertStudentInCourse(current.getId(), courseId, "Student does not belong to this course");
+        }
+    }
+
+    private boolean isRole(User user, String role) {
+        return user != null
+                && user.getRole() != null
+                && user.getRole().getRolename() != null
+                && role.equalsIgnoreCase(user.getRole().getRolename());
     }
 
     private String safeTrim(String s) {

@@ -30,6 +30,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final AvatarStorageService avatarStorageService;
+    private final MethodistTeacherService methodistTeacherService;
 
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_METHODIST = "METHODIST";
@@ -185,6 +186,9 @@ public class UserService {
     public UserDto createTeacherByMethodist(Integer metodistUserId, UserDto dto) {
         assertUserHasRole(metodistUserId, ROLE_METHODIST);
 
+        User methodist = userRepository.findById(metodistUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + metodistUserId + " not found"));
+
         validateUserCreateCommon(dto);
 
         Role teacherRole = roleRepository.findByRolename(ROLE_TEACHER)
@@ -200,6 +204,8 @@ public class UserService {
         teacher.setTgId(dto.getTgId());
 
         User saved = userRepository.save(teacher);
+        // ownership link (methodist can manage only own teachers)
+        methodistTeacherService.linkTeacher(methodist, saved);
         return convertToDto(saved);
     }
 
@@ -210,6 +216,13 @@ public class UserService {
     public void deleteTeacherByMethodist(Integer metodistUserId, Integer teacherUserId) {
         assertUserHasRole(metodistUserId, ROLE_METHODIST);
 
+        // Ensure this teacher belongs to this methodist
+        methodistTeacherService.assertMethodistOwnsTeacher(
+                metodistUserId,
+                teacherUserId,
+                "Methodist can manage only own teachers"
+        );
+
         User teacher = userRepository.findById(teacherUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + teacherUserId + " not found"));
 
@@ -218,6 +231,13 @@ public class UserService {
             throw new ForbiddenOperationException("Methodist can delete only TEACHER users");
         }
 
+        // If the teacher is linked to multiple methodists, do not allow deletion.
+        long owners = methodistTeacherService.countOwners(teacherUserId);
+        if (owners > 1) {
+            throw new ForbiddenOperationException("Teacher is linked to another methodist");
+        }
+
+        methodistTeacherService.unlinkTeacher(metodistUserId, teacherUserId);
         userRepository.delete(teacher);
     }
 

@@ -18,6 +18,15 @@ import java.util.*;
 @Transactional
 public class TestAttemptService {
 
+    /**
+     * Result of starting an attempt.
+     * <ul>
+     *   <li>{@code created=true}  -> a new attempt was created (HTTP 201)</li>
+     *   <li>{@code created=false} -> an existing IN_PROGRESS attempt was returned (HTTP 200)</li>
+     * </ul>
+     */
+    public record StartAttemptResult(TestAttemptDto attempt, boolean created) {}
+
     private static final String ROLE_ADMIN = "ADMIN";
     private static final String ROLE_METHODIST = "METHODIST";
     private static final String ROLE_TEACHER = "TEACHER";
@@ -27,6 +36,7 @@ public class TestAttemptService {
     private final LessonService lessonService;
     private final UserService userService;
     private final AuthService authService;
+    private final ClassStudentService classStudentService;
 
     private final TestAttemptRepository attemptRepository;
     private final TestAttemptAnswerRepository answerRepository;
@@ -36,7 +46,7 @@ public class TestAttemptService {
      * Starts a new attempt for a READY test.
      * If there is an existing IN_PROGRESS attempt for the student, returns it.
      */
-    public TestAttemptDto startAttempt(Integer testId) {
+    public StartAttemptResult startAttempt(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -50,7 +60,7 @@ public class TestAttemptService {
                 TestAttemptStatus.IN_PROGRESS
         );
         if (existing.isPresent()) {
-            return toDto(existing.get(), true);
+            return new StartAttemptResult(toDto(existing.get(), true), false);
         }
 
         int previousCount = attemptRepository.countByTest_IdAndStudent_Id(testId, current.getId());
@@ -62,7 +72,7 @@ public class TestAttemptService {
         attempt.setStatus(TestAttemptStatus.IN_PROGRESS);
         attempt.setStartedAt(LocalDateTime.now());
 
-        return toDto(attemptRepository.save(attempt), true);
+        return new StartAttemptResult(toDto(attemptRepository.save(attempt), true), true);
     }
 
     /**
@@ -97,6 +107,19 @@ public class TestAttemptService {
         }
         lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
 
+        Integer courseId = test.getLesson().getCourse() != null ? test.getLesson().getCourse().getId() : null;
+
+        // TEACHER: only attempts of own students (in teacher's classes within the course)
+        if (isRole(current, ROLE_TEACHER)) {
+            if (courseId == null) {
+                throw new TestAttemptValidationException("Course is missing");
+            }
+            return attemptRepository
+                    .findAllByTestIdForTeacher(testId, current.getId(), courseId)
+                    .stream().map(this::toSummaryDto).toList();
+        }
+
+        // METHODIST/ADMIN: lesson access already restricts METHODIST to own courses; ADMIN can see all
         return attemptRepository
                 .findAllByTest_IdOrderByCreatedAtDesc(testId)
                 .stream().map(this::toSummaryDto).toList();
@@ -329,6 +352,20 @@ public class TestAttemptService {
 
         if (isRole(current, ROLE_STUDENT)) {
             assertOwnerAttempt(attempt, current);
+        }
+
+        if (isRole(current, ROLE_TEACHER)) {
+            Integer studentId = attempt.getStudent() != null ? attempt.getStudent().getId() : null;
+            Integer courseId = attempt.getTest().getLesson().getCourse() != null ? attempt.getTest().getLesson().getCourse().getId() : null;
+            if (studentId == null || courseId == null) {
+                throw new TestAttemptValidationException("Attempt data is invalid");
+            }
+            classStudentService.assertStudentInTeacherCourse(
+                    studentId,
+                    current.getId(),
+                    courseId,
+                    "Teacher can access only own students"
+            );
         }
 
         // ensures course/lesson access for everyone (students checked above; others pass)

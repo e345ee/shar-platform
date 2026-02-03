@@ -27,6 +27,7 @@ public class StudyClassService {
     private final CourseService courseService;
     private final UserService userService;
     private final AuthService authService;
+    private final MethodistTeacherService methodistTeacherService;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final char[] JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
@@ -41,6 +42,11 @@ public class StudyClassService {
         if (dto.getTeacherId() != null) {
             teacher = userService.getUserEntityById(dto.getTeacherId());
             userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
+            methodistTeacherService.assertMethodistOwnsTeacher(
+                    current.getId(),
+                    teacher.getId(),
+                    "Methodist can assign only own teachers"
+            );
         }
 
         StudyClass sc = new StudyClass();
@@ -159,6 +165,11 @@ public class StudyClassService {
         } else {
             User teacher = userService.getUserEntityById(dto.getTeacherId());
             userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
+            methodistTeacherService.assertMethodistOwnsTeacher(
+                    current.getId(),
+                    teacher.getId(),
+                    "Methodist can assign only own teachers"
+            );
             sc.setTeacher(teacher);
         }
 

@@ -4,7 +4,6 @@ import com.course.dto.*;
 import com.course.service.TestAttemptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,8 +22,8 @@ public class TestAttemptController {
     @PostMapping("/api/tests/{testId}/attempts/start")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TestAttemptDto> startAttempt(@PathVariable Integer testId) {
-        TestAttemptDto created = attemptService.startAttempt(testId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        var result = attemptService.startAttempt(testId);
+        return ResponseEntity.status(result.created() ? 201 : 200).body(result.attempt());
     }
 
     /**
