@@ -32,4 +32,7 @@ public class S3Properties {
 
     // Used for achievement photos (defaults to avatar size limit if not configured)
     private long maxAchievementPhotoBytes = 2L * 1024L * 1024L;
+
+    // Used for lesson presentations (PDF)
+    private long maxLessonPdfBytes = 10L * 1024L * 1024L;
 }

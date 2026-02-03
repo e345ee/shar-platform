@@ -48,6 +48,7 @@ INSERT INTO "role"(rolename, description) VALUES
 
 DROP TABLE IF EXISTS
     "classes",
+    "lessons",
     "courses"
     CASCADE;
 
@@ -58,6 +59,25 @@ CREATE TABLE "courses" (
     created_by   INT NOT NULL REFERENCES "users"(id),
     created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE "lessons" (
+    id                SERIAL PRIMARY KEY,
+    course_id          INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
+    created_by         INT NOT NULL REFERENCES "users"(id),
+    order_index        INT NOT NULL,
+    title              VARCHAR(127) NOT NULL,
+    description        VARCHAR(2048),
+    presentation_url   VARCHAR(512),
+    created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT uq_lesson_title_in_course UNIQUE (course_id, title),
+    CONSTRAINT uq_lesson_order_in_course UNIQUE (course_id, order_index),
+    CONSTRAINT chk_lesson_title_len CHECK (char_length(title) BETWEEN 1 AND 127),
+    CONSTRAINT chk_lesson_order_idx CHECK (order_index >= 1),
+    CONSTRAINT chk_lesson_desc_len CHECK (description IS NULL OR char_length(description) <= 2048),
+    CONSTRAINT chk_lesson_presentation_len CHECK (presentation_url IS NULL OR char_length(presentation_url) BETWEEN 1 AND 512)
 );
 
 CREATE TABLE "classes" (
