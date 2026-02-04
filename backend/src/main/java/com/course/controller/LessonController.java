@@ -1,9 +1,8 @@
 package com.course.controller;
 
-import com.course.dto.CreateLessonForm;
+import com.course.dto.LessonForm;
 import com.course.dto.LessonDto;
 import com.course.dto.UpdateLessonDto;
-import com.course.dto.UpdateLessonForm;
 import com.course.service.LessonService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,7 @@ public class LessonController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<LessonDto> create(
             @PathVariable Integer courseId,
-            @Valid @ModelAttribute CreateLessonForm form) {
+            @Valid @ModelAttribute LessonForm form) {
         LessonDto created = lessonService.create(courseId, form);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -54,7 +53,7 @@ public class LessonController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<LessonDto> updateWithOptionalPresentation(
             @PathVariable Integer id,
-            @Valid @ModelAttribute UpdateLessonForm form) {
+            @Valid @ModelAttribute LessonForm form) {
         return ResponseEntity.ok(lessonService.updateWithOptionalPresentation(id, form));
     }
 

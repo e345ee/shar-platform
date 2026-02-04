@@ -5,10 +5,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Request body for creating or updating a test question.
+ */
 @Data
-public class CreateTestQuestionDto {
+public class TestQuestionUpsertDto {
 
-    /** Optional; if absent, will be auto-assigned as last+1. */
+    /** Optional; if absent, create: auto-assigned as last+1; update: keeps current order. */
     @Min(1)
     private Integer orderIndex;
 
@@ -16,14 +19,10 @@ public class CreateTestQuestionDto {
     @Size(min = 1, max = 2048)
     private String questionText;
 
-    /**
-     * Question type: SINGLE_CHOICE (legacy, default) or TEXT.
-     */
+    /** Question type: SINGLE_CHOICE (legacy, default) or TEXT or OPEN. If null on update, keeps current type. */
     private String questionType;
 
-    /**
-     * How many points the question is worth (default 1).
-     */
+    /** How many points the question is worth (default 1). If null on update, keeps current value. */
     @Min(1)
     private Integer points;
 

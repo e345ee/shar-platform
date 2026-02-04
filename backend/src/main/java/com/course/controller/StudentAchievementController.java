@@ -2,6 +2,7 @@ package com.course.controller;
 
 import com.course.dto.StudentAchievementDto;
 import com.course.entity.Achievement;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.ForbiddenOperationException;
 import com.course.service.AuthService;
@@ -19,8 +20,8 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 public class StudentAchievementController {
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_METHODIST = "METHODIST";
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
 
     private final StudentAchievementService studentAchievementService;
     private final AchievementService achievementService;
@@ -65,16 +66,16 @@ public class StudentAchievementController {
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
     public ResponseEntity<List<StudentAchievementDto>> getStudentAchievements(@PathVariable Integer studentId) {
         User current = authService.getCurrentUserEntity();
-        String role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
+        RoleName role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
         if (role == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+        if (ROLE_TEACHER == role) {
             userService.assertUserEntityHasRole(current, ROLE_TEACHER);
             classStudentService.assertStudentInTeacherClasses(studentId, current.getId(),
                     "Teacher can view achievements only for own students");
-        } else if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+        } else if (ROLE_METHODIST == role) {
             userService.assertUserEntityHasRole(current, ROLE_METHODIST);
             classStudentService.assertStudentInMethodistCourses(studentId, current.getId(),
                     "Methodist can view achievements only for students in own courses");

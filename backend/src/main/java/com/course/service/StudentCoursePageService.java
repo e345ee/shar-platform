@@ -5,6 +5,7 @@ import com.course.entity.ActivityType;
 import com.course.entity.Course;
 import com.course.entity.Test;
 import com.course.entity.TestStatus;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.repository.LatestAttemptProjection;
 import com.course.repository.TestAttemptRepository;
@@ -22,7 +23,7 @@ import java.util.*;
 @Transactional(readOnly = true)
 public class StudentCoursePageService {
 
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final AuthService authService;
     private final UserService userService;

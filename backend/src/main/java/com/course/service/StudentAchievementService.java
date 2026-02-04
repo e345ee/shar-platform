@@ -2,6 +2,7 @@ package com.course.service;
 
 import com.course.dto.StudentAchievementDto;
 import com.course.entity.Achievement;
+import com.course.entity.RoleName;
 import com.course.entity.StudentAchievement;
 import com.course.entity.User;
 import com.course.exception.AchievementAlreadyAwardedException;
@@ -19,8 +20,8 @@ import java.util.List;
 @Transactional
 public class StudentAchievementService {
 
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final StudentAchievementRepository studentAchievementRepository;
     private final StudyClassService classService;

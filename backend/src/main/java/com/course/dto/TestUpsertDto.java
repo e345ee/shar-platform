@@ -7,8 +7,11 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * Request body for creating or updating a test.
+ */
 @Data
-public class UpdateTestDto {
+public class TestUpsertDto {
 
     @NotBlank
     @Size(min = 1, max = 127)

@@ -1,8 +1,7 @@
 package com.course.controller;
 
 import com.course.dto.AchievementDto;
-import com.course.dto.CreateAchievementForm;
-import com.course.dto.UpdateAchievementForm;
+import com.course.dto.AchievementForm;
 import com.course.dto.UpdateAchievementDto;
 import com.course.service.AchievementService;
 import jakarta.validation.Valid;
@@ -25,7 +24,7 @@ public class AchievementController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<AchievementDto> create(
             @PathVariable Integer courseId,
-            @Valid @ModelAttribute CreateAchievementForm form) {
+            @Valid @ModelAttribute AchievementForm form) {
         AchievementDto created = achievementService.create(courseId, form);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -54,7 +53,7 @@ public class AchievementController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<AchievementDto> updateWithOptionalPhoto(
             @PathVariable Integer id,
-            @Valid @ModelAttribute UpdateAchievementForm form) {
+            @Valid @ModelAttribute AchievementForm form) {
         return ResponseEntity.ok(achievementService.updateWithOptionalPhoto(id, form));
     }
 

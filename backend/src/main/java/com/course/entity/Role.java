@@ -1,12 +1,12 @@
 package com.course.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.Set;
 
@@ -21,10 +21,10 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "rolename", length = 63, nullable = false, unique = true)
-    @NotBlank(message = "Role name cannot be blank")
-    @Size(min = 1, max = 63, message = "Role name must be between 1 and 63 characters")
-    private String rolename;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "rolename", nullable = false, unique = true, columnDefinition = "role_name")
+    private RoleName rolename;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;

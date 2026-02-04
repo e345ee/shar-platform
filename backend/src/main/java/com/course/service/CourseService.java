@@ -2,6 +2,7 @@ package com.course.service;
 
 import com.course.dto.CourseDto;
 import com.course.entity.Course;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.ForbiddenOperationException;
 import com.course.exception.ResourceNotFoundException;
@@ -17,7 +18,7 @@ import java.util.List;
 @Transactional
 public class CourseService {
 
-    private static final String ROLE_METHODIST = "METHODIST";
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
 
     private final CourseRepository courseRepository;
     private final AuthService authService;

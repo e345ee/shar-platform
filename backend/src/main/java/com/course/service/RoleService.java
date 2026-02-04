@@ -3,6 +3,7 @@ package com.course.service;
 import com.course.dto.PageDto;
 import com.course.dto.RoleDto;
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ResourceNotFoundException;
 import com.course.repository.RoleRepository;
@@ -23,12 +24,13 @@ public class RoleService {
     private final RoleRepository roleRepository;
 
     public RoleDto createRole(RoleDto dto) {
-        if (roleRepository.existsByRolename(dto.getRolename())) {
-            throw new DuplicateResourceException("Role with name '" + dto.getRolename() + "' already exists");
+        RoleName roleName = parseRoleName(dto.getRolename());
+        if (roleRepository.existsByRolename(roleName)) {
+            throw new DuplicateResourceException("Role with name '" + roleName.name() + "' already exists");
         }
 
         Role role = new Role();
-        role.setRolename(dto.getRolename());
+        role.setRolename(roleName);
         role.setDescription(dto.getDescription());
 
         Role savedRole = roleRepository.save(role);
@@ -44,8 +46,9 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public RoleDto getRoleByName(String rolename) {
-        Role role = roleRepository.findByRolename(rolename)
-                .orElseThrow(() -> new ResourceNotFoundException("Role with name '" + rolename + "' not found"));
+        RoleName roleName = parseRoleName(rolename);
+        Role role = roleRepository.findByRolename(roleName)
+                .orElseThrow(() -> new ResourceNotFoundException("Role with name '" + roleName.name() + "' not found"));
         return convertToDto(role);
     }
 
@@ -66,11 +69,13 @@ public class RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role with id " + id + " not found"));
 
-        if (!role.getRolename().equals(dto.getRolename()) && roleRepository.existsByRolename(dto.getRolename())) {
-            throw new DuplicateResourceException("Role with name '" + dto.getRolename() + "' already exists");
+        RoleName newRoleName = parseRoleName(dto.getRolename());
+
+        if (!role.getRolename().equals(newRoleName) && roleRepository.existsByRolename(newRoleName)) {
+            throw new DuplicateResourceException("Role with name '" + newRoleName.name() + "' already exists");
         }
 
-        role.setRolename(dto.getRolename());
+        role.setRolename(newRoleName);
         role.setDescription(dto.getDescription());
 
         Role updatedRole = roleRepository.save(role);
@@ -84,7 +89,18 @@ public class RoleService {
     }
 
     private RoleDto convertToDto(Role role) {
-        return new RoleDto(role.getId(), role.getRolename(), role.getDescription());
+        return new RoleDto(role.getId(), role.getRolename() != null ? role.getRolename().name() : null, role.getDescription());
+    }
+
+    private RoleName parseRoleName(String raw) {
+        if (raw == null) {
+            throw new IllegalArgumentException("Role name cannot be null");
+        }
+        try {
+            return RoleName.valueOf(raw.trim().toUpperCase());
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Unknown role name: " + raw);
+        }
     }
 
     private PageDto<RoleDto> convertPageToPageDto(Page<Role> page) {

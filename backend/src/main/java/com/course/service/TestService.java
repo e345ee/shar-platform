@@ -19,10 +19,10 @@ import java.util.List;
 @Transactional
 public class TestService {
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final TestRepository testRepository;
     private final TestQuestionRepository questionRepository;
@@ -33,7 +33,7 @@ public class TestService {
     private final UserService userService;
     private final AuthService authService;
 
-    public TestDto create(Integer lessonId, CreateTestDto dto) {
+    public TestDto create(Integer lessonId, TestUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -213,7 +213,7 @@ public class TestService {
         if (isRole(current, ROLE_METHODIST)) {
             assertOwner(course.getCreatedBy(), current, "Only course creator can view this course activities");
         }
-        if (isRole(current, "STUDENT")) {
+        if (isRole(current, ROLE_STUDENT)) {
             classStudentService.assertStudentInCourse(current.getId(), courseId, "Student is not enrolled in this course");
         }
         if (isRole(current, ROLE_TEACHER)) {
@@ -244,22 +244,19 @@ public class TestService {
     }
 
     /**
-     * Returns TestDto for admin/methodist (includes correctOption),
-     * otherwise returns TestPublicDto (without correctOption).
+     * Returns TestDto for admin/methodist (includes correct answers),
+     * otherwise returns the same TestDto with sensitive fields nulled.
      */
     @Transactional(readOnly = true)
-    public Object getById(Integer testId) {
+    public TestDto getById(Integer testId) {
         Test test = getEntityForCurrentUser(testId);
         User current = authService.getCurrentUserEntity();
 
         boolean canSeeCorrect = isRole(current, ROLE_METHODIST) || isRole(current, ROLE_ADMIN);
-        if (canSeeCorrect) {
-            return toDto(test, true);
-        }
-        return toPublicDto(test);
+        return toDto(test, canSeeCorrect);
     }
 
-    public TestDto update(Integer testId, UpdateTestDto dto) {
+    public TestDto update(Integer testId, TestUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -327,7 +324,7 @@ public class TestService {
 
     // -------- Questions --------
 
-    public TestQuestionDto createQuestion(Integer testId, CreateTestQuestionDto dto) {
+    public TestQuestionDto createQuestion(Integer testId, TestQuestionUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -390,7 +387,7 @@ public class TestService {
         return toQuestionDto(questionRepository.save(q));
     }
 
-    public TestQuestionDto updateQuestion(Integer testId, Integer questionId, UpdateTestQuestionDto dto) {
+    public TestQuestionDto updateQuestion(Integer testId, Integer questionId, TestQuestionUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -552,6 +549,15 @@ public class TestService {
 
         dto.setCreatedAt(test.getCreatedAt());
         dto.setUpdatedAt(test.getUpdatedAt());
+        if (!includeCorrectAnswers) {
+            // Student/public view: do not expose draft status, creator or audit timestamps.
+            dto.setStatus(null);
+            dto.setCreatedById(null);
+            dto.setCreatedByName(null);
+            dto.setCreatedAt(null);
+            dto.setUpdatedAt(null);
+        }
+
 
         List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
         dto.setQuestionCount(questions.size());
@@ -559,41 +565,13 @@ public class TestService {
             TestQuestionDto qdto = toQuestionDto(q);
             if (!includeCorrectAnswers) {
                 qdto.setCorrectOption(null);
+                qdto.setCorrectTextAnswer(null);
             }
             return qdto;
         }).toList());
         return dto;
     }
 
-    private TestPublicDto toPublicDto(Test test) {
-        TestPublicDto dto = new TestPublicDto();
-        dto.setId(test.getId());
-
-        dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
-        dto.setWeightMultiplier(test.getWeightMultiplier());
-        dto.setAssignedWeekStart(test.getAssignedWeekStart());
-
-        if (test.getLesson() != null) {
-            dto.setLessonId(test.getLesson().getId());
-            if (test.getLesson().getCourse() != null) {
-                dto.setCourseId(test.getLesson().getCourse().getId());
-            }
-        }
-        if (dto.getCourseId() == null && test.getCourse() != null) {
-            dto.setCourseId(test.getCourse().getId());
-        }
-
-        dto.setTitle(test.getTitle());
-        dto.setDescription(test.getDescription());
-        dto.setTopic(test.getTopic());
-        dto.setDeadline(test.getDeadline());
-        dto.setPublishedAt(test.getPublishedAt());
-
-        List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
-        dto.setQuestionCount(questions.size());
-        dto.setQuestions(questions.stream().map(this::toQuestionPublicDto).toList());
-        return dto;
-    }
 
     /**
      * Internal mapper used by controllers/services that need a light-weight view.
@@ -652,23 +630,6 @@ public class TestService {
         dto.setCorrectTextAnswer(q.getCorrectTextAnswer());
         dto.setCreatedAt(q.getCreatedAt());
         dto.setUpdatedAt(q.getUpdatedAt());
-        return dto;
-    }
-
-    private TestQuestionPublicDto toQuestionPublicDto(TestQuestion q) {
-        TestQuestionPublicDto dto = new TestQuestionPublicDto();
-        dto.setId(q.getId());
-        if (q.getTest() != null) {
-            dto.setTestId(q.getTest().getId());
-        }
-        dto.setOrderIndex(q.getOrderIndex());
-        dto.setQuestionText(q.getQuestionText());
-        dto.setQuestionType(q.getQuestionType() != null ? q.getQuestionType().name() : null);
-        dto.setPoints(q.getPoints());
-        dto.setOption1(q.getOption1());
-        dto.setOption2(q.getOption2());
-        dto.setOption3(q.getOption3());
-        dto.setOption4(q.getOption4());
         return dto;
     }
 
@@ -741,11 +702,11 @@ public class TestService {
         }
     }
 
-    private boolean isRole(User user, String role) {
+    private boolean isRole(User user, RoleName role) {
         return user != null
                 && user.getRole() != null
                 && user.getRole().getRolename() != null
-                && role.equalsIgnoreCase(user.getRole().getRolename());
+                && role == user.getRole().getRolename();
     }
 
     private String safeTrim(String s) {

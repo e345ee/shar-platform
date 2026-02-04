@@ -28,10 +28,10 @@ public class TestAttemptService {
      */
     public record StartAttemptResult(TestAttemptDto attempt, boolean created) {}
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final TestService testService;
     private final LessonService lessonService;
@@ -721,8 +721,8 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         testService.getEntityForCurrentUser(attempt.getTest().getId());
     }
 
-    private void assertAnyRole(User user, String... roles) {
-        for (String r : roles) {
+    private void assertAnyRole(User user, RoleName... roles) {
+        for (RoleName r : roles) {
             if (isRole(user, r)) {
                 return;
             }
@@ -730,10 +730,10 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         throw new TestAttemptAccessDeniedException("Forbidden");
     }
 
-    private boolean isRole(User user, String role) {
+    private boolean isRole(User user, RoleName role) {
         return user != null
                 && user.getRole() != null
                 && user.getRole().getRolename() != null
-                && role.equalsIgnoreCase(user.getRole().getRolename());
+                && role == user.getRole().getRolename();
     }
 }

@@ -1,11 +1,11 @@
 package com.course.service;
 
-import com.course.dto.CreateLessonForm;
+import com.course.dto.LessonForm;
 import com.course.dto.LessonDto;
 import com.course.dto.UpdateLessonDto;
-import com.course.dto.UpdateLessonForm;
 import com.course.entity.Course;
 import com.course.entity.Lesson;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.LessonAccessDeniedException;
@@ -25,9 +25,9 @@ import java.util.List;
 @Transactional
 public class LessonService {
 
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final LessonRepository lessonRepository;
     private final CourseService courseService;
@@ -38,7 +38,7 @@ public class LessonService {
     private final StudyClassService studyClassService;
     private final LessonPresentationStorageService presentationStorageService;
 
-    public LessonDto create(Integer courseId, CreateLessonForm form) {
+    public LessonDto create(Integer courseId, LessonForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -168,7 +168,7 @@ public class LessonService {
         return toDto(saved);
     }
 
-    public LessonDto updateWithOptionalPresentation(Integer id, UpdateLessonForm form) {
+    public LessonDto updateWithOptionalPresentation(Integer id, LessonForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -343,11 +343,11 @@ public class LessonService {
         }
     }
 
-    private boolean isRole(User user, String role) {
+    private boolean isRole(User user, RoleName role) {
         return user != null
                 && user.getRole() != null
                 && user.getRole().getRolename() != null
-                && role.equalsIgnoreCase(user.getRole().getRolename());
+                && role == user.getRole().getRolename();
     }
 
     /**

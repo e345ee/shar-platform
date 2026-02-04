@@ -3,6 +3,7 @@ package com.course.service;
 import com.course.dto.CourseDto;
 import com.course.dto.LessonDto;
 import com.course.entity.Course;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.repository.ClassStudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class StudentContentService {
 
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final AuthService authService;
     private final UserService userService;

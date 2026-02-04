@@ -1,6 +1,7 @@
 package com.course.init;
 
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.repository.RoleRepository;
 import com.course.repository.UserRepository;
@@ -30,14 +31,14 @@ public class AdminInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    private static final String ROLE_ADMIN = "ADMIN";
+    private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
 
     @Override
     @Transactional
     public void run(String... args) {
         Role adminRole = roleRepository.findByRolename(ROLE_ADMIN)
                 .orElseGet(() -> {
-                    log.warn("Role '{}' not found. Creating it automatically.", ROLE_ADMIN);
+                    log.warn("Role '{}' not found. Creating it automatically.", ROLE_ADMIN.name());
                     Role r = new Role();
                     r.setRolename(ROLE_ADMIN);
                     r.setDescription("Администратор системы");

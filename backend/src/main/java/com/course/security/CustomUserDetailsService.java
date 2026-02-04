@@ -34,8 +34,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                 throw new UsernameNotFoundException("User has no role assigned: " + username);
         }
 
-        String roleName = user.getRole().getRolename().toUpperCase();
-        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + roleName));
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority(user.getRole().getRolename().authority())
+        );
 
         return org.springframework.security.core.userdetails.User
                 // Keep the canonical username as email (if present)

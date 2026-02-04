@@ -5,6 +5,7 @@ import com.course.dto.CreateClassJoinRequestDto;
 import com.course.dto.UserDto;
 import com.course.entity.ClassJoinRequest;
 import com.course.entity.ClassStudent;
+import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
 import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
@@ -23,8 +24,8 @@ import java.util.List;
 @Transactional
 public class ClassJoinRequestService {
 
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_METHODIST = "METHODIST";
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
 
     private final ClassJoinRequestRepository joinRequestRepository;
     private final ClassStudentRepository classStudentRepository;
@@ -102,8 +103,8 @@ public class ClassJoinRequestService {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        boolean isTeacher = current.getRole() != null && ROLE_TEACHER.equalsIgnoreCase(current.getRole().getRolename());
-        boolean isMethodist = current.getRole() != null && ROLE_METHODIST.equalsIgnoreCase(current.getRole().getRolename());
+        boolean isTeacher = current.getRole() != null && current.getRole().getRolename() == ROLE_TEACHER;
+        boolean isMethodist = current.getRole() != null && current.getRole().getRolename() == ROLE_METHODIST;
 
         if (!isTeacher && !isMethodist) {
             throw new ForbiddenOperationException("Only TEACHER or METHODIST can manage join requests");

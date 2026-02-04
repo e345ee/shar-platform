@@ -2,6 +2,7 @@ package com.course.service;
 
 import com.course.dto.StudyClassDto;
 import com.course.entity.Course;
+import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
 import com.course.entity.User;
 import com.course.exception.ForbiddenOperationException;
@@ -19,8 +20,8 @@ import java.util.List;
 @Transactional
 public class StudyClassService {
 
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
 
     private final StudyClassRepository classRepository;
 
@@ -86,17 +87,17 @@ public class StudyClassService {
     @Transactional(readOnly = true)
     public List<StudyClassDto> getMyClasses() {
         User current = authService.getCurrentUserEntity();
-        String role = current.getRole() != null ? current.getRole().getRolename() : null;
+        RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
         if (role == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+        if (ROLE_TEACHER == role) {
             return classRepository.findAllByTeacherId(current.getId()).stream().map(this::toDto).toList();
         }
 
-        if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+        if (ROLE_METHODIST == role) {
             return classRepository.findAllByCreatedById(current.getId()).stream().map(this::toDto).toList();
         }
 
@@ -107,20 +108,20 @@ public class StudyClassService {
     @Transactional(readOnly = true)
     public StudyClassDto getMyClassById(Integer id) {
         User current = authService.getCurrentUserEntity();
-        String role = current.getRole() != null ? current.getRole().getRolename() : null;
+        RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
         if (role == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
         StudyClass sc;
-        if (ROLE_TEACHER.equalsIgnoreCase(role)) {
+        if (ROLE_TEACHER == role) {
             sc = classRepository.findByIdAndTeacherId(id, current.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
             return toDto(sc);
         }
 
-        if (ROLE_METHODIST.equalsIgnoreCase(role)) {
+        if (ROLE_METHODIST == role) {
             sc = classRepository.findByIdAndCreatedById(id, current.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
             return toDto(sc);

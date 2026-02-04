@@ -7,12 +7,18 @@ DROP TABLE IF EXISTS
     "role"
     CASCADE;
 
+DROP TYPE IF EXISTS role_name CASCADE;
+
 ----------------------------------------------------------------------
 -- 1. СОЗДАНИЕ ТАБЛИЦ 
 ----------------------------------------------------------------------
+
+-- Postgres-native enum for roles
+CREATE TYPE role_name AS ENUM ('ADMIN', 'METHODIST', 'TEACHER', 'STUDENT');
+
 CREATE TABLE "role" (
     id          SERIAL PRIMARY KEY,
-    rolename    VARCHAR(63)  NOT NULL UNIQUE,
+    rolename    role_name NOT NULL UNIQUE,
     description TEXT
 );
 

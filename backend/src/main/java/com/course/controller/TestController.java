@@ -23,7 +23,7 @@ public class TestController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<TestDto> createTest(
             @PathVariable Integer lessonId,
-            @Valid @RequestBody CreateTestDto dto
+            @Valid @RequestBody TestUpsertDto dto
     ) {
         TestDto created = testService.create(lessonId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -45,7 +45,7 @@ public class TestController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<TestDto> updateTest(
             @PathVariable Integer id,
-            @Valid @RequestBody UpdateTestDto dto
+            @Valid @RequestBody TestUpsertDto dto
     ) {
         return ResponseEntity.ok(testService.update(id, dto));
     }
@@ -72,7 +72,7 @@ public class TestController {
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<TestQuestionDto> createQuestion(
             @PathVariable Integer testId,
-            @Valid @RequestBody CreateTestQuestionDto dto
+            @Valid @RequestBody TestQuestionUpsertDto dto
     ) {
         TestQuestionDto created = testService.createQuestion(testId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
@@ -83,7 +83,7 @@ public class TestController {
     public ResponseEntity<TestQuestionDto> updateQuestion(
             @PathVariable Integer testId,
             @PathVariable Integer questionId,
-            @Valid @RequestBody UpdateTestQuestionDto dto
+            @Valid @RequestBody TestQuestionUpsertDto dto
     ) {
         return ResponseEntity.ok(testService.updateQuestion(testId, questionId, dto));
     }

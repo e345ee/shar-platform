@@ -4,6 +4,7 @@ import com.course.dto.StudyClassDto;
 import com.course.entity.Lesson;
 import com.course.entity.StudyClass;
 import com.course.entity.User;
+import com.course.entity.RoleName;
 import com.course.service.StudyClassService;
 import com.course.service.AuthService;
 import com.course.service.ClassOpenedLessonService;
@@ -50,7 +51,7 @@ public class TeacherClassesController {
     @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<Void> openLessonForClass(@PathVariable Integer classId, @PathVariable Integer lessonId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, "TEACHER");
+        userService.assertUserEntityHasRole(current, RoleName.TEACHER);
 
         StudyClass sc = classService.getEntityById(classId);
         if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {

@@ -1,5 +1,6 @@
 package com.course.security;
 
+import com.course.entity.RoleName;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,30 +33,30 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, "/api/join-requests").permitAll()
 
-                        .requestMatchers("/api/roles/**").hasRole("ADMIN")
+                        .requestMatchers("/api/roles/**").hasRole(RoleName.ADMIN.name())
 
-                        .requestMatchers(HttpMethod.POST, "/api/users/methodists/*/teachers").hasRole("METHODIST")
-                        .requestMatchers(HttpMethod.DELETE, "/api/users/methodists/*/teachers/*").hasRole("METHODIST")
+                        .requestMatchers(HttpMethod.POST, "/api/users/methodists/*/teachers").hasRole(RoleName.METHODIST.name())
+                        .requestMatchers(HttpMethod.DELETE, "/api/users/methodists/*/teachers/*").hasRole(RoleName.METHODIST.name())
 
-                        .requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers(HttpMethod.PUT, "/api/users/me").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers(HttpMethod.PUT, "/api/users/me/password").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers(HttpMethod.POST, "/api/users/me/avatar").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers(HttpMethod.DELETE, "/api/users/me/avatar").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
+                        .requestMatchers(HttpMethod.GET, "/api/users/me").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers(HttpMethod.PUT, "/api/users/me/password").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers(HttpMethod.POST, "/api/users/me/avatar").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers(HttpMethod.DELETE, "/api/users/me/avatar").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
 
-                        .requestMatchers(HttpMethod.GET, "/api/users/me/achievements").hasRole("STUDENT")
+                        .requestMatchers(HttpMethod.GET, "/api/users/me/achievements").hasRole(RoleName.STUDENT.name())
 
-                        .requestMatchers("/api/users/**").hasRole("ADMIN")
+                        .requestMatchers("/api/users/**").hasRole(RoleName.ADMIN.name())
 
                         
-                        .requestMatchers("/api/teachers/me/classes/**").hasAnyRole("TEACHER", "METHODIST")
+                        .requestMatchers("/api/teachers/me/classes/**").hasAnyRole(RoleName.TEACHER.name(), RoleName.METHODIST.name())
 
-                        .requestMatchers(HttpMethod.GET, "/api/courses/*/achievements/**").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers(HttpMethod.GET, "/api/courses/*/lessons/**").hasAnyRole("ADMIN", "TEACHER", "METHODIST", "STUDENT")
-                        .requestMatchers("/api/courses/**").hasRole("METHODIST")
-                        .requestMatchers("/api/classes/*/join-requests/**").hasAnyRole("TEACHER", "METHODIST")
-                        .requestMatchers("/api/classes/**").hasRole("METHODIST")
-                        .requestMatchers("/api/courses/*/classes").hasRole("METHODIST")
+                        .requestMatchers(HttpMethod.GET, "/api/courses/*/achievements/**").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers(HttpMethod.GET, "/api/courses/*/lessons/**").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
+                        .requestMatchers("/api/courses/**").hasRole(RoleName.METHODIST.name())
+                        .requestMatchers("/api/classes/*/join-requests/**").hasAnyRole(RoleName.TEACHER.name(), RoleName.METHODIST.name())
+                        .requestMatchers("/api/classes/**").hasRole(RoleName.METHODIST.name())
+                        .requestMatchers("/api/courses/*/classes").hasRole(RoleName.METHODIST.name())
 
                         .anyRequest().authenticated()
                 )

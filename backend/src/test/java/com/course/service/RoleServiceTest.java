@@ -3,6 +3,7 @@ package com.course.service;
 import com.course.dto.CreateRoleDto;
 import com.course.dto.RoleDto;
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ResourceNotFoundException;
 import com.course.repository.RoleRepository;
@@ -39,7 +40,7 @@ class RoleServiceTest {
     void setUp() {
         testRole = new Role();
         testRole.setId(1);
-        testRole.setRolename("ADMIN");
+        testRole.setRolename(RoleName.ADMIN);
         testRole.setDescription("Administrator role");
 
         createRoleDto = new CreateRoleDto();
@@ -95,7 +96,7 @@ class RoleServiceTest {
     @Test
     @DisplayName("Should get role by name")
     void testGetRoleByName() {
-        when(roleRepository.findByRolename("ADMIN")).thenReturn(Optional.of(testRole));
+        when(roleRepository.findByRolename(RoleName.ADMIN)).thenReturn(Optional.of(testRole));
 
         RoleDto result = roleService.getRoleByName("ADMIN");
 
@@ -106,9 +107,7 @@ class RoleServiceTest {
     @Test
     @DisplayName("Should throw exception when role not found by name")
     void testGetRoleByNameNotFound() {
-        when(roleRepository.findByRolename("NONEXISTENT")).thenReturn(Optional.empty());
-
-        assertThrows(ResourceNotFoundException.class, 
+        assertThrows(IllegalArgumentException.class,
                 () -> roleService.getRoleByName("NONEXISTENT"));
     }
 
@@ -117,7 +116,7 @@ class RoleServiceTest {
     void testGetAllRoles() {
         Role role2 = new Role();
         role2.setId(2);
-        role2.setRolename("TEACHER");
+        role2.setRolename(RoleName.TEACHER);
 
         when(roleRepository.findAll()).thenReturn(Arrays.asList(testRole, role2));
 
@@ -146,11 +145,11 @@ class RoleServiceTest {
     void testUpdateRoleDuplicate() {
         Role existingRole = new Role();
         existingRole.setId(1);
-        existingRole.setRolename("ADMIN");
+        existingRole.setRolename(RoleName.ADMIN);
 
         Role anotherRole = new Role();
         anotherRole.setId(2);
-        anotherRole.setRolename("TEACHER");
+        anotherRole.setRolename(RoleName.TEACHER);
 
         when(roleRepository.findById(1)).thenReturn(Optional.of(existingRole));
         when(roleRepository.existsByRolename("TEACHER")).thenReturn(true);

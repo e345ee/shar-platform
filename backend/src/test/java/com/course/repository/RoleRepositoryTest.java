@@ -1,6 +1,7 @@
 package com.course.repository;
 
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class RoleRepositoryTest {
     @BeforeEach
     void setUp() {
         testRole = new Role();
-        testRole.setRolename("ADMIN");
+        testRole.setRolename(RoleName.ADMIN);
         testRole.setDescription("Administrator role");
     }
 
@@ -33,7 +34,7 @@ class RoleRepositoryTest {
         Role saved = roleRepository.save(testRole);
         
         assertNotNull(saved.getId());
-        assertEquals("ADMIN", saved.getRolename());
+        assertEquals(RoleName.ADMIN, saved.getRolename());
         assertEquals("Administrator role", saved.getDescription());
     }
 
@@ -42,16 +43,16 @@ class RoleRepositoryTest {
     void testFindByRolename() {
         roleRepository.save(testRole);
         
-        Optional<Role> found = roleRepository.findByRolename("ADMIN");
+        Optional<Role> found = roleRepository.findByRolename(RoleName.ADMIN);
         
         assertTrue(found.isPresent());
-        assertEquals("ADMIN", found.get().getRolename());
+        assertEquals(RoleName.ADMIN, found.get().getRolename());
     }
 
     @Test
     @DisplayName("Should return empty when rolename not found")
     void testFindByRolenameNotFound() {
-        Optional<Role> found = roleRepository.findByRolename("NONEXISTENT");
+        Optional<Role> found = roleRepository.findByRolename(RoleName.ADMIN);
         
         assertFalse(found.isPresent());
     }
@@ -61,8 +62,8 @@ class RoleRepositoryTest {
     void testExistsByRolename() {
         roleRepository.save(testRole);
         
-        assertTrue(roleRepository.existsByRolename("ADMIN"));
-        assertFalse(roleRepository.existsByRolename("TEACHER"));
+        assertTrue(roleRepository.existsByRolename(RoleName.ADMIN));
+        assertFalse(roleRepository.existsByRolename(RoleName.TEACHER));
     }
 
     @Test
@@ -73,7 +74,7 @@ class RoleRepositoryTest {
         Optional<Role> found = roleRepository.findById(saved.getId());
         
         assertTrue(found.isPresent());
-        assertEquals("ADMIN", found.get().getRolename());
+        assertEquals(RoleName.ADMIN, found.get().getRolename());
     }
 
     @Test

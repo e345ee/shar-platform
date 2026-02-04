@@ -4,6 +4,7 @@ import com.course.dto.PageDto;
 import com.course.dto.UpdateProfileDto;
 import com.course.dto.UserDto;
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ForbiddenOperationException;
@@ -32,10 +33,10 @@ public class UserService {
     private final AvatarStorageService avatarStorageService;
     private final MethodistTeacherService methodistTeacherService;
 
-    private static final String ROLE_ADMIN = "ADMIN";
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final char[] TEMP_PASSWORD_ALPHABET =
@@ -54,13 +55,13 @@ public class UserService {
 
         // Only ADMIN, TEACHER, METHODIST or STUDENT
         boolean isAdmin = currentUser.getRole() != null
-                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_ADMIN;
         boolean isTeacher = currentUser.getRole() != null
-                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_TEACHER;
         boolean isMethodist = currentUser.getRole() != null
-                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_METHODIST;
         boolean isStudent = currentUser.getRole() != null
-                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_STUDENT;
         if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
             throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can update profile");
         }
@@ -132,13 +133,13 @@ public class UserService {
         }
 
         boolean isAdmin = currentUser.getRole() != null
-                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_ADMIN;
         boolean isTeacher = currentUser.getRole() != null
-                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_TEACHER;
         boolean isMethodist = currentUser.getRole() != null
-                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_METHODIST;
         boolean isStudent = currentUser.getRole() != null
-                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_STUDENT;
         if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
             throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can upload avatar");
         }
@@ -160,13 +161,13 @@ public class UserService {
         }
 
         boolean isAdmin = currentUser.getRole() != null
-                && ROLE_ADMIN.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_ADMIN;
         boolean isTeacher = currentUser.getRole() != null
-                && ROLE_TEACHER.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_TEACHER;
         boolean isMethodist = currentUser.getRole() != null
-                && ROLE_METHODIST.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_METHODIST;
         boolean isStudent = currentUser.getRole() != null
-                && ROLE_STUDENT.equalsIgnoreCase(currentUser.getRole().getRolename());
+                && currentUser.getRole().getRolename() == ROLE_STUDENT;
         if (!isAdmin && !isTeacher && !isMethodist && !isStudent) {
             throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can delete avatar");
         }
@@ -227,7 +228,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + teacherUserId + " not found"));
 
         if (teacher.getRole() == null || teacher.getRole().getRolename() == null
-                || !ROLE_TEACHER.equalsIgnoreCase(teacher.getRole().getRolename())) {
+                || teacher.getRole().getRolename() != ROLE_TEACHER) {
             throw new ForbiddenOperationException("Methodist can delete only TEACHER users");
         }
 
@@ -275,7 +276,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + methodistUserId + " not found"));
 
         if (methodist.getRole() == null || methodist.getRole().getRolename() == null
-                || !ROLE_METHODIST.equalsIgnoreCase(methodist.getRole().getRolename())) {
+                || methodist.getRole().getRolename() != ROLE_METHODIST) {
             throw new ForbiddenOperationException("Admin can delete only METHODIST users via this endpoint");
         }
 
@@ -299,7 +300,7 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User '" + usernameOrEmail + "' not found"));
 
         if (admin.getRole() == null || admin.getRole().getRolename() == null
-                || !ROLE_ADMIN.equalsIgnoreCase(admin.getRole().getRolename())) {
+                || admin.getRole().getRolename() != ROLE_ADMIN) {
             throw new ForbiddenOperationException("Only ADMIN can change admin password");
         }
 
@@ -307,13 +308,13 @@ public class UserService {
         userRepository.save(admin);
     }
 
-    private void assertUserHasRole(Integer userId, String requiredRole) {
+    private void assertUserHasRole(Integer userId, RoleName requiredRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + userId + " not found"));
 
         if (user.getRole() == null || user.getRole().getRolename() == null
-                || !requiredRole.equalsIgnoreCase(user.getRole().getRolename())) {
-            throw new ForbiddenOperationException("User with id " + userId + " must have role " + requiredRole);
+                || requiredRole != user.getRole().getRolename()) {
+            throw new ForbiddenOperationException("User with id " + userId + " must have role " + requiredRole.name());
         }
     }
 
@@ -443,10 +444,10 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User '" + usernameOrEmail + "' not found"));
     }
 
-    public void assertUserEntityHasRole(User user, String requiredRole) {
+    public void assertUserEntityHasRole(User user, RoleName requiredRole) {
         if (user == null || user.getRole() == null || user.getRole().getRolename() == null
-                || !requiredRole.equalsIgnoreCase(user.getRole().getRolename())) {
-            throw new ForbiddenOperationException("User must have role " + requiredRole);
+                || requiredRole != user.getRole().getRolename()) {
+            throw new ForbiddenOperationException("User must have role " + requiredRole.name());
         }
     }
 

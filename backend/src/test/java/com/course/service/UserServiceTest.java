@@ -3,6 +3,7 @@ package com.course.service;
 import com.course.dto.CreateUserDto;
 import com.course.dto.UserDto;
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ResourceNotFoundException;
@@ -45,7 +46,7 @@ class UserServiceTest {
     void setUp() {
         testRole = new Role();
         testRole.setId(1);
-        testRole.setRolename("STUDENT");
+        testRole.setRolename(RoleName.STUDENT);
 
         testUser = new User();
         testUser.setId(1);

@@ -1,6 +1,7 @@
 package com.course.repository;
 
 import com.course.entity.Role;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +29,7 @@ class UserRepositoryTest {
     @BeforeEach
     void setUp() {
         testRole = new Role();
-        testRole.setRolename("STUDENT");
+        testRole.setRolename(RoleName.STUDENT);
         testRole.setDescription("Student role");
         testRole = roleRepository.save(testRole);
 

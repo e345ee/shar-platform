@@ -1,11 +1,11 @@
 package com.course.service;
 
 import com.course.dto.AchievementDto;
-import com.course.dto.CreateAchievementForm;
-import com.course.dto.UpdateAchievementForm;
+import com.course.dto.AchievementForm;
 import com.course.dto.UpdateAchievementDto;
 import com.course.entity.Achievement;
 import com.course.entity.Course;
+import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.exception.AchievementAccessDeniedException;
 import com.course.exception.AchievementNotFoundException;
@@ -25,9 +25,9 @@ import java.util.List;
 @Transactional
 public class AchievementService {
 
-    private static final String ROLE_METHODIST = "METHODIST";
-    private static final String ROLE_TEACHER = "TEACHER";
-    private static final String ROLE_STUDENT = "STUDENT";
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     private final AchievementRepository achievementRepository;
     private final CourseService courseService;
@@ -38,7 +38,7 @@ public class AchievementService {
     private final AchievementPhotoStorageService photoStorageService;
     private final StudentAchievementService studentAchievementService;
 
-    public AchievementDto create(Integer courseId, CreateAchievementForm form) {
+    public AchievementDto create(Integer courseId, AchievementForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -139,7 +139,7 @@ public class AchievementService {
         return toDto(achievementRepository.save(a));
     }
 
-    public AchievementDto updateWithOptionalPhoto(Integer id, UpdateAchievementForm form) {
+    public AchievementDto updateWithOptionalPhoto(Integer id, AchievementForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -272,11 +272,11 @@ public class AchievementService {
         }
     }
 
-    private boolean isRole(User user, String role) {
+    private boolean isRole(User user, RoleName role) {
         return user != null
                 && user.getRole() != null
                 && user.getRole().getRolename() != null
-                && role.equalsIgnoreCase(user.getRole().getRolename());
+                && role == user.getRole().getRolename();
     }
 
     private String safeTrim(String s) {
