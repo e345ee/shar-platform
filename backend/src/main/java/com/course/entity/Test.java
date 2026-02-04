@@ -14,12 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(
-        name = "tests",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "uq_activity_lesson_kind", columnNames = {"lesson_id","activity_type"})
-        }
-)
+@Table(name = "tests")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

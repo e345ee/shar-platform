@@ -45,9 +45,7 @@ public class TestService {
             throw new TestValidationException("Test data is required");
         }
 
-        if (testRepository.existsByLesson_IdAndActivityType(lessonId, ActivityType.HOMEWORK_TEST)) {
-            throw new DuplicateResourceException("Test for lesson " + lessonId + " already exists");
-        }
+        // Allow multiple HOMEWORK_TEST activities per lesson.
 
         String title = safeTrim(dto.getTitle());
         String description = safeTrim(dto.getDescription());
@@ -115,9 +113,7 @@ public class TestService {
             if (!lesson.getCourse().getId().equals(courseId)) {
                 throw new TestValidationException("Lesson does not belong to course");
             }
-            if (testRepository.existsByLesson_IdAndActivityType(lessonId, ActivityType.HOMEWORK_TEST)) {
-                throw new DuplicateResourceException("Homework test for lesson " + lessonId + " already exists");
-            }
+            // Allow multiple HOMEWORK_TEST activities per lesson.
         } else if (type == ActivityType.CONTROL_WORK) {
             if (lessonId != null) {
                 lesson = lessonService.getEntityById(lessonId);

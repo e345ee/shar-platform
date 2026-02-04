@@ -150,6 +150,7 @@ CREATE TABLE "class_students" (
 ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS
+    "class_achievement_feed",
     "student_achievements",
     "achievements"
     CASCADE;
@@ -181,6 +182,20 @@ CREATE TABLE "student_achievements" (
 
     CONSTRAINT uq_student_achievement UNIQUE (student_id, achievement_id)
 );
+
+-- Class-wide feed for awarded achievements
+CREATE TABLE "class_achievement_feed" (
+    id             SERIAL PRIMARY KEY,
+    class_id       INT NOT NULL REFERENCES "classes"(id) ON DELETE CASCADE,
+    student_id     INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    achievement_id INT NOT NULL REFERENCES "achievements"(id) ON DELETE CASCADE,
+    awarded_by     INT NOT NULL REFERENCES "users"(id),
+    awarded_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_class_achievement_feed_class_created_at
+    ON "class_achievement_feed"(class_id, created_at DESC);
 
 ----------------------------------------------------------------------
 -- 1.4. TESTS / TEST QUESTIONS (Домашка к уроку)
@@ -214,8 +229,7 @@ CREATE TABLE "tests" (
     created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMP NOT NULL DEFAULT NOW(),
 
-    -- for lesson-attached activities we allow at most one per (lesson, type)
-    CONSTRAINT uq_activity_lesson_kind UNIQUE (lesson_id, activity_type),
+    -- multiple activities per lesson are allowed
     CONSTRAINT chk_activity_type CHECK (activity_type IN ('HOMEWORK_TEST','CONTROL_WORK','WEEKLY_STAR')),
     CONSTRAINT chk_weight_multiplier CHECK (weight_multiplier BETWEEN 1 AND 100),
     CONSTRAINT chk_weekly_requires_no_lesson CHECK (activity_type <> 'WEEKLY_STAR' OR lesson_id IS NULL),
@@ -227,6 +241,10 @@ CREATE TABLE "tests" (
     CONSTRAINT chk_test_topic_len CHECK (char_length(topic) BETWEEN 1 AND 127),
     CONSTRAINT chk_test_desc_len CHECK (description IS NULL OR char_length(description) <= 2048)
 );
+
+-- frequently used in topic aggregations
+CREATE INDEX IF NOT EXISTS idx_tests_course_topic ON "tests"(course_id, topic);
+CREATE INDEX IF NOT EXISTS idx_tests_topic ON "tests"(topic);
 
 
 CREATE TABLE "test_questions" (

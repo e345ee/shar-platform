@@ -117,7 +117,78 @@ PY
 
 json_len() {
   # Usage: json_len "$json"
-  echo "$1" | jq 'length'
+  local json="$1"
+  if command -v jq >/dev/null 2>&1; then
+    echo "$json" | jq 'length'
+  else
+    python3 - <<'PY' <<<"$json"
+import json,sys
+obj=json.load(sys.stdin)
+print(len(obj) if isinstance(obj, list) else 0)
+PY
+  fi
+}
+
+json_filter_first() {
+  # Usage: json_filter_first "$json" "field" "value"
+  local json="$1"
+  local field="$2"
+  local value="$3"
+  if command -v jq >/dev/null 2>&1; then
+    echo "$json" | jq -c --arg f "$field" --arg v "$value" 'map(select(.[$f] == $v))[0]'
+  else
+    python3 - "$field" "$value" <<'PY' <<<"$json"
+import json,sys
+field=sys.argv[1]; value=sys.argv[2]
+arr=json.load(sys.stdin)
+res=None
+if isinstance(arr, list):
+    for it in arr:
+        if isinstance(it, dict) and str(it.get(field)) == value:
+            res=it; break
+print('null' if res is None else json.dumps(res))
+PY
+  fi
+}
+
+json_filter_first2() {
+  # Usage: json_filter_first2 "$json" "field1" "value1" "field2" "value2"
+  local json="$1"
+  local f1="$2"; local v1="$3"
+  local f2="$4"; local v2="$5"
+  if command -v jq >/dev/null 2>&1; then
+    echo "$json" | jq -c --arg f1 "$f1" --arg v1 "$v1" --arg f2 "$f2" --arg v2 "$v2" 'map(select(.[$f1] == $v1 and .[$f2] == $v2))[0]'
+  else
+    python3 - "$f1" "$v1" "$f2" "$v2" <<'PY' <<<"$json"
+import json,sys
+f1,v1,f2,v2=sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4]
+arr=json.load(sys.stdin)
+res=None
+if isinstance(arr, list):
+    for it in arr:
+        if isinstance(it, dict) and str(it.get(f1))==v1 and str(it.get(f2))==v2:
+            res=it; break
+print('null' if res is None else json.dumps(res))
+PY
+  fi
+}
+
+float_ge() {
+  # Usage: float_ge "a" "b"  => returns 0 if ok, 1 if not
+  python3 - "$1" "$2" <<'PY'
+import sys
+a=float(sys.argv[1]); b=float(sys.argv[2])
+sys.exit(0 if a>=b else 1)
+PY
+}
+
+float_between() {
+  # Usage: float_between "x" "lo" "hi"
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+x=float(sys.argv[1]); lo=float(sys.argv[2]); hi=float(sys.argv[3])
+sys.exit(0 if (lo<=x<=hi) else 1)
+PY
 }
 
 HTTP_BODY=""
@@ -279,6 +350,166 @@ expect_code 200 "set student password"
 pass "Student password set"
 
 STUDENT_AUTH="$STUDENT_EMAIL:$STUDENT_PASS"
+
+# ------------------------------------------------------------
+# 7c) ACHIEVEMENTS: create 2 achievements + verify "My achievements" page + award + class feed
+# ------------------------------------------------------------
+
+PNG_FILE="$WORKDIR/ach_photo.png"
+log "Create tiny PNG for achievement photo"
+cat > "$PNG_FILE.b64" <<'B64'
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/6X0h0cAAAAASUVORK5CYII=
+B64
+base64 -d "$PNG_FILE.b64" > "$PNG_FILE"
+[[ -s "$PNG_FILE" ]] || fail "PNG was not created"
+pass "PNG created at $PNG_FILE"
+
+log "Create ACHIEVEMENT #1 as METHODIST"
+request_json POST "/api/courses/$COURSE_ID/achievements" "$METHODIST_AUTH" \
+  -H "Accept: application/json" \
+  -F "title=Achievement1_$SUF" \
+  -F "jokeDescription=Joke1_$SUF" \
+  -F "description=Desc1_$SUF" \
+  -F "photo=@$PNG_FILE;type=image/png"
+expect_code 201 "create achievement 1"
+ACH1_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Achievement1 created: id=$ACH1_ID"
+
+log "Create ACHIEVEMENT #2 as METHODIST"
+request_json POST "/api/courses/$COURSE_ID/achievements" "$METHODIST_AUTH" \
+  -H "Accept: application/json" \
+  -F "title=Achievement2_$SUF" \
+  -F "jokeDescription=Joke2_$SUF" \
+  -F "description=Desc2_$SUF" \
+  -F "photo=@$PNG_FILE;type=image/png"
+expect_code 201 "create achievement 2"
+ACH2_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Achievement2 created: id=$ACH2_ID"
+
+log "Student MY ACHIEVEMENTS PAGE before awarding: should have 0 earned and 2 recommendations"
+request_json GET "/api/users/me/achievements/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get my achievements page (before award)"
+TA=$(json_get "$HTTP_BODY" '.totalAvailable')
+TE=$(json_get "$HTTP_BODY" '.totalEarned')
+[[ "$TA" == "2" ]] || fail "Expected totalAvailable=2, got $TA ($HTTP_BODY)"
+[[ "$TE" == "0" ]] || fail "Expected totalEarned=0, got $TE ($HTTP_BODY)"
+REC_CNT=$(json_get "$HTTP_BODY" '.recommendations | length')
+[[ "$REC_CNT" == "2" ]] || fail "Expected recommendations length=2, got $REC_CNT ($HTTP_BODY)"
+pass "My achievements page (before award) OK"
+
+log "Teacher AWARDS achievement #1 to student"
+request_json POST "/api/achievements/$ACH1_ID/award/$STUDENT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "award achievement"
+AW_AID=$(json_get "$HTTP_BODY" '.achievementId')
+[[ "$AW_AID" == "$ACH1_ID" ]] || fail "Expected awarded achievementId=$ACH1_ID, got $AW_AID ($HTTP_BODY)"
+pass "Achievement awarded"
+
+log "Student MY ACHIEVEMENTS PAGE after awarding: should have 1 earned and 1 recommendation"
+request_json GET "/api/users/me/achievements/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get my achievements page (after award)"
+TA=$(json_get "$HTTP_BODY" '.totalAvailable')
+TE=$(json_get "$HTTP_BODY" '.totalEarned')
+[[ "$TA" == "2" ]] || fail "Expected totalAvailable=2, got $TA ($HTTP_BODY)"
+[[ "$TE" == "1" ]] || fail "Expected totalEarned=1, got $TE ($HTTP_BODY)"
+EARN_CNT=$(json_get "$HTTP_BODY" '.earned | length')
+REC_CNT=$(json_get "$HTTP_BODY" '.recommendations | length')
+[[ "$EARN_CNT" == "1" ]] || fail "Expected earned length=1, got $EARN_CNT ($HTTP_BODY)"
+[[ "$REC_CNT" == "1" ]] || fail "Expected recommendations length=1, got $REC_CNT ($HTTP_BODY)"
+echo "$HTTP_BODY" | grep -q "achievementDescription" || fail "Expected earned item to contain achievementDescription"
+pass "My achievements page (after award) OK"
+
+log "Student CLASS ACHIEVEMENT FEED: should include awarded record"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get class achievement feed"
+FEED_CNT=$(json_get "$HTTP_BODY" 'length')
+[[ "$FEED_CNT" == "1" ]] || fail "Expected feed length=1, got $FEED_CNT ($HTTP_BODY)"
+F_STUDENT=$(json_get "$HTTP_BODY" '.[0].studentId')
+F_ACH=$(json_get "$HTTP_BODY" '.[0].achievementId')
+[[ "$F_STUDENT" == "$STUDENT_ID" ]] || fail "Expected feed studentId=$STUDENT_ID, got $F_STUDENT"
+[[ "$F_ACH" == "$ACH1_ID" ]] || fail "Expected feed achievementId=$ACH1_ID, got $F_ACH"
+pass "Class feed OK"
+log "Update ACHIEVEMENT #2 as METHODIST (JSON update)"
+request_json PUT "/api/achievements/$ACH2_ID" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Achievement2_UPDATED_$SUF\",\"jokeDescription\":\"Joke2_UPDATED_$SUF\",\"description\":\"Desc2_UPDATED_$SUF\"}"
+expect_code 200 "update achievement 2"
+UP_TITLE=$(json_get "$HTTP_BODY" '.title')
+[[ "$UP_TITLE" == "Achievement2_UPDATED_$SUF" ]] || fail "Expected updated achievement title, got $UP_TITLE ($HTTP_BODY)"
+pass "Achievement2 updated"
+
+log "Student MY ACHIEVEMENTS PAGE after update: recommendation title should be updated"
+request_json GET "/api/users/me/achievements/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get my achievements page (after achievement update)"
+TA=$(json_get "$HTTP_BODY" '.totalAvailable')
+TE=$(json_get "$HTTP_BODY" '.totalEarned')
+[[ "$TA" == "2" ]] || fail "Expected totalAvailable=2, got $TA ($HTTP_BODY)"
+[[ "$TE" == "1" ]] || fail "Expected totalEarned=1, got $TE ($HTTP_BODY)"
+REC_CNT=$(json_get "$HTTP_BODY" '.recommendations | length')
+[[ "$REC_CNT" == "1" ]] || fail "Expected recommendations length=1, got $REC_CNT ($HTTP_BODY)"
+REC_TITLE=$(json_get "$HTTP_BODY" '.recommendations[0].title')
+[[ "$REC_TITLE" == "Achievement2_UPDATED_$SUF" ]] || fail "Expected updated recommendation title, got $REC_TITLE ($HTTP_BODY)"
+pass "Achievement update is visible to student"
+
+log "Negative: TEACHER cannot update achievement (methodist-only)"
+request_json PUT "/api/achievements/$ACH1_ID" "$TEACHER_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"ShouldFail_$SUF\",\"jokeDescription\":\"x\",\"description\":\"x\"}"
+expect_code_one_of "teacher update achievement forbidden" 401 403
+pass "Teacher cannot update achievements"
+
+log "Negative: STUDENT cannot delete achievement"
+request_json DELETE "/api/achievements/$ACH1_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student delete achievement forbidden" 401 403
+pass "Student cannot delete achievements"
+
+log "Delete ACHIEVEMENT #2 as METHODIST"
+request_json DELETE "/api/achievements/$ACH2_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "delete achievement2" 200 204
+pass "Achievement2 deleted"
+
+log "Deleted achievement should return 404 on GET"
+request_json GET "/api/achievements/$ACH2_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "get deleted achievement" 404 403
+pass "Deleted achievement is not accessible"
+
+log "Student MY ACHIEVEMENTS PAGE after deletion: totalAvailable=1, totalEarned=1, recommendations=0"
+request_json GET "/api/users/me/achievements/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get my achievements page (after achievement delete)"
+TA=$(json_get "$HTTP_BODY" '.totalAvailable')
+TE=$(json_get "$HTTP_BODY" '.totalEarned')
+[[ "$TA" == "1" ]] || fail "Expected totalAvailable=1 after delete, got $TA ($HTTP_BODY)"
+[[ "$TE" == "1" ]] || fail "Expected totalEarned=1 after delete, got $TE ($HTTP_BODY)"
+REC_CNT=$(json_get "$HTTP_BODY" '.recommendations | length')
+[[ "$REC_CNT" == "0" ]] || fail "Expected recommendations length=0 after delete, got $REC_CNT ($HTTP_BODY)"
+pass "My achievements page updated after delete"
+
+log "List achievements by course should have 1"
+request_json GET "/api/courses/$COURSE_ID/achievements" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "list achievements by course"
+ACH_CNT=$(json_len "$HTTP_BODY")
+[[ "$ACH_CNT" == "1" ]] || fail "Expected achievements count=1, got $ACH_CNT ($HTTP_BODY)"
+pass "Course achievements list updated after delete"
+
+log "Student CLASS ACHIEVEMENT FEED still includes awarded record after delete"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get class achievement feed after achievement delete"
+FEED_CNT=$(json_get "$HTTP_BODY" 'length')
+[[ "$FEED_CNT" == "1" ]] || fail "Expected feed length=1, got $FEED_CNT ($HTTP_BODY)"
+F_ACH=$(json_get "$HTTP_BODY" '.[0].achievementId')
+[[ "$F_ACH" == "$ACH1_ID" ]] || fail "Expected feed achievementId=$ACH1_ID, got $F_ACH"
+pass "Class feed stays correct after achievement delete"
+
+
+log "Negative: Student cannot view feed of a class they are not enrolled in"
+request_json POST "/api/classes" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"OtherClass_$SUF\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER_ID}"
+expect_code 201 "create other class"
+OTHER_CLASS_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json GET "/api/classes/$OTHER_CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student feed for чужой class forbidden" 403 404
+pass "Student cannot view чужой class feed"
 
 # ------------------------------------------------------------
 # 7b) Student COURSE PAGE aggregated endpoint (initially empty)
@@ -987,6 +1218,293 @@ request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST2_AUTH" \
   -F "presentation=@$PDF_FILE;type=application/pdf"
 expect_code_one_of "methodist2 cannot add lesson to чужой course" 403 404
 pass "Methodist isolation on lessons OK"
+
+# ------------------------------------------------------------
+# 17) STATISTICS by topics + overview (STUDENT / TEACHER / METHODIST) + security checks
+# ------------------------------------------------------------
+
+log "Create TEACHER #2 + CLASS #2 + STUDENT #3 (for чужой access checks)"
+TEACHER2_NAME="teacher2_$SUF"
+TEACHER2_EMAIL="teacher2_$SUF@example.com"
+TEACHER2_PASS="Teacher2Pass1!"
+
+request_json POST "/api/users/methodists/$METHODIST_ID/teachers" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$TEACHER2_NAME\",\"email\":\"$TEACHER2_EMAIL\",\"password\":\"$TEACHER2_PASS\"}"
+expect_code 201 "create teacher2"
+TEACHER2_ID=$(json_get "$HTTP_BODY" '.id')
+TEACHER2_AUTH="$TEACHER2_EMAIL:$TEACHER2_PASS"
+pass "Teacher2 created: id=$TEACHER2_ID"
+
+CLASS2_NAME="Class2_$SUF"
+request_json POST "/api/classes" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$CLASS2_NAME\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER2_ID}"
+expect_code 201 "create class2"
+CLASS2_ID=$(json_get "$HTTP_BODY" '.id')
+CLASS2_CODE=$(json_get "$HTTP_BODY" '.joinCode')
+[[ ${#CLASS2_CODE} -eq 8 ]] || fail "class2 joinCode must be 8 chars, got '$CLASS2_CODE'"
+pass "Class2 created: id=$CLASS2_ID joinCode=$CLASS2_CODE"
+
+STUDENT3_NAME="student3_$SUF"
+STUDENT3_EMAIL="student3_$SUF@example.com"
+STUDENT3_TG="tg3_$SUF"
+STUDENT3_PASS="StudentPass3!"
+
+request_json POST "/api/join-requests" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"tgId\":\"$STUDENT3_TG\",\"classCode\":\"$CLASS2_CODE\"}"
+expect_code 201 "create join request 3"
+REQUEST3_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/classes/$CLASS2_ID/join-requests/$REQUEST3_ID/approve" "$TEACHER2_AUTH" -H "Accept: application/json"
+expect_code 200 "approve join request 3"
+STUDENT3_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json PUT "/api/users/$STUDENT3_ID" "$ADMIN_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":$STUDENT3_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\",\"tgId\":\"$STUDENT3_TG\"}"
+expect_code 200 "set student3 password"
+STUDENT3_AUTH="$STUDENT3_EMAIL:$STUDENT3_PASS"
+pass "Student3 created: id=$STUDENT3_ID"
+
+log "Negative: TEACHER #1 cannot view statistics for чужой class (class2)"
+request_json GET "/api/teachers/me/statistics/classes/$CLASS2_ID/topics" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher1 чужой class statistics forbidden" 401 403 404
+pass "Teacher1 cannot view чужой class statistics"
+
+log "Teacher #2 can view own class statistics (may be empty)"
+request_json GET "/api/teachers/me/statistics/classes/$CLASS2_ID/topics" "$TEACHER2_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher2 class2 statistics"
+pass "Teacher2 can view own class statistics"
+
+log "Negative: TEACHER #1 cannot view achievements of чужой student (student3)"
+request_json GET "/api/students/$STUDENT3_ID/achievements" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher1 чужой student achievements forbidden" 401 403 404
+pass "Teacher1 cannot view чужой student achievements"
+
+log "METHODIST can view achievements of student3 (same course)"
+request_json GET "/api/students/$STUDENT3_ID/achievements" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist view student3 achievements"
+pass "Methodist can view student3 achievements"
+
+log "Negative: TEACHER #1 cannot award achievement to student3 (not in teacher1 classes)"
+request_json POST "/api/achievements/$ACH1_ID/award/$STUDENT3_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher1 award to чужой student forbidden" 401 403 404
+pass "Teacher1 cannot award to чужой student"
+
+log "TEACHER #2 awards achievement #1 to student3 (should work)"
+request_json POST "/api/achievements/$ACH1_ID/award/$STUDENT3_ID" "$TEACHER2_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher2 award achievement to student3"
+pass "Teacher2 awarded achievement to student3"
+
+log "Student3 MY ACHIEVEMENTS PAGE: should have totalAvailable=1 and totalEarned=1 after award"
+request_json GET "/api/users/me/achievements/page" "$STUDENT3_AUTH" -H "Accept: application/json"
+expect_code 200 "student3 my achievements page"
+TA=$(json_get "$HTTP_BODY" '.totalAvailable')
+TE=$(json_get "$HTTP_BODY" '.totalEarned')
+[[ "$TA" == "1" ]] || fail "Expected student3 totalAvailable=1, got $TA ($HTTP_BODY)"
+[[ "$TE" == "1" ]] || fail "Expected student3 totalEarned=1, got $TE ($HTTP_BODY)"
+pass "Student3 achievements page OK"
+
+log "Create 6 READY tests with the SAME topic (to validate topic aggregation)"
+SHARED_TOPIC="SharedTopic_$SUF"
+declare -a SHARED_TEST_IDS=()
+declare -a SHARED_Q_IDS=()
+for i in 1 2 3 4 5 6; do
+  request_json POST "/api/lessons/$LESSON_ID/tests" "$METHODIST_AUTH" \
+    -H "Content-Type: application/json" \
+    -d "{\"title\":\"SharedTest${i}_$SUF\",\"description\":\"SharedDesc${i}\",\"topic\":\"$SHARED_TOPIC\",\"deadline\":\"$DEADLINE\"}"
+  expect_code 201 "create shared test $i"
+  TID=$(json_get "$HTTP_BODY" '.id')
+  SHARED_TEST_IDS+=("$TID")
+
+  request_json POST "/api/tests/$TID/questions" "$METHODIST_AUTH" \
+    -H "Content-Type: application/json" \
+    -d "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"Shared Q${i}: 1+0=?\",\"option1\":\"0\",\"option2\":\"1\",\"option3\":\"2\",\"option4\":\"3\",\"correctOption\":2}"
+  expect_code 201 "add question to shared test $i"
+  QID=$(json_get "$HTTP_BODY" '.id')
+  SHARED_Q_IDS+=("$QID")
+
+  request_json POST "/api/tests/$TID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+  expect_code 200 "publish shared test $i"
+done
+pass "Shared-topic tests created and published: ${#SHARED_TEST_IDS[@]}"
+
+log "Student list tests in lesson should now include original + shared tests"
+request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list lesson tests after shared tests"
+LIST_AFTER=$(json_len "$HTTP_BODY")
+[[ "$LIST_AFTER" -ge 7 ]] || fail "Expected >=7 tests in lesson after shared tests, got $LIST_AFTER: $HTTP_BODY"
+pass "Student sees shared-topic tests"
+
+log "Student #1 solves all 6 shared-topic tests with 100% (auto-graded)"
+for idx in "${!SHARED_TEST_IDS[@]}"; do
+  tid="${SHARED_TEST_IDS[$idx]}"
+  qid="${SHARED_Q_IDS[$idx]}"
+
+  request_json POST "/api/tests/$tid/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+  expect_code_one_of "student1 start shared attempt" 200 201
+  AID=$(json_get "$HTTP_BODY" '.id')
+
+  request_json POST "/api/attempts/$AID/submit" "$STUDENT_AUTH" \
+    -H "Content-Type: application/json" \
+    -d "{\"answers\":[{\"questionId\":$qid,\"selectedOption\":2}]}"
+  expect_code 200 "student1 submit shared attempt"
+  SS=$(json_get "$HTTP_BODY" '.score')
+  MM=$(json_get "$HTTP_BODY" '.maxScore')
+  [[ "$SS" == "1" ]] || fail "Expected shared score=1, got $SS ($HTTP_BODY)"
+  [[ "$MM" == "1" ]] || fail "Expected shared maxScore=1, got $MM ($HTTP_BODY)"
+done
+pass "Student1 completed all shared-topic tests"
+
+log "Student #2 solves first 2 shared-topic tests with 0% (to validate class avg aggregation)"
+for j in 0 1; do
+  tid="${SHARED_TEST_IDS[$j]}"
+  qid="${SHARED_Q_IDS[$j]}"
+
+  request_json POST "/api/tests/$tid/attempts/start" "$STUDENT2_AUTH" -H "Accept: application/json"
+  expect_code_one_of "student2 start shared attempt" 200 201
+  AID=$(json_get "$HTTP_BODY" '.id')
+
+  request_json POST "/api/attempts/$AID/submit" "$STUDENT2_AUTH" \
+    -H "Content-Type: application/json" \
+    -d "{\"answers\":[{\"questionId\":$qid,\"selectedOption\":1}]}"
+  expect_code 200 "student2 submit shared attempt"
+  SS=$(json_get "$HTTP_BODY" '.score')
+  [[ "$SS" == "0" ]] || fail "Expected student2 shared score=0, got $SS ($HTTP_BODY)"
+done
+pass "Student2 created low-score data for shared topic"
+
+# ------------------- STUDENT STATISTICS -------------------
+log "STUDENT statistics overview (counts + course progress)"
+request_json GET "/api/student/statistics/overview" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student statistics overview"
+AT_TOTAL=$(json_get "$HTTP_BODY" '.attemptsTotal')
+AT_IP=$(json_get "$HTTP_BODY" '.attemptsInProgress')
+AT_GRADED=$(json_get "$HTTP_BODY" '.attemptsGraded')
+T_GRADED=$(json_get "$HTTP_BODY" '.testsGraded')
+C_STARTED=$(json_get "$HTTP_BODY" '.coursesStarted')
+C_COMPLETED=$(json_get "$HTTP_BODY" '.coursesCompleted')
+
+[[ "$C_STARTED" == "1" ]] || fail "Expected coursesStarted=1, got $C_STARTED ($HTTP_BODY)"
+[[ "$C_COMPLETED" == "1" ]] || fail "Expected coursesCompleted=1, got $C_COMPLETED ($HTTP_BODY)"
+[[ "$AT_IP" -ge 1 ]] || fail "Expected attemptsInProgress >= 1 (due to rejected submit), got $AT_IP ($HTTP_BODY)"
+[[ "$AT_GRADED" -ge 9 ]] || fail "Expected attemptsGraded >= 9, got $AT_GRADED ($HTTP_BODY)"
+[[ "$T_GRADED" -ge 9 ]] || fail "Expected testsGraded >= 9, got $T_GRADED ($HTTP_BODY)"
+
+COURSES_JSON=$(json_get "$HTTP_BODY" '.courses')
+COURSE_OBJ=$(json_filter_first "$COURSES_JSON" "courseId" "$COURSE_ID")
+[[ "$COURSE_OBJ" != "null" ]] || fail "Course progress missing for courseId=$COURSE_ID: $COURSES_JSON"
+REQ=$(json_get "$COURSE_OBJ" '.requiredTests')
+DONE=$(json_get "$COURSE_OBJ" '.completedTests')
+PCT=$(json_get "$COURSE_OBJ" '.percent')
+COMPL=$(json_get "$COURSE_OBJ" '.completed')
+[[ "$REQ" == "8" ]] || fail "Expected requiredTests=8 (2 existing + 6 shared), got $REQ ($COURSE_OBJ)"
+[[ "$DONE" == "8" ]] || fail "Expected completedTests=8, got $DONE ($COURSE_OBJ)"
+[[ "$COMPL" == "true" ]] || fail "Expected completed=true, got $COMPL ($COURSE_OBJ)"
+float_ge "$PCT" "99.0" || fail "Expected percent >= 99.0, got $PCT ($COURSE_OBJ)"
+pass "Student overview stats OK (course progress + attempts/tests counts)"
+
+log "STUDENT topic stats (course filter): shared topic must be aggregated across 6 tests"
+request_json GET "/api/student/statistics/topics?courseId=$COURSE_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student topic stats"
+TOP_OBJ=$(json_filter_first "$HTTP_BODY" "topic" "$SHARED_TOPIC")
+[[ "$TOP_OBJ" != "null" ]] || fail "Missing shared topic stats for student: $HTTP_BODY"
+TTA=$(json_get "$TOP_OBJ" '.testsAttempted')
+TAC=$(json_get "$TOP_OBJ" '.attemptsCount')
+AVG=$(json_get "$TOP_OBJ" '.avgBestPercent')
+[[ "$TTA" == "6" ]] || fail "Expected testsAttempted=6 for shared topic, got $TTA ($TOP_OBJ)"
+[[ "$TAC" == "6" ]] || fail "Expected attemptsCount=6 for shared topic, got $TAC ($TOP_OBJ)"
+float_ge "$AVG" "99.9" || fail "Expected avgBestPercent ~100 for shared topic, got $AVG ($TOP_OBJ)"
+pass "Student topic aggregation OK (shared topic)"
+
+log "Negative: STUDENT cannot request stats for a course they are not enrolled in"
+request_json GET "/api/student/statistics/topics?courseId=$OTHER_COURSE_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student topic stats for чужой course forbidden" 401 403 404
+pass "Student cannot request stats for чужой course"
+
+# ------------------- TEACHER STATISTICS -------------------
+log "TEACHER class topic stats: shared topic should aggregate across students"
+request_json GET "/api/teachers/me/statistics/classes/$CLASS_ID/topics" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher class topic stats"
+CT_OBJ=$(json_filter_first "$HTTP_BODY" "topic" "$SHARED_TOPIC")
+[[ "$CT_OBJ" != "null" ]] || fail "Missing shared topic in class stats: $HTTP_BODY"
+ST_TOT=$(json_get "$CT_OBJ" '.studentsTotal')
+ST_ACT=$(json_get "$CT_OBJ" '.studentsWithActivity')
+TT_ATT=$(json_get "$CT_OBJ" '.testsAttempted')
+CAVG=$(json_get "$CT_OBJ" '.avgPercent')
+[[ "$ST_TOT" == "2" ]] || fail "Expected studentsTotal=2, got $ST_TOT ($CT_OBJ)"
+[[ "$ST_ACT" == "2" ]] || fail "Expected studentsWithActivity=2, got $ST_ACT ($CT_OBJ)"
+[[ "$TT_ATT" == "8" ]] || fail "Expected testsAttempted=8 (6+2), got $TT_ATT ($CT_OBJ)"
+float_between "$CAVG" "45.0" "55.0" || fail "Expected avgPercent around 50, got $CAVG ($CT_OBJ)"
+pass "Teacher class topic stats OK"
+
+log "TEACHER student topic stats: shared topic for student1 should show 6 testsAttempted"
+request_json GET "/api/teachers/me/statistics/students/$STUDENT_ID/topics?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "teacher student topic stats"
+TS_OBJ=$(json_filter_first "$HTTP_BODY" "topic" "$SHARED_TOPIC")
+[[ "$TS_OBJ" != "null" ]] || fail "Missing shared topic in teacher->student stats: $HTTP_BODY"
+TTA=$(json_get "$TS_OBJ" '.testsAttempted')
+[[ "$TTA" == "6" ]] || fail "Expected teacher->student testsAttempted=6 for shared topic, got $TTA ($TS_OBJ)"
+pass "Teacher student topic stats OK"
+
+log "Negative: STUDENT cannot access teacher statistics endpoints"
+request_json GET "/api/teachers/me/statistics/classes/$CLASS_ID/topics" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student cannot access teacher stats" 401 403
+pass "Student blocked from teacher stats"
+
+log "Negative: TEACHER cannot access methodist statistics endpoints"
+request_json GET "/api/methodist/statistics/courses/$COURSE_ID/topics" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher cannot access methodist stats" 401 403
+pass "Teacher blocked from methodist stats"
+
+# ------------------- METHODIST STATISTICS -------------------
+log "METHODIST course topic stats: shared topic should show 3 students total (incl. student3), activity for 2"
+request_json GET "/api/methodist/statistics/courses/$COURSE_ID/topics" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist course topic stats"
+MT_OBJ=$(json_filter_first "$HTTP_BODY" "topic" "$SHARED_TOPIC")
+[[ "$MT_OBJ" != "null" ]] || fail "Missing shared topic in methodist course stats: $HTTP_BODY"
+M_ST_TOT=$(json_get "$MT_OBJ" '.studentsTotal')
+M_ST_ACT=$(json_get "$MT_OBJ" '.studentsWithActivity')
+M_TT_ATT=$(json_get "$MT_OBJ" '.testsAttempted')
+MAVG=$(json_get "$MT_OBJ" '.avgPercent')
+[[ "$M_ST_TOT" == "3" ]] || fail "Expected methodist studentsTotal=3, got $M_ST_TOT ($MT_OBJ)"
+[[ "$M_ST_ACT" == "2" ]] || fail "Expected methodist studentsWithActivity=2, got $M_ST_ACT ($MT_OBJ)"
+[[ "$M_TT_ATT" == "8" ]] || fail "Expected methodist testsAttempted=8, got $M_TT_ATT ($MT_OBJ)"
+float_between "$MAVG" "45.0" "55.0" || fail "Expected methodist avgPercent around 50, got $MAVG ($MT_OBJ)"
+pass "Methodist course stats OK"
+
+log "METHODIST course->classes topic stats: class1(shared topic) should be present"
+request_json GET "/api/methodist/statistics/courses/$COURSE_ID/classes/topics" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist course classes topic stats"
+MC_OBJ=$(json_filter_first2 "$HTTP_BODY" "classId" "$CLASS_ID" "topic" "$SHARED_TOPIC")
+[[ "$MC_OBJ" != "null" ]] || fail "Missing class1 shared topic in methodist classes stats: $HTTP_BODY"
+MC_ST_TOT=$(json_get "$MC_OBJ" '.studentsTotal')
+MC_ST_ACT=$(json_get "$MC_OBJ" '.studentsWithActivity')
+[[ "$MC_ST_TOT" == "2" ]] || fail "Expected class1 studentsTotal=2, got $MC_ST_TOT ($MC_OBJ)"
+[[ "$MC_ST_ACT" == "2" ]] || fail "Expected class1 studentsWithActivity=2, got $MC_ST_ACT ($MC_OBJ)"
+pass "Methodist course->classes stats OK"
+
+log "Negative: METHODIST #2 cannot view statistics for чужой course"
+request_json GET "/api/methodist/statistics/courses/$COURSE_ID/topics" "$METHODIST2_AUTH" -H "Accept: application/json"
+expect_code_one_of "methodist2 cannot view чужой course stats" 401 403 404
+pass "Methodist2 is blocked from чужой course stats"
+
+log "Create a course by METHODIST #2 and verify METHODIST #1 cannot access it"
+request_json POST "/api/courses" "$METHODIST2_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"M2Course_$SUF\",\"description\":\"Course of methodist2\"}"
+expect_code 201 "methodist2 create course"
+M2_COURSE_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json GET "/api/methodist/statistics/courses/$M2_COURSE_ID/topics" "$METHODIST2_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist2 own course stats (may be empty)"
+pass "Methodist2 can view own course stats"
+
+request_json GET "/api/methodist/statistics/courses/$M2_COURSE_ID/topics" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "methodist1 cannot view methodist2 course stats" 401 403 404
+pass "Methodist1 cannot view чужой course stats"
 
 log "All tests passed ✅"
 echo "Users created:"

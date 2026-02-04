@@ -13,6 +13,26 @@ public class ClassStudentService {
 
     private final ClassStudentRepository classStudentRepository;
 
+    public boolean existsStudentInClass(Integer studentId, Integer classId) {
+        if (studentId == null || classId == null) {
+            return false;
+        }
+        return classStudentRepository.existsByStudyClassIdAndStudentId(classId, studentId);
+    }
+
+    public void assertStudentInClass(Integer studentId, Integer classId, String message) {
+        if (!existsStudentInClass(studentId, classId)) {
+            throw new ForbiddenOperationException(message);
+        }
+    }
+
+    public java.util.List<Integer> findClassIdsByStudentInCourse(Integer studentId, Integer courseId) {
+        if (studentId == null || courseId == null) {
+            return java.util.List.of();
+        }
+        return classStudentRepository.findClassIdsByStudentInCourse(studentId, courseId);
+    }
+
     public boolean existsStudentInCourse(Integer studentId, Integer courseId) {
         if (studentId == null || courseId == null) {
             return false;

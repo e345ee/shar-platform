@@ -29,6 +29,8 @@ public class StudentAchievementService {
     private final UserService userService;
     private final AuthService authService;
 
+    private final ClassAchievementFeedService classAchievementFeedService;
+
     public StudentAchievementDto awardToStudent(Achievement achievement, Integer studentId) {
         User teacher = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
@@ -58,7 +60,12 @@ public class StudentAchievementService {
         sa.setAchievement(achievement);
         sa.setAwardedBy(teacher);
 
-        return toDto(studentAchievementRepository.save(sa));
+        StudentAchievement saved = studentAchievementRepository.save(sa);
+
+        // Publish to all class feeds where the student is enrolled for this course.
+        classAchievementFeedService.publishAward(saved);
+
+        return toDto(saved);
     }
 
     public void revokeFromStudent(Achievement achievement, Integer studentId) {
@@ -123,6 +130,13 @@ public class StudentAchievementService {
             dto.setAchievementId(sa.getAchievement().getId());
             dto.setAchievementTitle(sa.getAchievement().getTitle());
             dto.setAchievementPhotoUrl(sa.getAchievement().getPhotoUrl());
+
+            dto.setAchievementJokeDescription(sa.getAchievement().getJokeDescription());
+            dto.setAchievementDescription(sa.getAchievement().getDescription());
+
+            if (sa.getAchievement().getCourse() != null) {
+                dto.setAchievementCourseId(sa.getAchievement().getCourse().getId());
+            }
         }
 
         if (sa.getAwardedBy() != null) {

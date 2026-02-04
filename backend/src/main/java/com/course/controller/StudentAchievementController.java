@@ -1,6 +1,7 @@
 package com.course.controller;
 
 import com.course.dto.StudentAchievementDto;
+import com.course.dto.MyAchievementsPageDto;
 import com.course.entity.Achievement;
 import com.course.entity.RoleName;
 import com.course.entity.User;
@@ -9,6 +10,7 @@ import com.course.service.AuthService;
 import com.course.service.ClassStudentService;
 import com.course.service.AchievementService;
 import com.course.service.StudentAchievementService;
+import com.course.service.MyAchievementsService;
 import com.course.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +30,7 @@ public class StudentAchievementController {
     private final AuthService authService;
     private final UserService userService;
     private final ClassStudentService classStudentService;
+    private final MyAchievementsService myAchievementsService;
 
     @PostMapping("/api/achievements/{achievementId}/award/{studentId}")
     @PreAuthorize("hasRole('TEACHER')")
@@ -52,6 +55,18 @@ public class StudentAchievementController {
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<StudentAchievementDto>> getMyAchievements() {
         return ResponseEntity.ok(studentAchievementService.getMyAchievements());
+    }
+
+    /**
+     * "My achievements" page:
+     * - earned achievements (with conditions)
+     * - overall progress (earned/available)
+     * - recommendations (not yet earned)
+     */
+    @GetMapping("/api/users/me/achievements/page")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<MyAchievementsPageDto> getMyAchievementsPage() {
+        return ResponseEntity.ok(myAchievementsService.getMyAchievementsPage());
     }
 
     /**
