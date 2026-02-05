@@ -7,7 +7,7 @@ import com.course.entity.Test;
 import com.course.entity.TestStatus;
 import com.course.entity.RoleName;
 import com.course.entity.User;
-import com.course.repository.LatestAttemptProjection;
+import com.course.repository.StudentRemedialAssignmentRepository;
 import com.course.repository.TestAttemptRepository;
 import com.course.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +36,7 @@ public class StudentCoursePageService {
 
     private final TestRepository testRepository;
     private final TestAttemptRepository testAttemptRepository;
+    private final StudentRemedialAssignmentRepository studentRemedialAssignmentRepository;
     private final TestService testService;
 
     public StudentCoursePageDto getCoursePage(Integer courseId) {
@@ -81,25 +82,45 @@ public class StudentCoursePageService {
                 courseId, ActivityType.WEEKLY_STAR, TestStatus.READY, weekStart
         );
 
+        // Remedial activities assigned to this student (current week + unassigned week).
+        // Visibility is controlled via StudentRemedialAssignment.
+        List<Test> remedial = studentRemedialAssignmentRepository
+                .findAllByStudent_IdAndCourse_Id(current.getId(), courseId)
+                .stream()
+                .filter(a -> a.getAssignedWeekStart() == null || weekStart.equals(a.getAssignedWeekStart()))
+                .map(a -> a.getTest())
+                .filter(Objects::nonNull)
+                .toList();
+
         // Collect all activity ids for latest attempt lookup
         Set<Integer> testIds = new LinkedHashSet<>();
         lessonActivities.forEach(t -> testIds.add(t.getId()));
         weekly.forEach(t -> testIds.add(t.getId()));
+        remedial.forEach(t -> testIds.add(t.getId()));
 
         Map<Integer, AttemptStatusDto> latestByTest = new HashMap<>();
         if (!testIds.isEmpty()) {
-            List<LatestAttemptProjection> latest = testAttemptRepository.findLatestAttemptsForStudent(current.getId(), new ArrayList<>(testIds));
-            for (LatestAttemptProjection p : latest) {
+            // JPQL approach: returns attempts ordered so that the first row per testId is the latest.
+            var attempts = testAttemptRepository.findAllForLatestMap(current.getId(), new ArrayList<>(testIds));
+            for (var ta : attempts) {
+                if (ta == null || ta.getTest() == null || ta.getTest().getId() == null) {
+                    continue;
+                }
+                Integer tid = ta.getTest().getId();
+                if (latestByTest.containsKey(tid)) {
+                    continue; // already have latest for this test
+                }
                 AttemptStatusDto a = new AttemptStatusDto();
-                a.setTestId(p.getTestId());
-                a.setAttemptId(p.getAttemptId());
-                a.setStatus(p.getStatus());
-                a.setScore(p.getScore());
-                a.setMaxScore(p.getMaxScore());
-                a.setWeightedScore(p.getWeightedScore());
-                a.setWeightedMaxScore(p.getWeightedMaxScore());
-                a.setSubmittedAt(p.getSubmittedAt());
-                latestByTest.put(p.getTestId(), a);
+                a.setTestId(tid);
+                a.setAttemptId(ta.getId());
+                a.setStatus(ta.getStatus() != null ? ta.getStatus().name() : null);
+                a.setScore(ta.getScore());
+                a.setMaxScore(ta.getMaxScore());
+                Integer w = (ta.getTest().getWeightMultiplier() == null || ta.getTest().getWeightMultiplier() < 1) ? 1 : ta.getTest().getWeightMultiplier();
+                a.setWeightedScore((ta.getScore() == null ? 0 : ta.getScore()) * w);
+                a.setWeightedMaxScore((ta.getMaxScore() == null ? 0 : ta.getMaxScore()) * w);
+                a.setSubmittedAt(ta.getSubmittedAt());
+                latestByTest.put(tid, a);
             }
         }
 
@@ -124,6 +145,7 @@ public class StudentCoursePageService {
         dto.setCourse(toCourseDto(course));
         dto.setLessons(lessonBlocks);
         dto.setWeeklyThisWeek(weekly.stream().map(t -> toActivityWithAttempt(t, latestByTest.get(t.getId()))).toList());
+        dto.setRemedialThisWeek(remedial.stream().map(t -> toActivityWithAttempt(t, latestByTest.get(t.getId()))).toList());
         return dto;
     }
 

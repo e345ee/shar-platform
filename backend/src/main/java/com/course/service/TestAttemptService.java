@@ -44,6 +44,8 @@ public class TestAttemptService {
     private final TestAttemptAnswerRepository answerRepository;
     private final TestQuestionRepository questionRepository;
 
+    private final RemedialAssignmentService remedialAssignmentService;
+
     /**
      * Teacher grades OPEN questions in an attempt.
      * Supports partial grading (you can grade a subset of OPEN questions).
@@ -153,6 +155,14 @@ public class TestAttemptService {
         attempt.setStatus(allOpenGraded ? TestAttemptStatus.GRADED : TestAttemptStatus.SUBMITTED);
 
         TestAttempt saved = attemptRepository.save(attempt);
+
+        // If the attempt just became fully graded, consider assigning a remedial task by topic.
+        if (saved.getStatus() == TestAttemptStatus.GRADED) {
+            remedialAssignmentService.considerAssignAfterGrading(saved);
+        }
+        // Remedial attempts (should not have OPEN questions) are still safe to mark as completed here.
+        remedialAssignmentService.markCompletedIfRemedial(saved);
+
         return toDto(saved, true);
     }
 
@@ -456,6 +466,14 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         attempt.setSubmittedAt(LocalDateTime.now());
 
         TestAttempt saved = attemptRepository.save(attempt);
+
+        // Auto-graded attempt: if it became GRADED, consider remedial assignment by topic (< 50%).
+        if (saved.getStatus() == TestAttemptStatus.GRADED) {
+            remedialAssignmentService.considerAssignAfterGrading(saved);
+        }
+        // If the student completed a remedial activity, mark it as completed in the assignment table.
+        remedialAssignmentService.markCompletedIfRemedial(saved);
+
         return toDto(saved, true);
     }
 

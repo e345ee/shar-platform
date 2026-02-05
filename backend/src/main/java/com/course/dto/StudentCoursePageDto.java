@@ -2,6 +2,7 @@ package com.course.dto;
 
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -10,9 +11,14 @@ import java.util.List;
 @Data
 public class StudentCoursePageDto {
     private CourseDto course;
-    private List<LessonWithActivitiesDto> lessons;
+    private List<LessonWithActivitiesDto> lessons = new ArrayList<>();
     /**
      * Weekly activities assigned to the current week.
      */
-    private List<ActivityWithAttemptDto> weeklyThisWeek;
+    private List<ActivityWithAttemptDto> weeklyThisWeek = new ArrayList<>();
+
+    /**
+     * Remedial activities ("задания для отстающих") assigned to the student for the current week.
+     */
+    private List<ActivityWithAttemptDto> remedialThisWeek = new ArrayList<>();
 }

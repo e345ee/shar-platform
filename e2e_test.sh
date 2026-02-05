@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ------------------------------------------------------------
-# v6: add TEXT + OPEN questions, manual grading, teacher pending queue, lesson open gating (2nd start may return 201) + json_len + 2 tests across 2 lessons
+# v7: add REMEDIAL_TASK activity + auto-assignment on low score (<50%) by topic
 # E2E smoke-test for:
 # - roles/users: ADMIN -> create METHODIST; METHODIST -> create TEACHER
 # - METHODIST: create COURSE + CLASS
@@ -31,7 +31,6 @@ BASE_URL="${BASE_URL:-http://localhost:8080}"
 
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
-ADMIN_AUTH="$ADMIN_USER:$ADMIN_PASS"
 
 # Test users passwords
 METHODIST_PASS="MethodistPass1!"
@@ -44,16 +43,76 @@ WORKDIR="$(mktemp -d)"
 KEEP_ARTIFACTS="${KEEP_ARTIFACTS:-1}"
 cleanup() {
   if [[ "${KEEP_ARTIFACTS}" == "1" ]]; then
-    echo -e "\nArtifacts kept in: $WORKDIR"
+    echo -e "\nArtifacts kept in: $WORKDIR\nLogs: $LOG_DIR\nFailures: $FAIL_DIR"
   else
     rm -rf "$WORKDIR"
   fi
 }
 trap cleanup EXIT
 
-log() { printf "\n==> %s\n" "$*"; }
-fail() { echo -e "\n[FAIL] $*" >&2; exit 1; }
+# --- structured logging / failure artifacts ---
+RUN_ID="${RUN_ID:-$(date +%Y%m%d%H%M%S)-$RANDOM}"
+LOG_DIR="${E2E_LOG_DIR:-$WORKDIR/logs}"
+FAIL_DIR="$LOG_DIR/failures"
+mkdir -p "$LOG_DIR" "$FAIL_DIR"
+
+STEP_NO=0
+REQ_NO=0
+CURRENT_STEP_DIR="$LOG_DIR/000_start"
+LAST_STEP_DIR=""
+LAST_HTTP_BODY_FILE=""
+LAST_HTTP_HEADERS_FILE=""
+
+_slugify() {
+  # best-effort slug for directories
+  echo "$*" | tr ' /' '__' | tr -cd 'A-Za-z0-9_.-'
+}
+
+log() {
+  STEP_NO=$((STEP_NO+1))
+  REQ_NO=0
+  local title="$*"
+  local slug="$(_slugify "$title")"
+  CURRENT_STEP_DIR="$LOG_DIR/$(printf '%03d_%s' "$STEP_NO" "$slug")"
+  mkdir -p "$CURRENT_STEP_DIR"
+  printf "%s
+" "$title" > "$CURRENT_STEP_DIR/step.txt"
+  printf "
+==> %s
+" "$title"
+}
+
+_copy_failure_logs() {
+  local reason="$1"
+  local ts
+  ts="$(date +%Y%m%d%H%M%S)"
+  mkdir -p "$FAIL_DIR"
+  if [[ -n "${LAST_STEP_DIR:-}" && -d "$LAST_STEP_DIR" ]]; then
+    local dest="$FAIL_DIR/${ts}_${reason}_$(basename "$LAST_STEP_DIR")"
+    cp -a "$LAST_STEP_DIR" "$dest" 2>/dev/null || true
+    echo "[FAIL] Logs saved: $dest" >&2
+  elif [[ -n "${CURRENT_STEP_DIR:-}" && -d "$CURRENT_STEP_DIR" ]]; then
+    local dest="$FAIL_DIR/${ts}_${reason}_$(basename "$CURRENT_STEP_DIR")"
+    cp -a "$CURRENT_STEP_DIR" "$dest" 2>/dev/null || true
+    echo "[FAIL] Logs saved: $dest" >&2
+  fi
+}
+
+fail() {
+  echo -e "
+[FAIL] $*" >&2
+  _copy_failure_logs "assert"
+  exit 1
+}
 pass() { echo "[OK] $*"; }
+
+on_err() {
+  local line="${1:-?}"
+  echo -e "
+[ERROR] Script crashed at line $line" >&2
+  _copy_failure_logs "crash"
+}
+trap 'on_err $LINENO' ERR
 
 need_tool() {
   command -v "$1" >/dev/null 2>&1 || fail "Required tool '$1' not found";
@@ -70,46 +129,41 @@ json_get() {
     return 0
   fi
   if command -v python3 >/dev/null 2>&1; then
-    python3 - "$expr" <<'PY' <<<"$json"
+    python3 -c '
 import json,sys,re
 expr=sys.argv[1].strip()
 obj=json.load(sys.stdin)
-if expr.startswith('.'): expr=expr[1:]
-if expr=='':
-    print(json.dumps(obj))
-    sys.exit(0)
-parts=[]
-buf=''
+if expr.startswith("."):
+    expr=expr[1:]
+if expr=="":
+    print(json.dumps(obj)); raise SystemExit(0)
+parts=[]; buf=""
 for ch in expr:
-    if ch=='.':
-        if buf: parts.append(buf); buf=''
+    if ch==".":
+        if buf: parts.append(buf); buf=""
         continue
     buf+=ch
 if buf: parts.append(buf)
 for p in parts:
-    if p.startswith('['):
-        for im in re.finditer(r'\[(\d+)\]', p):
+    if p.startswith("["):
+        for im in re.finditer(r"\\[(\\d+)\\]", p):
             obj=obj[int(im.group(1))]
         continue
-    m=re.match(r'^([A-Za-z0-9_\-]+)(\[.*\])?$', p)
-    if not m:
-        raise SystemExit(1)
+    m=re.match(r"^([A-Za-z0-9_\\-]+)(\\[.*\\])?$", p)
+    if not m: raise SystemExit(1)
     key=m.group(1)
-    if isinstance(obj, dict):
-        obj=obj[key]
-    else:
-        obj=obj[int(key)]
+    obj=obj[key] if isinstance(obj,dict) else obj[int(key)]
     idx_part=m.group(2)
     if idx_part:
-        for im in re.finditer(r'\[(\d+)\]', idx_part):
+        for im in re.finditer(r"\\[(\\d+)\\]", idx_part):
             obj=obj[int(im.group(1))]
 if obj is None:
-    print('')
+    print("")
 elif isinstance(obj,(dict,list)):
     print(json.dumps(obj))
 else:
     print(obj)
-PY
+' "$expr" <<<"$json"
     return 0
   fi
   fail "Need jq or python3 for JSON parsing"
@@ -121,11 +175,7 @@ json_len() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq 'length'
   else
-    python3 - <<'PY' <<<"$json"
-import json,sys
-obj=json.load(sys.stdin)
-print(len(obj) if isinstance(obj, list) else 0)
-PY
+    python3 -c 'import json,sys; obj=json.load(sys.stdin); print(len(obj) if isinstance(obj,list) else 0)' <<<"$json"
   fi
 }
 
@@ -137,17 +187,15 @@ json_filter_first() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -c --arg f "$field" --arg v "$value" 'map(select(.[$f] == $v))[0]'
   else
-    python3 - "$field" "$value" <<'PY' <<<"$json"
-import json,sys
+    python3 -c 'import json,sys
 field=sys.argv[1]; value=sys.argv[2]
 arr=json.load(sys.stdin)
 res=None
-if isinstance(arr, list):
+if isinstance(arr,list):
     for it in arr:
-        if isinstance(it, dict) and str(it.get(field)) == value:
+        if isinstance(it,dict) and str(it.get(field))==value:
             res=it; break
-print('null' if res is None else json.dumps(res))
-PY
+print("null" if res is None else json.dumps(res))' "$field" "$value" <<<"$json"
   fi
 }
 
@@ -159,17 +207,15 @@ json_filter_first2() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -c --arg f1 "$f1" --arg v1 "$v1" --arg f2 "$f2" --arg v2 "$v2" 'map(select(.[$f1] == $v1 and .[$f2] == $v2))[0]'
   else
-    python3 - "$f1" "$v1" "$f2" "$v2" <<'PY' <<<"$json"
-import json,sys
+    python3 -c 'import json,sys
 f1,v1,f2,v2=sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4]
 arr=json.load(sys.stdin)
 res=None
-if isinstance(arr, list):
+if isinstance(arr,list):
     for it in arr:
-        if isinstance(it, dict) and str(it.get(f1))==v1 and str(it.get(f2))==v2:
+        if isinstance(it,dict) and str(it.get(f1))==v1 and str(it.get(f2))==v2:
             res=it; break
-print('null' if res is None else json.dumps(res))
-PY
+print("null" if res is None else json.dumps(res))' "$f1" "$v1" "$f2" "$v2" <<<"$json"
   fi
 }
 
@@ -197,25 +243,99 @@ HTTP_CODE=""
 request_json() {
   local method="$1"; shift
   local url="$1"; shift
-  local auth="$1"; shift
+  local token="$1"; shift
 
-  local out="$WORKDIR/resp.json"
-  if [[ -n "$auth" ]]; then
-    HTTP_CODE=$(curl -sS -o "$out" -w "%{http_code}" -u "$auth" -X "$method" "$BASE_URL$url" "$@")
+  REQ_NO=$((REQ_NO+1))
+  local pfx
+  pfx="$(printf '%02d' "$REQ_NO")"
+  local dir="${CURRENT_STEP_DIR:-$LOG_DIR/uncategorized}"
+  mkdir -p "$dir"
+
+  local hdr="$dir/${pfx}_response.headers"
+  local out="$dir/${pfx}_response.body"
+  local meta="$dir/${pfx}_request.meta"
+  local args="$dir/${pfx}_request.args"
+
+  {
+    echo "METHOD=$method"
+    echo "URL=$BASE_URL$url"
+    if [[ -n "$token" ]]; then
+      echo "AUTH=Bearer (redacted)"
+      [[ "${LOG_SECRETS:-0}" == "1" ]] && echo "AUTH_TOKEN=$token"
+    else
+      echo "AUTH=<none>"
+    fi
+    echo "TIME_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$meta"
+
+  # Save curl args (best-effort). Redact JSON "password" fields unless LOG_SECRETS=1.
+  if [[ "${LOG_SECRETS:-0}" == "1" ]]; then
+    printf '%s\n' "$@" > "$args"
   else
-    HTTP_CODE=$(curl -sS -o "$out" -w "%{http_code}" -X "$method" "$BASE_URL$url" "$@")
+    printf '%s\n' "$@" | sed -E 's/("password"[[:space:]]*:[[:space:]]*")[^"]*"/\1***"/g' > "$args" || true
   fi
+
+  local curl_stderr="$dir/${pfx}_curl.stderr"
+  local curl_verbose=()
+  [[ "${CURL_VERBOSE:-0}" == "1" ]] && curl_verbose=(-v)
+
+  if [[ -n "$token" ]]; then
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
+      -H "Authorization: Bearer $token" -X "$method" "$BASE_URL$url" "$@" 2> "$curl_stderr")
+  else
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
+      -X "$method" "$BASE_URL$url" "$@" 2> "$curl_stderr")
+  fi
+
   HTTP_BODY=$(cat "$out")
+  LAST_STEP_DIR="$dir"
+  LAST_HTTP_BODY_FILE="$out"
+  LAST_HTTP_HEADERS_FILE="$hdr"
 }
 
 request_png() {
   local url="$1"; shift
-  local auth="$1"; shift
+  local token="$1"; shift
   local out_file="$1"; shift
 
-  local hdr="$WORKDIR/headers.txt"
-  HTTP_CODE=$(curl -sS -D "$hdr" -o "$out_file" -w "%{http_code}" -u "$auth" "$BASE_URL$url" "$@")
+  REQ_NO=$((REQ_NO+1))
+  local pfx
+  pfx="$(printf '%02d' "$REQ_NO")"
+  local dir="${CURRENT_STEP_DIR:-$LOG_DIR/uncategorized}"
+  mkdir -p "$dir"
+
+  local hdr="$dir/${pfx}_response.headers"
+  local meta="$dir/${pfx}_request.meta"
+  local args="$dir/${pfx}_request.args"
+
+  {
+    echo "METHOD=GET"
+    echo "URL=$BASE_URL$url"
+    if [[ -n "$token" ]]; then
+      echo "AUTH=Bearer (redacted)"
+      [[ "${LOG_SECRETS:-0}" == "1" ]] && echo "AUTH_TOKEN=$token"
+    else
+      echo "AUTH=<none>"
+    fi
+    echo "OUT_FILE=$out_file"
+    echo "TIME_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$meta"
+  printf '%s\n' "$@" > "$args"
+
+  local curl_stderr="$dir/${pfx}_curl.stderr"
+  local curl_verbose=()
+  [[ "${CURL_VERBOSE:-0}" == "1" ]] && curl_verbose=(-v)
+
+  if [[ -n "$token" ]]; then
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out_file" -w "%{http_code}" \
+      -H "Authorization: Bearer $token" "$BASE_URL$url" "$@" 2> "$curl_stderr")
+  else
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out_file" -w "%{http_code}" \
+      "$BASE_URL$url" "$@" 2> "$curl_stderr")
+  fi
   HTTP_BODY=$(cat "$hdr")
+  LAST_STEP_DIR="$dir"
+  LAST_HTTP_HEADERS_FILE="$hdr"
 }
 
 expect_code() {
@@ -250,13 +370,38 @@ expect_code 200 "health check"
 pass "Backend is up"
 
 # ------------------------------------------------------------
+# 0.1) Swagger + JWT smoke checks
+# ------------------------------------------------------------
+log "Swagger/OpenAPI check"
+request_json GET "/v3/api-docs" "" -H "Accept: application/json"
+expect_code 200 "openapi docs"
+
+log "JWT login check (admin) + Bearer auth"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}"
+expect_code 200 "jwt login"
+ADMIN_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$ADMIN_JWT" && "$ADMIN_JWT" != "null" ]] || fail "No accessToken in jwt login response"
+request_json GET "/api/users/me" "$ADMIN_JWT" -H "Accept: application/json"
+expect_code 200 "jwt bearer access to /api/users/me"
+pass "Swagger + JWT are OK"
+
+log "Basic auth should be disabled"
+HTTP_CODE=$(curl -sS -o "$WORKDIR/basic_disabled.json" -w "%{http_code}" -u "$ADMIN_USER:$ADMIN_PASS" \
+  -H "Accept: application/json" "$BASE_URL/api/users/me")
+HTTP_BODY=$(cat "$WORKDIR/basic_disabled.json")
+[[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]] || fail "Expected Basic auth to be rejected (401/403), got $HTTP_CODE"
+pass "Basic auth is disabled"
+
+# ------------------------------------------------------------
 # 1) Create METHODIST (ADMIN)
 # ------------------------------------------------------------
 METHODIST_NAME="methodist_$SUF"
 METHODIST_EMAIL="methodist_$SUF@example.com"
 
 log "Create METHODIST as ADMIN"
-request_json POST "/api/users/admin/methodists" "$ADMIN_AUTH" \
+request_json POST "/api/users/admin/methodists" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$METHODIST_NAME\",\"email\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
 expect_code 201 "create methodist"
@@ -264,7 +409,17 @@ METHODIST_ID=$(json_get "$HTTP_BODY" '.id')
 [[ -n "$METHODIST_ID" && "$METHODIST_ID" != "null" ]] || fail "No methodist id in response"
 pass "Methodist created: id=$METHODIST_ID"
 
-METHODIST_AUTH="$METHODIST_EMAIL:$METHODIST_PASS"
+log "JWT login (methodist)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
+expect_code 200 "jwt login methodist"
+METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$METHODIST_JWT" && "$METHODIST_JWT" != "null" ]] || fail "No accessToken for methodist"
+pass "Methodist JWT acquired"
+
+# Backward-compatible var name used across the script: now stores JWT (Bearer)
+METHODIST_AUTH="$METHODIST_JWT"
 
 # ------------------------------------------------------------
 # 2) Create TEACHER (METHODIST)
@@ -273,7 +428,7 @@ TEACHER_NAME="teacher_$SUF"
 TEACHER_EMAIL="teacher_$SUF@example.com"
 
 log "Create TEACHER as METHODIST"
-request_json POST "/api/users/methodists/$METHODIST_ID/teachers" "$METHODIST_AUTH" \
+request_json POST "/api/users/methodists/$METHODIST_ID/teachers" "$METHODIST_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$TEACHER_NAME\",\"email\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
 expect_code 201 "create teacher"
@@ -281,7 +436,17 @@ TEACHER_ID=$(json_get "$HTTP_BODY" '.id')
 [[ -n "$TEACHER_ID" && "$TEACHER_ID" != "null" ]] || fail "No teacher id in response"
 pass "Teacher created: id=$TEACHER_ID"
 
-TEACHER_AUTH="$TEACHER_EMAIL:$TEACHER_PASS"
+log "JWT login (teacher)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
+expect_code 200 "jwt login teacher"
+TEACHER_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$TEACHER_JWT" && "$TEACHER_JWT" != "null" ]] || fail "No accessToken for teacher"
+pass "Teacher JWT acquired"
+
+# Backward-compatible var name used across the script: now stores JWT (Bearer)
+TEACHER_AUTH="$TEACHER_JWT"
 
 # ------------------------------------------------------------
 # 3) Create COURSE (METHODIST)
@@ -338,18 +503,28 @@ pass "Student approved: id=$STUDENT_ID"
 # 7) Set known STUDENT password (ADMIN) so we can login in this script
 # ------------------------------------------------------------
 log "Fetch STUDENT role id (ADMIN)"
-request_json GET "/api/roles/name/STUDENT" "$ADMIN_AUTH" -H "Accept: application/json"
+request_json GET "/api/roles/name/STUDENT" "$ADMIN_JWT" -H "Accept: application/json"
 expect_code 200 "get STUDENT role"
 ROLE_STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 
 log "Set known password for the approved STUDENT (ADMIN)"
-request_json PUT "/api/users/$STUDENT_ID" "$ADMIN_AUTH" \
+request_json PUT "/api/users/$STUDENT_ID" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"id\":$STUDENT_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT_NAME\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
 expect_code 200 "set student password"
 pass "Student password set"
 
-STUDENT_AUTH="$STUDENT_EMAIL:$STUDENT_PASS"
+log "JWT login (student)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect_code 200 "jwt login student"
+STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT_JWT" && "$STUDENT_JWT" != "null" ]] || fail "No accessToken for student"
+
+# Backward-compatible var name used across the script: now stores JWT (Bearer)
+STUDENT_AUTH="$STUDENT_JWT"
+pass "Student JWT acquired"
 
 # ------------------------------------------------------------
 # 7c) ACHIEVEMENTS: create 2 achievements + verify "My achievements" page + award + class feed
@@ -811,6 +986,77 @@ echo "$HTTP_BODY" | grep -q "\"weeklyThisWeek\"" || fail "course page missing we
 echo "$HTTP_BODY" | grep -q "\"id\":$WEEKLY_ID" || fail "course page does not include weekly id=$WEEKLY_ID"
 pass "Course page includes weekly activity"
 
+# ------------------------------------------------------------
+# REMEDIAL_TASK activity: create -> add questions -> publish -> assign current week
+# (Visibility: only after assignment to a specific student based on low score <50% on the same topic)
+# ------------------------------------------------------------
+WEAK_TOPIC="WeakTopic_$SUF"
+
+log "Create REMEDIAL_TASK activity (DRAFT) as METHODIST (topic=$WEAK_TOPIC)"
+request_json POST "/api/courses/$COURSE_ID/activities" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"activityType\":\"REMEDIAL_TASK\",\"title\":\"Remedial_$SUF\",\"description\":\"Remedial task for weak topic\",\"topic\":\"$WEAK_TOPIC\",\"deadline\":\"$DEADLINE\",\"weightMultiplier\":1}"
+expect_code 201 "create remedial activity"
+REMEDIAL_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Remedial activity created: id=$REMEDIAL_ID"
+
+log "Add REMEDIAL question #1 (SINGLE_CHOICE, points=1)"
+request_json POST "/api/tests/$REMEDIAL_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"Select valid Python variable name\",\"option1\":\"1var\",\"option2\":\"var_1\",\"option3\":\"var-1\",\"option4\":\"var 1\",\"correctOption\":2}"
+expect_code 201 "create remedial q1"
+RQ1_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Negative: REMEDIAL_TASK cannot contain OPEN questions"
+request_json POST "/api/tests/$REMEDIAL_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionType\":\"OPEN\",\"points\":2,\"questionText\":\"Explain variables\"}"
+expect_code_one_of "remedial open question rejected" 400 409 422
+pass "OPEN questions are rejected for remedial activity"
+
+log "Add REMEDIAL question #2 (TEXT, points=1)"
+request_json POST "/api/tests/$REMEDIAL_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionType\":\"TEXT\",\"points\":1,\"questionText\":\"Python keyword to define a function?\",\"correctTextAnswer\":\"def\"}"
+expect_code 201 "create remedial q2"
+RQ2_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Publish REMEDIAL activity: DRAFT -> READY"
+request_json POST "/api/tests/$REMEDIAL_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish remedial ready"
+
+log "Assign REMEDIAL activity to current week (weekStart=$WEEK_START)"
+request_json POST "/api/activities/$REMEDIAL_ID/assign-week" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"weekStart\":\"$WEEK_START\"}"
+expect_code 200 "assign remedial week"
+pass "Remedial activity published and assigned to week"
+
+log "Negative: STUDENT cannot access REMEDIAL activity before it is assigned to them"
+request_json GET "/api/tests/$REMEDIAL_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student get remedial before assignment" 401 403 404
+pass "Student cannot access unassigned remedial activity"
+
+log "Student COURSE PAGE should NOT include remedial activity before assignment"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page (no remedial yet)"
+REM_LIST=$(json_get "$HTTP_BODY" '.remedialThisWeek')
+[[ "$REM_LIST" != "null" ]] || fail "course page missing remedialThisWeek"
+if command -v jq >/dev/null 2>&1; then
+  echo "$HTTP_BODY" | jq -e --argjson id "$REMEDIAL_ID" '.remedialThisWeek | any(.activity.id == $id)' >/dev/null && \
+    fail "Course page must not include remedial id=$REMEDIAL_ID before assignment"
+else
+	  python3 -c 'import json,sys
+rid=int(sys.argv[1])
+obj=json.load(sys.stdin)
+arr=obj.get("remedialThisWeek") or []
+found=any(isinstance(it,dict) and isinstance(it.get("activity"),dict) and (it.get("activity") or {}).get("id")==rid for it in arr)
+sys.exit(0 if found else 1)' "$REMEDIAL_ID" <<<"$HTTP_BODY"
+  [[ $? -ne 0 ]] || fail "Course page must not include remedial id=$REMEDIAL_ID before assignment"
+fi
+pass "Course page does not include remedial before assignment"
+
+
 log "TEACHER opens lesson2 for the class (required for student visibility)"
 request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code_one_of "teacher open lesson2" 200 201 204
@@ -877,6 +1123,120 @@ request_json PUT "/api/tests/$TEST_ID" "$METHODIST_AUTH" \
 # depending on your exception mapping it might be 400/409/403
 expect_code_one_of "edit published test" 400 403 409
 pass "Editing published test is blocked"
+
+# ------------------------------------------------------------
+# REMEDIAL auto-assignment: fail a topic test (<50%) -> remedial appears on course page
+# ------------------------------------------------------------
+log "Create WEAK TOPIC homework test (auto-graded) on lesson2 (topic=$WEAK_TOPIC)"
+request_json POST "/api/lessons/$LESSON2_ID/tests" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"WeakTest_$SUF\",\"description\":\"Weak topic baseline\",\"topic\":\"$WEAK_TOPIC\",\"deadline\":\"$DEADLINE\"}"
+expect_code 201 "create weak topic test"
+WEAK_TEST_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Add 2 auto-graded questions to weak test"
+request_json POST "/api/tests/$WEAK_TEST_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"In Python, '=' is ...\",\"option1\":\"assignment\",\"option2\":\"comparison\",\"option3\":\"division\",\"option4\":\"power\",\"correctOption\":1}"
+expect_code 201 "create weak q1"
+WEAK_Q1_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/tests/$WEAK_TEST_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":2,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"Which is a valid variable?\",\"option1\":\"my-var\",\"option2\":\"my var\",\"option3\":\"my_var\",\"option4\":\"3var\",\"correctOption\":3}"
+expect_code 201 "create weak q2"
+WEAK_Q2_ID=$(json_get "$HTTP_BODY" '.id')
+
+request_json POST "/api/tests/$WEAK_TEST_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish weak test ready"
+
+log "TEACHER opens WEAK test for the class"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$WEAK_TEST_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher open weak test" 200 201 204
+pass "Weak test opened for class"
+
+log "Student START attempt on WEAK test"
+request_json POST "/api/tests/$WEAK_TEST_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start weak attempt"
+WEAK_ATT_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Student SUBMIT WEAK attempt with wrong answers (score should be <50% -> remedial assigned)"
+request_json POST "/api/attempts/$WEAK_ATT_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$WEAK_Q1_ID,\"selectedOption\":2},{\"questionId\":$WEAK_Q2_ID,\"selectedOption\":1}]}"
+expect_code 200 "submit weak attempt"
+WEAK_STATUS=$(json_get "$HTTP_BODY" '.status')
+WEAK_SCORE=$(json_get "$HTTP_BODY" '.score')
+WEAK_MAX=$(json_get "$HTTP_BODY" '.maxScore')
+[[ "$WEAK_STATUS" == "GRADED" ]] || fail "Expected weak attempt GRADED (auto-graded), got $WEAK_STATUS ($HTTP_BODY)"
+[[ "$WEAK_SCORE" == "0" ]] || fail "Expected weak score=0, got $WEAK_SCORE ($HTTP_BODY)"
+[[ "$WEAK_MAX" == "2" ]] || fail "Expected weak maxScore=2, got $WEAK_MAX ($HTTP_BODY)"
+pass "Weak attempt graded $WEAK_SCORE/$WEAK_MAX (<50%)"
+
+log "Student COURSE PAGE should NOW include remedialThisWeek with REMEDIAL_ID (topic=$WEAK_TOPIC)"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page (remedial assigned)"
+REM_LIST=$(json_get "$HTTP_BODY" '.remedialThisWeek')
+[[ "$REM_LIST" != "null" ]] || fail "course page missing remedialThisWeek"
+REM_COUNT=$(json_len "$REM_LIST")
+[[ "$REM_COUNT" != "0" ]] || fail "Expected remedialThisWeek not empty after assignment, got: $HTTP_BODY"
+if command -v jq >/dev/null 2>&1; then
+  echo "$HTTP_BODY" | jq -e --argjson id "$REMEDIAL_ID" '.remedialThisWeek | any(.activity.id == $id)' >/dev/null || \
+    fail "Course page does not include remedial id=$REMEDIAL_ID after assignment: $HTTP_BODY"
+else
+	  python3 -c 'import json,sys
+rid=int(sys.argv[1])
+obj=json.load(sys.stdin)
+arr=obj.get("remedialThisWeek") or []
+found=any(isinstance(it,dict) and isinstance(it.get("activity"),dict) and (it.get("activity") or {}).get("id")==rid for it in arr)
+sys.exit(0 if found else 1)' "$REMEDIAL_ID" <<<"$HTTP_BODY"
+  [[ $? -eq 0 ]] || fail "Course page does not include remedial id=$REMEDIAL_ID after assignment: $HTTP_BODY"
+fi
+pass "Course page includes remedial after low score"
+
+log "Student can GET assigned REMEDIAL activity"
+request_json GET "/api/tests/$REMEDIAL_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student get remedial after assignment"
+pass "Student can access assigned remedial activity"
+
+log "Student START remedial attempt"
+request_json POST "/api/tests/$REMEDIAL_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start remedial attempt"
+REM_ATT_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Student SUBMIT remedial attempt (all correct -> auto-graded GRADED)"
+request_json POST "/api/attempts/$REM_ATT_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$RQ1_ID,\"selectedOption\":2},{\"questionId\":$RQ2_ID,\"textAnswer\":\"def\"}]}"
+expect_code 200 "submit remedial attempt"
+REM_STATUS=$(json_get "$HTTP_BODY" '.status')
+[[ "$REM_STATUS" == "GRADED" ]] || fail "Expected remedial attempt GRADED, got $REM_STATUS ($HTTP_BODY)"
+pass "Remedial attempt graded (auto)"
+
+log "Student COURSE PAGE should show latestAttempt for remedial activity"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student course page after remedial attempt"
+	if command -v jq >/dev/null 2>&1; then
+	  echo "$HTTP_BODY" | jq -e --argjson rid "$REMEDIAL_ID" --argjson aid "$REM_ATT_ID" \
+	    '.remedialThisWeek | any(.activity.id == $rid and (.latestAttempt.attemptId // -1) == $aid)' >/dev/null
+	else
+	  python3 -c 'import json,sys
+rid=int(sys.argv[1]); aid=int(sys.argv[2])
+obj=json.load(sys.stdin)
+arr=obj.get("remedialThisWeek") or []
+for it in arr:
+    if not isinstance(it,dict):
+        continue
+    act=it.get("activity") or {}
+    if isinstance(act,dict) and act.get("id")==rid:
+        la=it.get("latestAttempt")
+        if isinstance(la,dict) and la.get("attemptId")==aid:
+            raise SystemExit(0)
+raise SystemExit(1)' "$REMEDIAL_ID" "$REM_ATT_ID" <<<"$HTTP_BODY"
+	fi
+[[ $? -eq 0 ]] || fail "Course page missing remedial latestAttempt attemptId=$REM_ATT_ID (activityId=$REMEDIAL_ID): $HTTP_BODY"
+pass "Course page includes remedial latestAttempt"
+
 
 # ---------------- Student attempt flow ----------------
 log "Student START attempt"
@@ -1208,11 +1568,24 @@ expect_code 200 "approve join request 2"
 STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
 
 # set password for student2
-request_json PUT "/api/users/$STUDENT2_ID" "$ADMIN_AUTH" \
+request_json PUT "/api/users/$STUDENT2_ID" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"id\":$STUDENT2_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
 expect_code 200 "set student2 password"
-STUDENT2_AUTH="$STUDENT2_EMAIL:$STUDENT_PASS"
+log "JWT login (student2)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect_code 200 "jwt login student2"
+STUDENT2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT2_JWT" && "$STUDENT2_JWT" != "null" ]] || fail "No accessToken for student2"
+STUDENT2_AUTH="$STUDENT2_JWT"
+
+log "Negative: STUDENT2 cannot access remedial activity assigned to STUDENT1"
+request_json GET "/api/tests/$REMEDIAL_ID" "$STUDENT2_AUTH" -H "Accept: application/json"
+expect_code_one_of "student2 get чужой remedial forbidden" 401 403 404
+pass "Student2 cannot access remedial assigned to another student"
+
 
 # student2 starts attempt on test2 to create another attempt record
 request_json POST "/api/tests/$TEST2_ID/attempts/start" "$STUDENT2_AUTH" -H "Accept: application/json"
@@ -1227,12 +1600,19 @@ pass "Student cannot view other student's attempt"
 log "Negative: create second methodist and ensure access isolation (methodist cannot manage чужой курс/класс)"
 METHODIST2_NAME="methodist2_$SUF"
 METHODIST2_EMAIL="methodist2_$SUF@example.com"
-request_json POST "/api/users/admin/methodists" "$ADMIN_AUTH" \
+request_json POST "/api/users/admin/methodists" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$METHODIST2_NAME\",\"email\":\"$METHODIST2_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
 expect_code 201 "create methodist2"
 METHODIST2_ID=$(json_get "$HTTP_BODY" '.id')
-METHODIST2_AUTH="$METHODIST2_EMAIL:$METHODIST_PASS"
+log "JWT login (methodist2)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$METHODIST2_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
+expect_code 200 "jwt login methodist2"
+METHODIST2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$METHODIST2_JWT" && "$METHODIST2_JWT" != "null" ]] || fail "No accessToken for methodist2"
+METHODIST2_AUTH="$METHODIST2_JWT"
 
 # methodist2 tries to delete test from methodist1 course (should be forbidden)
 request_json DELETE "/api/tests/$TEST_ID" "$METHODIST2_AUTH" -H "Accept: application/json"
@@ -1262,7 +1642,14 @@ request_json POST "/api/users/methodists/$METHODIST_ID/teachers" "$METHODIST_AUT
   -d "{\"name\":\"$TEACHER2_NAME\",\"email\":\"$TEACHER2_EMAIL\",\"password\":\"$TEACHER2_PASS\"}"
 expect_code 201 "create teacher2"
 TEACHER2_ID=$(json_get "$HTTP_BODY" '.id')
-TEACHER2_AUTH="$TEACHER2_EMAIL:$TEACHER2_PASS"
+log "JWT login (teacher2)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEACHER2_EMAIL\",\"password\":\"$TEACHER2_PASS\"}"
+expect_code 200 "jwt login teacher2"
+TEACHER2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$TEACHER2_JWT" && "$TEACHER2_JWT" != "null" ]] || fail "No accessToken for teacher2"
+TEACHER2_AUTH="$TEACHER2_JWT"
 pass "Teacher2 created: id=$TEACHER2_ID"
 
 CLASS2_NAME="Class2_$SUF"
@@ -1290,11 +1677,18 @@ request_json POST "/api/classes/$CLASS2_ID/join-requests/$REQUEST3_ID/approve" "
 expect_code 200 "approve join request 3"
 STUDENT3_ID=$(json_get "$HTTP_BODY" '.id')
 
-request_json PUT "/api/users/$STUDENT3_ID" "$ADMIN_AUTH" \
+request_json PUT "/api/users/$STUDENT3_ID" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"id\":$STUDENT3_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\",\"tgId\":\"$STUDENT3_TG\"}"
 expect_code 200 "set student3 password"
-STUDENT3_AUTH="$STUDENT3_EMAIL:$STUDENT3_PASS"
+log "JWT login (student3)"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\"}"
+expect_code 200 "jwt login student3"
+STUDENT3_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT3_JWT" && "$STUDENT3_JWT" != "null" ]] || fail "No accessToken for student3"
+STUDENT3_AUTH="$STUDENT3_JWT"
 pass "Student3 created: id=$STUDENT3_ID"
 
 log "Negative: TEACHER #1 cannot view statistics for чужой class (class2)"
@@ -1436,8 +1830,10 @@ REQ=$(json_get "$COURSE_OBJ" '.requiredTests')
 DONE=$(json_get "$COURSE_OBJ" '.completedTests')
 PCT=$(json_get "$COURSE_OBJ" '.percent')
 COMPL=$(json_get "$COURSE_OBJ" '.completed')
-[[ "$REQ" == "8" ]] || fail "Expected requiredTests=8 (2 existing + 6 shared), got $REQ ($COURSE_OBJ)"
-[[ "$DONE" == "8" ]] || fail "Expected completedTests=8, got $DONE ($COURSE_OBJ)"
+# Script creates 3 baseline required tests (2 original + 1 weak-topic) + 6 shared-topic tests = 9.
+EXPECTED_REQUIRED_TESTS=9
+[[ "$REQ" == "$EXPECTED_REQUIRED_TESTS" ]] || fail "Expected requiredTests=$EXPECTED_REQUIRED_TESTS (2 original + 1 weak-topic + 6 shared), got $REQ ($COURSE_OBJ)"
+[[ "$DONE" == "$EXPECTED_REQUIRED_TESTS" ]] || fail "Expected completedTests=$EXPECTED_REQUIRED_TESTS, got $DONE ($COURSE_OBJ)"
 [[ "$COMPL" == "true" ]] || fail "Expected completed=true, got $COMPL ($COURSE_OBJ)"
 float_ge "$PCT" "99.0" || fail "Expected percent >= 99.0, got $PCT ($COURSE_OBJ)"
 pass "Student overview stats OK (course progress + attempts/tests counts)"

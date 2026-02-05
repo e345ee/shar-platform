@@ -5,6 +5,7 @@ import com.course.entity.*;
 import com.course.exception.*;
 import com.course.repository.TestQuestionRepository;
 import com.course.repository.TestRepository;
+import com.course.repository.StudentRemedialAssignmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class TestService {
     private final StudyClassService studyClassService;
     private final UserService userService;
     private final AuthService authService;
+    private final StudentRemedialAssignmentRepository studentRemedialAssignmentRepository;
 
     public TestDto create(Integer lessonId, TestUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
@@ -129,6 +131,10 @@ public class TestService {
             if (lessonId != null) {
                 throw new TestValidationException("lessonId must be null for WEEKLY_STAR");
             }
+        } else if (type == ActivityType.REMEDIAL_TASK) {
+            if (lessonId != null) {
+                throw new TestValidationException("lessonId must be null for REMEDIAL_TASK");
+            }
         }
 
         String title = safeTrim(dto.getTitle());
@@ -146,7 +152,7 @@ public class TestService {
             throw new TestValidationException("Activity deadline is required");
         }
 
-        int defaultWeight = (type == ActivityType.HOMEWORK_TEST) ? 1 : 2;
+        int defaultWeight = (type == ActivityType.HOMEWORK_TEST || type == ActivityType.REMEDIAL_TASK) ? 1 : 2;
         Integer weight = dto.getWeightMultiplier() != null ? dto.getWeightMultiplier() : defaultWeight;
         if (weight == null || weight < 1 || weight > 100) {
             throw new TestValidationException("weightMultiplier must be between 1 and 100");
@@ -178,8 +184,8 @@ public class TestService {
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
         Test test = getEntityById(activityId);
-        if (test.getActivityType() != ActivityType.WEEKLY_STAR) {
-            throw new TestValidationException("Only WEEKLY_STAR can be assigned to a week");
+        if (test.getActivityType() != ActivityType.WEEKLY_STAR && test.getActivityType() != ActivityType.REMEDIAL_TASK) {
+            throw new TestValidationException("Only WEEKLY_STAR or REMEDIAL_TASK can be assigned to a week");
         }
         assertOwner(test.getCourse().getCreatedBy(), current, "Only course creator can assign weekly activity");
 
@@ -362,6 +368,9 @@ public class TestService {
         q.setQuestionText(safeTrim(dto.getQuestionText()));
 
         TestQuestionType type = parseQuestionType(dto.getQuestionType(), TestQuestionType.SINGLE_CHOICE);
+        if (test.getActivityType() == ActivityType.REMEDIAL_TASK && type == TestQuestionType.OPEN) {
+            throw new TestQuestionValidationException("REMEDIAL_TASK cannot contain OPEN questions");
+        }
         q.setQuestionType(type);
         q.setPoints(dto.getPoints() == null ? 1 : dto.getPoints());
 
@@ -428,7 +437,11 @@ public class TestService {
         q.setQuestionText(safeTrim(dto.getQuestionText()));
 
         if (dto.getQuestionType() != null) {
-            q.setQuestionType(parseQuestionType(dto.getQuestionType(), q.getQuestionType()));
+            TestQuestionType newType = parseQuestionType(dto.getQuestionType(), q.getQuestionType());
+            if (test.getActivityType() == ActivityType.REMEDIAL_TASK && newType == TestQuestionType.OPEN) {
+                throw new TestQuestionValidationException("REMEDIAL_TASK cannot contain OPEN questions");
+            }
+            q.setQuestionType(newType);
         }
         if (dto.getPoints() != null) {
             q.setPoints(dto.getPoints());
@@ -518,6 +531,14 @@ public class TestService {
                 studyClassService.assertTeacherCanManageCourse(courseId, currentUser);
             } else if (isRole(currentUser, ROLE_STUDENT)) {
                 classStudentService.assertStudentInCourse(currentUser.getId(), courseId, "Student is not enrolled in this course");
+
+                // Remedial tasks are visible only when explicitly assigned to the student.
+                if (test.getActivityType() == ActivityType.REMEDIAL_TASK) {
+                    boolean assigned = studentRemedialAssignmentRepository.existsByStudent_IdAndTest_Id(currentUser.getId(), test.getId());
+                    if (!assigned) {
+                        throw new ForbiddenOperationException("Remedial activity is not assigned to you");
+                    }
+                }
             }
         }
 

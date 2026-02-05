@@ -12,12 +12,13 @@ import java.time.LocalDateTime;
  * - HOMEWORK_TEST (lessonId required)
  * - CONTROL_WORK (lessonId optional)
  * - WEEKLY_STAR (lessonId must be null; assigned to a week separately)
+ * - REMEDIAL_TASK (lessonId must be null; can be assigned to a week; shown only to assigned students)
  */
 @Data
 public class CreateActivityDto {
 
     @NotNull
-    private String activityType; // HOMEWORK_TEST | CONTROL_WORK | WEEKLY_STAR
+    private String activityType; // HOMEWORK_TEST | CONTROL_WORK | WEEKLY_STAR | REMEDIAL_TASK
 
     /** Required for lesson-attached activities */
     private Integer lessonId;

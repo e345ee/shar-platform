@@ -123,4 +123,31 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Intege
             @Param("studentId") Integer studentId,
             @Param("testIds") List<Integer> testIds
     );
+
+    /**
+     * JPQL fallback used for course page aggregation.
+     * <p>
+     * Native projections can be finicky across environments; this query returns all attempts
+     * ordered so that the first attempt per testId is the latest.
+     */
+    @Query("select ta from TestAttempt ta join fetch ta.test t " +
+            "where ta.student.id = :studentId and t.id in :testIds " +
+            "order by t.id asc, ta.createdAt desc, ta.id desc")
+    List<TestAttempt> findAllForLatestMap(
+            @Param("studentId") Integer studentId,
+            @Param("testIds") List<Integer> testIds
+    );
+
+    /**
+     * For a student and a set of tests returns ids of tests that have at least one finished attempt.
+     */
+    @Query("select distinct ta.test.id from TestAttempt ta " +
+            "where ta.student.id = :studentId " +
+            "and ta.test.id in :testIds " +
+            "and ta.status in :statuses")
+    List<Integer> findCompletedTestIdsForStudent(
+            @Param("studentId") Integer studentId,
+            @Param("testIds") List<Integer> testIds,
+            @Param("statuses") List<TestAttemptStatus> statuses
+    );
 }

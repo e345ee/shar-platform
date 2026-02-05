@@ -34,6 +34,13 @@ logging:
     org.hibernate.SQL: DEBUG
 
 app:
+  jwt:
+    # For production, override via env var APP_JWT_SECRET
+    # Must be at least 32 characters for HS256
+    secret: "dev-secret-change-me-please-dev-secret-change-me"
+    # Access token TTL
+    access-token-ttl-minutes: 120
+
   s3:
     endpoint: http://localhost:9000
     region: us-east-1
@@ -44,3 +51,8 @@ app:
     max-avatar-bytes: 2097152
     max-achievement-photo-bytes: 5242880
     max-lesson-pdf-bytes: 10485760
+
+  remedial:
+    # Assign "задания для отстающих" when a student's result is strictly below this percent.
+    # Requirement: < 50%
+    min-percent: 50.0

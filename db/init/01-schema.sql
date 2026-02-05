@@ -202,13 +202,14 @@ CREATE INDEX idx_class_achievement_feed_class_created_at
 ----------------------------------------------------------------------
 
 DROP TABLE IF EXISTS
+    "student_remedial_assignments",
     "test_questions",
     "tests"
     CASCADE;
 
 CREATE TABLE "tests" (
     id           SERIAL PRIMARY KEY,
-    -- lesson attachment is optional (for WEEKLY_STAR lesson_id is NULL)
+    -- lesson attachment is optional (for WEEKLY_STAR/REMEDIAL_TASK lesson_id is NULL)
     lesson_id    INT REFERENCES "lessons"(id) ON DELETE CASCADE,
     -- course is always required (for lesson activities it matches lesson.course_id)
     course_id    INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
@@ -230,9 +231,9 @@ CREATE TABLE "tests" (
     updated_at   TIMESTAMP NOT NULL DEFAULT NOW(),
 
     -- multiple activities per lesson are allowed
-    CONSTRAINT chk_activity_type CHECK (activity_type IN ('HOMEWORK_TEST','CONTROL_WORK','WEEKLY_STAR')),
+    CONSTRAINT chk_activity_type CHECK (activity_type IN ('HOMEWORK_TEST','CONTROL_WORK','WEEKLY_STAR','REMEDIAL_TASK')),
     CONSTRAINT chk_weight_multiplier CHECK (weight_multiplier BETWEEN 1 AND 100),
-    CONSTRAINT chk_weekly_requires_no_lesson CHECK (activity_type <> 'WEEKLY_STAR' OR lesson_id IS NULL),
+    CONSTRAINT chk_weekly_requires_no_lesson CHECK (activity_type NOT IN ('WEEKLY_STAR','REMEDIAL_TASK') OR lesson_id IS NULL),
     CONSTRAINT chk_weekly_requires_week_monday CHECK (
         assigned_week_start IS NULL OR EXTRACT(ISODOW FROM assigned_week_start) = 1
     ),
@@ -245,6 +246,32 @@ CREATE TABLE "tests" (
 -- frequently used in topic aggregations
 CREATE INDEX IF NOT EXISTS idx_tests_course_topic ON "tests"(course_id, topic);
 CREATE INDEX IF NOT EXISTS idx_tests_topic ON "tests"(topic);
+
+----------------------------------------------------------------------
+-- 1.4.1. STUDENT REMEDIAL ASSIGNMENTS (назначения заданий для отстающих)
+----------------------------------------------------------------------
+
+CREATE TABLE "student_remedial_assignments" (
+    id                 SERIAL PRIMARY KEY,
+    student_id         INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    test_id            INT NOT NULL REFERENCES "tests"(id) ON DELETE CASCADE,
+    course_id          INT NOT NULL REFERENCES "courses"(id) ON DELETE CASCADE,
+    topic              VARCHAR(127) NOT NULL,
+    assigned_week_start DATE,
+    assigned_at        TIMESTAMP NOT NULL DEFAULT NOW(),
+    completed_at       TIMESTAMP,
+
+    CONSTRAINT uq_student_remedial_assignment UNIQUE (student_id, test_id),
+    CONSTRAINT chk_sra_topic_len CHECK (char_length(topic) BETWEEN 1 AND 127),
+    CONSTRAINT chk_sra_week_monday CHECK (
+        assigned_week_start IS NULL OR EXTRACT(ISODOW FROM assigned_week_start) = 1
+    )
+);
+
+CREATE INDEX idx_sra_student ON "student_remedial_assignments"(student_id);
+CREATE INDEX idx_sra_course ON "student_remedial_assignments"(course_id);
+CREATE INDEX idx_sra_topic ON "student_remedial_assignments"(topic);
+CREATE INDEX idx_sra_student_course_week ON "student_remedial_assignments"(student_id, course_id, assigned_week_start);
 
 
 CREATE TABLE "test_questions" (
