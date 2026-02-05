@@ -5,6 +5,7 @@ import com.course.entity.Course;
 import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
 import com.course.entity.User;
+import com.course.exception.ClassNotFoundException;
 import com.course.exception.ForbiddenOperationException;
 import com.course.exception.ResourceNotFoundException;
 import com.course.repository.StudyClassRepository;
@@ -68,13 +69,13 @@ public class StudyClassService {
     @Transactional(readOnly = true)
     public StudyClass getEntityById(Integer id) {
         return classRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+                .orElseThrow(() -> new ClassNotFoundException("Class with id " + id + " not found"));
     }
 
     @Transactional(readOnly = true)
     public StudyClass getEntityByJoinCode(String joinCode) {
         return classRepository.findByJoinCode(joinCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Class with code " + joinCode + " not found"));
+                .orElseThrow(() -> new ClassNotFoundException("Class with code " + joinCode + " not found"));
     }
 
     @Transactional(readOnly = true)
@@ -117,13 +118,13 @@ public class StudyClassService {
         StudyClass sc;
         if (ROLE_TEACHER == role) {
             sc = classRepository.findByIdAndTeacherId(id, current.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+                    .orElseThrow(() -> new ClassNotFoundException("Class with id " + id + " not found"));
             return toDto(sc);
         }
 
         if (ROLE_METHODIST == role) {
             sc = classRepository.findByIdAndCreatedById(id, current.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Class with id " + id + " not found"));
+                    .orElseThrow(() -> new ClassNotFoundException("Class with id " + id + " not found"));
             return toDto(sc);
         }
 

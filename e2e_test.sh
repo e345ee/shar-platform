@@ -501,9 +501,10 @@ pass "Class feed stays correct after achievement delete"
 
 
 log "Negative: Student cannot view feed of a class they are not enrolled in"
+OTHER_CLASS_NAME="OtherClass_$SUF"
 request_json POST "/api/classes" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"OtherClass_$SUF\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER_ID}"
+  -d "{\"name\":\"$OTHER_CLASS_NAME\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER_ID}"
 expect_code 201 "create other class"
 OTHER_CLASS_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -815,22 +816,50 @@ request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" 
 expect_code_one_of "teacher open lesson2" 200 201 204
 pass "Lesson2 opened for class"
 
-log "Student list tests in lesson2: should include READY test2"
+log "SRS 3.2.3: Student list tests in lesson2: should be EMPTY until teacher opens the TEST"
 request_json GET "/api/lessons/$LESSON2_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
-expect_code 200 "student list tests in lesson2"
+expect_code 200 "student list tests in lesson2 (closed)"
 LIST2_COUNT=$(json_len "$HTTP_BODY")
-[[ "$LIST2_COUNT" == "1" ]] || fail "Expected 1 visible test in lesson2, got $LIST2_COUNT: $HTTP_BODY"
-pass "Student sees READY test in lesson2"
+[[ "$LIST2_COUNT" == "0" ]] || fail "Expected 0 visible tests in lesson2 before open, got $LIST2_COUNT: $HTTP_BODY"
+pass "Student cannot see lesson2 tests before teacher opens them"
 
+log "SRS 3.2.3: Student GET test1 before open should be forbidden"
+request_json GET "/api/tests/$TEST_ID" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student get test1 before open" 401 403 404
+pass "Student cannot GET test1 before open"
 
-log "Student list tests in lesson: should include READY test"
+log "TEACHER opens TEST1 for the class"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$TEST_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher open test1" 200 201 204
+pass "Test1 opened for class"
+
+log "Student list tests in lesson2: should now include READY test1"
+request_json GET "/api/lessons/$LESSON2_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list tests in lesson2 (opened)"
+LIST2_COUNT=$(json_len "$HTTP_BODY")
+[[ "$LIST2_COUNT" == "1" ]] || fail "Expected 1 visible test in lesson2 after open, got $LIST2_COUNT: $HTTP_BODY"
+pass "Student sees READY test in lesson2 after teacher opened it"
+
+log "SRS 3.2.3: Student list tests in lesson1: should be EMPTY until teacher opens the TEST2"
 request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
-expect_code 200 "student list lesson tests (ready visible)"
+expect_code 200 "student list lesson1 tests (closed)"
 LIST_COUNT=$(json_get "$HTTP_BODY" 'length')
-[[ "$LIST_COUNT" == "1" ]] || fail "Expected 1 visible test, got $LIST_COUNT: $HTTP_BODY"
-pass "Student sees published test"
+[[ "$LIST_COUNT" == "0" ]] || fail "Expected 0 visible tests in lesson1 before open, got $LIST_COUNT: $HTTP_BODY"
+pass "Student cannot see lesson1 tests before teacher opens them"
 
-log "Student GET test (public view): should NOT contain correctOption/correctTextAnswer"
+log "TEACHER opens TEST2 for the class"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$TEST2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code_one_of "teacher open test2" 200 201 204
+pass "Test2 opened for class"
+
+log "Student list tests in lesson1: should now include READY test2"
+request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "student list lesson1 tests (opened)"
+LIST_COUNT=$(json_get "$HTTP_BODY" 'length')
+[[ "$LIST_COUNT" == "1" ]] || fail "Expected 1 visible test in lesson1 after open, got $LIST_COUNT: $HTTP_BODY"
+pass "Student sees published test after teacher opened it"
+
+log "Student GET test1 (public view): should NOT contain correctOption/correctTextAnswer"
 request_json GET "/api/tests/$TEST_ID" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student get test"
 if echo "$HTTP_BODY" | grep -q "correctOption"; then
@@ -1331,6 +1360,13 @@ for i in 1 2 3 4 5 6; do
 done
 pass "Shared-topic tests created and published: ${#SHARED_TEST_IDS[@]}"
 
+log "SRS 3.2.3: TEACHER opens all shared-topic tests for class1"
+for tid in "${SHARED_TEST_IDS[@]}"; do
+  request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$tid/open" "$TEACHER_AUTH" -H "Accept: application/json"
+  expect_code_one_of "teacher open shared test $tid" 200 201 204
+done
+pass "Teacher opened shared-topic tests"
+
 log "Student list tests in lesson should now include original + shared tests"
 request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student list lesson tests after shared tests"
@@ -1505,6 +1541,81 @@ pass "Methodist2 can view own course stats"
 request_json GET "/api/methodist/statistics/courses/$M2_COURSE_ID/topics" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code_one_of "methodist1 cannot view methodist2 course stats" 401 403 404
 pass "Methodist1 cannot view чужой course stats"
+
+
+# ------------------- METHODIST TEACHER STATISTICS -------------------
+log "SRS 3.1.3: METHODIST teacher statistics (JSON)"
+request_json GET "/api/methodist/statistics/teachers" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist teacher stats"
+echo "$HTTP_BODY" | grep -q "\"teacherId\":$TEACHER_ID" || fail "Teacher1 missing in teacher stats: $HTTP_BODY"
+echo "$HTTP_BODY" | grep -q "\"teacherId\":$TEACHER2_ID" || fail "Teacher2 missing in teacher stats: $HTTP_BODY"
+pass "Methodist teacher stats returns both teachers"
+
+log "SRS 3.1.4: METHODIST download CSV with teacher statistics"
+request_json GET "/api/methodist/statistics/teachers/export/csv" "$METHODIST_AUTH" -H "Accept: text/csv"
+expect_code 200 "methodist teacher stats CSV"
+echo "$HTTP_BODY" | head -n 1 | grep -q "teacherId,teacherName,teacherEmail" || fail "CSV header missing/incorrect: $(echo "$HTTP_BODY" | head -n 2)"
+echo "$HTTP_BODY" | grep -q "$TEACHER_EMAIL" || fail "CSV does not contain teacher1 email: $HTTP_BODY"
+echo "$HTTP_BODY" | grep -q "$TEACHER2_EMAIL" || fail "CSV does not contain teacher2 email: $HTTP_BODY"
+pass "Methodist teacher stats CSV OK"
+
+
+# ------------------------------------------------------------
+# 20) SRS 3.2.1: TEACHER removes STUDENT from class
+# ------------------------------------------------------------
+log "SRS 3.2.1: TEACHER removes STUDENT from class"
+request_json DELETE "/api/classes/$CLASS_ID/students/$STUDENT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 204 "teacher removes student from class"
+pass "Student removed from class"
+
+log "After removal: STUDENT cannot access course page anymore"
+request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student blocked from course after removal" 403 404
+pass "Student is blocked from course page after removal"
+
+log "After removal: STUDENT cannot access class achievement feed anymore"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code_one_of "student blocked from class feed after removal" 403 404
+pass "Student is blocked from class feed after removal"
+
+log "Idempotency-ish: deleting same student again should return 404"
+request_json DELETE "/api/classes/$CLASS_ID/students/$STUDENT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 404 "delete student again -> 404"
+pass "Second delete returns 404 as expected"
+
+
+# ------------------------------------------------------------
+# 21) SRS 3.1.2: Deleting teacher - alternative flow (teacher has active classes)
+# ------------------------------------------------------------
+log "SRS 3.1.2 alt: METHODIST tries to delete TEACHER #1 who is still assigned to class1 -> should return 409"
+request_json DELETE "/api/users/methodists/$METHODIST_ID/teachers/$TEACHER_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 409 "delete teacher1 with active classes -> 409"
+echo "$HTTP_BODY" | grep -q "$CLASS_ID" || echo "(warn) conflict message did not include class id; body=$HTTP_BODY"
+pass "Teacher deletion is blocked while assigned to active classes"
+
+log "Reassign class1 to TEACHER #2"
+request_json PUT "/api/classes/$CLASS_ID" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$CLASS_NAME\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER2_ID}"
+expect_code 200 "reassign class1 teacher"
+pass "Class1 reassigned"
+
+# We also created OTHER_CLASS_ID earlier for negative чужой access checks. It is
+# assigned to TEACHER #1 too, so reassign it as well; otherwise deleteTeacher
+# will still correctly return 409.
+if [[ -n "${OTHER_CLASS_ID:-}" ]]; then
+  log "Reassign OtherClass to TEACHER #2 (cleanup for teacher deletion)"
+  request_json PUT "/api/classes/$OTHER_CLASS_ID" "$METHODIST_AUTH" \
+    -H "Content-Type: application/json" \
+    -d "{\"name\":\"${OTHER_CLASS_NAME:-OtherClass_$SUF}\",\"courseId\":$COURSE_ID,\"teacherId\":$TEACHER2_ID}"
+  expect_code 200 "reassign other class teacher"
+  pass "OtherClass reassigned"
+fi
+
+log "Now delete TEACHER #1 should succeed"
+request_json DELETE "/api/users/methodists/$METHODIST_ID/teachers/$TEACHER_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 204 "delete teacher1 after reassignment"
+pass "Teacher1 deleted after reassignment"
 
 log "All tests passed ✅"
 echo "Users created:"

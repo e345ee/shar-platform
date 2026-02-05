@@ -56,6 +56,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/courses/*/lessons/**").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
                         .requestMatchers("/api/courses/**").hasRole(RoleName.METHODIST.name())
                         .requestMatchers("/api/classes/*/join-requests/**").hasAnyRole(RoleName.TEACHER.name(), RoleName.METHODIST.name())
+                        // SRS 3.2.1: teacher removes student from class
+                        .requestMatchers(HttpMethod.DELETE, "/api/classes/*/students/*").hasAnyRole(RoleName.TEACHER.name(), RoleName.METHODIST.name())
                         .requestMatchers(HttpMethod.GET, "/api/classes/*/achievement-feed").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name(), RoleName.STUDENT.name())
                         .requestMatchers("/api/classes/**").hasRole(RoleName.METHODIST.name())
                         .requestMatchers("/api/courses/*/classes").hasRole(RoleName.METHODIST.name())

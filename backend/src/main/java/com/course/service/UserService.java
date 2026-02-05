@@ -9,7 +9,9 @@ import com.course.entity.User;
 import com.course.exception.DuplicateResourceException;
 import com.course.exception.ForbiddenOperationException;
 import com.course.exception.ResourceNotFoundException;
+import com.course.exception.TeacherDeletionConflictException;
 import com.course.repository.RoleRepository;
+import com.course.repository.StudyClassRepository;
 import com.course.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -32,6 +34,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AvatarStorageService avatarStorageService;
     private final MethodistTeacherService methodistTeacherService;
+    private final StudyClassRepository studyClassRepository;
 
     private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
     private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
@@ -236,6 +239,22 @@ public class UserService {
         long owners = methodistTeacherService.countOwners(teacherUserId);
         if (owners > 1) {
             throw new ForbiddenOperationException("Teacher is linked to another methodist");
+        }
+
+        // SRS 3.1.2 alt flow: if teacher is assigned to any existing classes,
+        // backend must block deletion and let UI propose selecting another teacher.
+        var assignedClasses = studyClassRepository.findAllByTeacherId(teacherUserId);
+        if (assignedClasses != null && !assignedClasses.isEmpty()) {
+            String classList = assignedClasses.stream()
+                    .map(c -> {
+                        String id = c.getId() == null ? "?" : String.valueOf(c.getId());
+                        String name = c.getName() == null ? "" : c.getName();
+                        return name.isBlank() ? id : (id + ":" + name);
+                    })
+                    .collect(Collectors.joining(", "));
+            throw new TeacherDeletionConflictException(
+                    "Teacher is assigned to active classes. Reassign teacher for these classes before deletion: " + classList
+            );
         }
 
         methodistTeacherService.unlinkTeacher(metodistUserId, teacherUserId);

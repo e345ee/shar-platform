@@ -1,6 +1,13 @@
 package com.course.service;
 
+import com.course.entity.ClassStudent;
+import com.course.entity.RoleName;
+import com.course.entity.StudyClass;
+import com.course.entity.User;
+import com.course.exception.ClassStudentAccessDeniedException;
 import com.course.exception.ForbiddenOperationException;
+import com.course.exception.ResourceNotFoundException;
+import com.course.exception.StudentNotEnrolledInClassException;
 import com.course.repository.ClassStudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -12,6 +19,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ClassStudentService {
 
     private final ClassStudentRepository classStudentRepository;
+
+    private final StudyClassService classService;
+    private final AuthService authService;
+    private final UserService userService;
+
+    private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
+    private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
+    private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
 
     public boolean existsStudentInClass(Integer studentId, Integer classId) {
         if (studentId == null || classId == null) {
@@ -83,5 +98,57 @@ public class ClassStudentService {
         if (!existsStudentInMethodistCourses(studentId, methodistId)) {
             throw new ForbiddenOperationException(message);
         }
+    }
+
+    /**
+     * Business operation (SRS 3.2.1): remove a student from a specific study class.
+     *
+     * Access rules:
+     * - TEACHER: only for own classes (class.teacher == current user)
+     * - METHODIST: only for classes created by current user (class.createdBy == current user)
+     */
+    @Transactional
+    public void removeStudentFromClass(Integer classId, Integer studentId) {
+        if (classId == null || studentId == null) {
+            throw new IllegalArgumentException("classId and studentId are required");
+        }
+
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
+            // keep consistent with other services in the project
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        RoleName role = current.getRole().getRolename();
+        boolean isTeacher = role == ROLE_TEACHER;
+        boolean isMethodist = role == ROLE_METHODIST;
+        if (!isTeacher && !isMethodist) {
+            throw new ClassStudentAccessDeniedException("Only TEACHER or METHODIST can remove students from classes");
+        }
+
+        StudyClass sc = classService.getEntityById(classId);
+
+        if (isTeacher) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || current.getId() == null
+                    || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class teacher can remove students");
+            }
+        }
+
+        if (isMethodist) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || current.getId() == null
+                    || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class creator can remove students");
+            }
+        }
+
+        User student = userService.getUserEntityById(studentId);
+        userService.assertUserEntityHasRole(student, ROLE_STUDENT);
+
+        ClassStudent cs = classStudentRepository.findByStudyClassIdAndStudentId(classId, studentId)
+                .orElseThrow(() -> new StudentNotEnrolledInClassException(
+                        "Student with id " + studentId + " is not enrolled in class " + classId));
+
+        classStudentRepository.delete(cs);
     }
 }

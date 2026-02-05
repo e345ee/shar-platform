@@ -111,6 +111,18 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <!--
+                      Lombok relies on annotation processing.
+                      Some build environments (including Docker builds) may disable it implicitly,
+                      which results in missing getters/setters (e.g., getId(), setX()).
+                      Force annotation processing to be enabled.
+                    -->
+                    <!--
+                      Do NOT set <proc> here.
+                      The only valid values are "none" and "only".
+                      Leaving it unset keeps javac's default (compile + annotation processing),
+                      which is what Lombok needs.
+                    -->
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>

@@ -177,7 +177,7 @@ CREATE TABLE "student_achievements" (
     id                SERIAL PRIMARY KEY,
     student_id        INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
     achievement_id    INT NOT NULL REFERENCES "achievements"(id) ON DELETE CASCADE,
-    awarded_by        INT NOT NULL REFERENCES "users"(id),
+    awarded_by        INT REFERENCES "users"(id) ON DELETE SET NULL,
     awarded_at        TIMESTAMP NOT NULL DEFAULT NOW(),
 
     CONSTRAINT uq_student_achievement UNIQUE (student_id, achievement_id)
@@ -189,7 +189,7 @@ CREATE TABLE "class_achievement_feed" (
     class_id       INT NOT NULL REFERENCES "classes"(id) ON DELETE CASCADE,
     student_id     INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
     achievement_id INT NOT NULL REFERENCES "achievements"(id) ON DELETE CASCADE,
-    awarded_by     INT NOT NULL REFERENCES "users"(id),
+    awarded_by        INT REFERENCES "users"(id) ON DELETE SET NULL,
     awarded_at     TIMESTAMP NOT NULL DEFAULT NOW(),
     created_at     TIMESTAMP NOT NULL DEFAULT NOW()
 );

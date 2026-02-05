@@ -29,6 +29,7 @@ public class TestService {
     private final LessonService lessonService;
     private final CourseService courseService;
     private final ClassStudentService classStudentService;
+    private final ClassOpenedTestService classOpenedTestService;
     private final StudyClassService studyClassService;
     private final UserService userService;
     private final AuthService authService;
@@ -235,6 +236,16 @@ public class TestService {
         List<Test> tests = canSeeDrafts
                 ? testRepository.findAllByLesson_Id(lessonId)
                 : testRepository.findAllByLesson_IdAndStatus(lessonId, TestStatus.READY);
+
+        // SRS 3.2.3: for students, lesson-bound tests become visible only after the teacher opens the test
+        // for the student's class.
+        if (isRole(current, ROLE_STUDENT) && !tests.isEmpty()) {
+            List<Integer> opened = classOpenedTestService.findOpenedTestIdsForStudentInLesson(current.getId(), lessonId);
+            if (opened.isEmpty()) {
+                return List.of();
+            }
+            tests = tests.stream().filter(t -> t.getId() != null && opened.contains(t.getId())).toList();
+        }
 
         return tests.stream().map(this::toSummaryDto).toList();
     }
@@ -483,6 +494,16 @@ public class TestService {
         if (test.getLesson() != null && test.getLesson().getId() != null) {
             // ensures lesson access (incl. student-in-course + lesson opened gating)
             lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
+
+            // SRS 3.2.3: for students, access is opened per-test (in addition to lesson open gating)
+            User currentUser = authService.getCurrentUserEntity();
+            if (isRole(currentUser, ROLE_STUDENT)) {
+                classOpenedTestService.assertTestOpenedForStudent(
+                        currentUser.getId(),
+                        test.getId(),
+                        "Test is not opened for your class yet"
+                );
+            }
         } else {
             // course-level activity (e.g. WEEKLY_STAR) - not bound to a lesson
             if (test.getCourse() == null || test.getCourse().getId() == null) {

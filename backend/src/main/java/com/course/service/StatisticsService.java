@@ -30,6 +30,60 @@ public class StatisticsService {
 
     private final StatisticsRepository statisticsRepository;
 
+    public List<TeacherStatsDto> getTeacherStatsForCurrentMethodist(Integer methodistIdOverrideForAdmin) {
+        User current = authService.getCurrentUserEntity();
+        assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
+
+        Integer methodistId = null;
+        if (isRole(current, ROLE_METHODIST)) {
+            methodistId = current.getId();
+        } else {
+            // ADMIN may request stats for a specific methodist
+            methodistId = methodistIdOverrideForAdmin;
+        }
+
+        if (methodistId == null) {
+            return List.of();
+        }
+
+        return statisticsRepository.findTeacherStatsForMethodist(methodistId)
+                .stream().map(p -> {
+                    TeacherStatsDto dto = new TeacherStatsDto();
+                    dto.setTeacherId(p.getTeacherId());
+                    dto.setTeacherName(p.getTeacherName());
+                    dto.setTeacherEmail(p.getTeacherEmail());
+                    dto.setClassesCount(nullSafe(p.getClassesCount()));
+                    dto.setStudentsCount(nullSafe(p.getStudentsCount()));
+                    dto.setSubmittedAttemptsCount(nullSafe(p.getSubmittedAttemptsCount()));
+                    dto.setGradedAttemptsCount(nullSafe(p.getGradedAttemptsCount()));
+                    dto.setAvgGradePercent(p.getAvgGradePercent());
+                    return dto;
+                }).toList();
+    }
+
+    /**
+     * CSV export for SRS 3.1.4.
+     */
+    public String exportTeacherStatsCsv(Integer methodistIdOverrideForAdmin) {
+        List<TeacherStatsDto> rows = getTeacherStatsForCurrentMethodist(methodistIdOverrideForAdmin);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("teacherId,teacherName,teacherEmail,classesCount,studentsCount,submittedAttemptsCount,gradedAttemptsCount,avgGradePercent\n");
+
+        for (TeacherStatsDto r : rows) {
+            sb.append(csv(r.getTeacherId()));
+            sb.append(',').append(csv(r.getTeacherName()));
+            sb.append(',').append(csv(r.getTeacherEmail()));
+            sb.append(',').append(csv(r.getClassesCount()));
+            sb.append(',').append(csv(r.getStudentsCount()));
+            sb.append(',').append(csv(r.getSubmittedAttemptsCount()));
+            sb.append(',').append(csv(r.getGradedAttemptsCount()));
+            sb.append(',').append(csv(r.getAvgGradePercent()));
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
     public List<StudentTopicStatsDto> getMyTopicStats(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
@@ -193,6 +247,19 @@ public class StatisticsService {
 
     private static Long nullSafe(Long v) {
         return v == null ? 0L : v;
+    }
+
+    private static String csv(Object v) {
+        if (v == null) {
+            return "";
+        }
+        String s = String.valueOf(v);
+        boolean needsQuotes = s.contains(",") || s.contains("\n") || s.contains("\r") || s.contains("\"");
+        if (needsQuotes) {
+            s = s.replace("\"", "\"\"");
+            return '"' + s + '"';
+        }
+        return s;
     }
 
     private void assertAnyRole(User user, RoleName... roles) {

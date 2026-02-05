@@ -5,8 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Optional;
+
 public interface ClassStudentRepository extends JpaRepository<ClassStudent, Integer> {
     boolean existsByStudyClassIdAndStudentId(Integer classId, Integer studentId);
+
+    Optional<ClassStudent> findByStudyClassIdAndStudentId(Integer classId, Integer studentId);
 
     @Query("select cs.studyClass.id from ClassStudent cs where cs.student.id = :studentId and cs.studyClass.course.id = :courseId")
     java.util.List<Integer> findClassIdsByStudentInCourse(@Param("studentId") Integer studentId,

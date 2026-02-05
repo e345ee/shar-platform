@@ -3,12 +3,16 @@ package com.course.controller;
 import com.course.dto.StudyClassDto;
 import com.course.entity.Lesson;
 import com.course.entity.StudyClass;
+import com.course.entity.Test;
+import com.course.entity.TestStatus;
 import com.course.entity.User;
 import com.course.entity.RoleName;
 import com.course.service.StudyClassService;
 import com.course.service.AuthService;
 import com.course.service.ClassOpenedLessonService;
+import com.course.service.ClassOpenedTestService;
 import com.course.service.LessonService;
+import com.course.service.TestService;
 import com.course.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +34,8 @@ public class TeacherClassesController {
     private final UserService userService;
     private final LessonService lessonService;
     private final ClassOpenedLessonService classOpenedLessonService;
+    private final TestService testService;
+    private final ClassOpenedTestService classOpenedTestService;
 
     @GetMapping("/api/teachers/me/classes")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
@@ -65,6 +71,38 @@ public class TeacherClassesController {
         }
 
         classOpenedLessonService.openLessonForClass(sc, lesson, current);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Teacher opens a TEST for a specific class.
+     *
+     * SRS 3.2.3: "Открыть доступ к тесту".
+     * Students will be able to see/start this test only after it is opened for their class.
+     */
+    @PostMapping("/api/teachers/me/classes/{classId}/tests/{testId}/open")
+    @PreAuthorize("hasRole('TEACHER')")
+    public ResponseEntity<Void> openTestForClass(@PathVariable Integer classId, @PathVariable Integer testId) {
+        User current = authService.getCurrentUserEntity();
+        userService.assertUserEntityHasRole(current, RoleName.TEACHER);
+
+        StudyClass sc = classService.getEntityById(classId);
+        if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
+            return ResponseEntity.status(403).build();
+        }
+
+        Test test = testService.getEntityById(testId);
+        if (test.getCourse() == null || sc.getCourse() == null || sc.getCourse().getId() == null
+                || test.getCourse().getId() == null || !sc.getCourse().getId().equals(test.getCourse().getId())) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // We open only READY tests, otherwise the action is meaningless for students.
+        if (test.getStatus() == null || test.getStatus() != TestStatus.READY) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        classOpenedTestService.openTestForClass(sc, test);
         return ResponseEntity.ok().build();
     }
 }

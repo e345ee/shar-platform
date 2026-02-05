@@ -31,6 +31,7 @@ public class StudentCoursePageService {
     private final CourseService courseService;
     private final LessonService lessonService;
     private final ClassOpenedLessonService classOpenedLessonService;
+    private final ClassOpenedTestService classOpenedTestService;
     private final ClassStudentService classStudentService;
 
     private final TestRepository testRepository;
@@ -59,6 +60,20 @@ public class StudentCoursePageService {
                         TestStatus.READY,
                         List.of(ActivityType.HOMEWORK_TEST, ActivityType.CONTROL_WORK)
                 );
+
+        // SRS 3.2.3: lesson-bound tests must be explicitly opened for the student's class.
+        // (Weekly activities are not lesson-bound and are controlled by week assignment.)
+        if (!lessonActivities.isEmpty()) {
+            List<Integer> openedTestIds = classOpenedTestService.findOpenedTestIdsForStudentInCourse(current.getId(), courseId);
+            if (openedTestIds.isEmpty()) {
+                lessonActivities = List.of();
+            } else {
+                Set<Integer> openedSet = new HashSet<>(openedTestIds);
+                lessonActivities = lessonActivities.stream()
+                        .filter(t -> t.getId() != null && openedSet.contains(t.getId()))
+                        .toList();
+            }
+        }
 
         // Weekly activities for current week
         LocalDate weekStart = LocalDate.now().with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));

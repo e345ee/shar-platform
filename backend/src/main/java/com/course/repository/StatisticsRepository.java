@@ -392,4 +392,33 @@ public interface StatisticsRepository extends JpaRepository<TestAttempt, Integer
             ORDER BY c.name ASC
             """, nativeQuery = true)
     List<StudentCourseProgressProjection> findStudentCourseProgress(@Param("studentId") Integer studentId);
+
+
+    @Query(value = """
+            SELECT
+              u.id AS teacherId,
+              u.name AS teacherName,
+              u.email AS teacherEmail,
+              COALESCE(COUNT(DISTINCT c.id), 0) AS classesCount,
+              COALESCE(COUNT(DISTINCT cs.student_id), 0) AS studentsCount,
+              COALESCE(COUNT(DISTINCT ta.id) FILTER (WHERE t.id IS NOT NULL AND ta.status = 'SUBMITTED'), 0) AS submittedAttemptsCount,
+              COALESCE(COUNT(DISTINCT ta.id) FILTER (WHERE t.id IS NOT NULL AND ta.status = 'GRADED'), 0) AS gradedAttemptsCount,
+              AVG(
+                CASE
+                  WHEN t.id IS NOT NULL AND ta.status = 'GRADED' AND COALESCE(ta.max_score, 0) > 0
+                    THEN (CAST(COALESCE(ta.score, 0) AS double precision) / ta.max_score) * 100
+                  ELSE NULL
+                END
+              ) AS avgGradePercent
+            FROM methodist_teachers mt
+            JOIN users u ON u.id = mt.teacher_id
+            LEFT JOIN classes c ON c.teacher_id = u.id
+            LEFT JOIN class_students cs ON cs.class_id = c.id
+            LEFT JOIN test_attempts ta ON ta.student_id = cs.student_id AND ta.status IN ('SUBMITTED','GRADED')
+            LEFT JOIN tests t ON t.id = ta.test_id AND t.course_id = c.course_id
+            WHERE mt.methodist_id = :methodistId
+            GROUP BY u.id, u.name, u.email
+            ORDER BY u.name ASC NULLS LAST, u.id ASC
+            """, nativeQuery = true)
+    List<TeacherStatsProjection> findTeacherStatsForMethodist(@Param("methodistId") Integer methodistId);
 }

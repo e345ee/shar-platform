@@ -11,7 +11,7 @@ public interface ClassAchievementFeedRepository extends JpaRepository<ClassAchie
 
     @Query("select f from ClassAchievementFeed f " +
             "join fetch f.student s " +
-            "join fetch f.awardedBy ab " +
+            "left join fetch f.awardedBy ab " +
             "join fetch f.achievement a " +
             "left join fetch a.course c " +
             "where f.studyClass.id = :classId " +
