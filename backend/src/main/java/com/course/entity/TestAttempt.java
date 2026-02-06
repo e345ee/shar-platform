@@ -54,9 +54,7 @@ public class TestAttempt {
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
-    /**
-     * Autograde fields. score = number of correct answers.
-     */
+    
     @Column(name = "score")
     private Integer score;
 

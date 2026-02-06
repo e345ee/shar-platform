@@ -51,7 +51,7 @@ public class StudyClassService {
                         "Methodist can assign only own teachers"
                 );
             } else {
-                // Methodist can be a teacher, but only for own classes.
+                
                 if (teacher.getId() == null || current.getId() == null || !teacher.getId().equals(current.getId())) {
                     throw new ForbiddenOperationException("Methodist can assign only self as methodist-teacher");
                 }
@@ -87,7 +87,7 @@ public class StudyClassService {
 
     @Transactional(readOnly = true)
     public List<StudyClassDto> getAllByCourse(Integer courseId) {
-        // optional: validate that course exists using CourseService
+        
         courseService.getEntityById(courseId);
         return classRepository.findAllByCourseId(courseId).stream().map(this::toDto).toList();
     }
@@ -159,12 +159,12 @@ public class StudyClassService {
 
         StudyClass sc = getEntityById(id);
 
-        // По аналогии с курсом: редактирует только создатель класса
+        
         assertOwner(sc.getCreatedBy(), current, "Only class creator can edit this class");
 
         sc.setName(dto.getName());
 
-        // курс НЕ меняем (упрощение, чтобы не ломать логику)
+        
         if (dto.getCourseId() != null && !dto.getCourseId().equals(sc.getCourse().getId())) {
             throw new ForbiddenOperationException("Changing courseId is not allowed");
         }
@@ -181,7 +181,7 @@ public class StudyClassService {
                         "Methodist can assign only own teachers"
                 );
             } else {
-                // Methodist can be a teacher, but only for own classes.
+                
                 if (teacher.getId() == null || current.getId() == null || !teacher.getId().equals(current.getId())) {
                     throw new ForbiddenOperationException("Methodist can assign only self as methodist-teacher");
                 }
@@ -229,7 +229,7 @@ public class StudyClassService {
     }
 
     private String generateUniqueJoinCode() {
-        // 8 chars, no 0/1/I/O to reduce confusion when typing
+        
         for (int attempt = 0; attempt < 20; attempt++) {
             char[] buf = new char[8];
             for (int i = 0; i < buf.length; i++) {

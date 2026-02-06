@@ -50,7 +50,7 @@ public class StudentAchievementService {
         if (current.getRole().getRolename() == ROLE_TEACHER) {
             classService.assertTeacherCanManageCourse(achievement.getCourse().getId(), current);
         } else {
-            // Methodist can do everything teacher can, but only inside own courses.
+            
             if (achievement.getCourse().getCreatedBy() == null
                     || achievement.getCourse().getCreatedBy().getId() == null
                     || !achievement.getCourse().getCreatedBy().getId().equals(current.getId())) {
@@ -80,10 +80,10 @@ public class StudentAchievementService {
 
         StudentAchievement saved = studentAchievementRepository.save(sa);
 
-        // Publish to all class feeds where the student is enrolled for this course.
+        
         classAchievementFeedService.publishAward(saved);
 
-        // Notify student about a newly awarded achievement.
+        
         notificationService.create(student,
                 NotificationType.ACHIEVEMENT_AWARDED,
                 "Новая ачивка",
@@ -135,17 +135,13 @@ public class StudentAchievementService {
 
     @Transactional(readOnly = true)
     public List<StudentAchievementDto> listByStudent(Integer studentId) {
-        // Teacher/Methodist access control should be done in controller or via dedicated service,
-        // this method returns data only.
+        
+        
         return studentAchievementRepository.findAllByStudent_IdOrderByAwardedAtDesc(studentId)
                 .stream().map(this::toDto).toList();
     }
 
-    /**
-     * Used when an achievement is removed from the system.
-     * We delete award records explicitly to be compatible with databases
-     * where foreign keys might not have ON DELETE CASCADE.
-     */
+    
     public void deleteAllForAchievement(Integer achievementId) {
         if (achievementId == null) {
             return;

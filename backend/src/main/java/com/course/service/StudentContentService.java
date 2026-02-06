@@ -38,8 +38,8 @@ public class StudentContentService {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
-        // LessonService checks membership; additionally, students see lessons only
-        // after the responsible teacher opens them for their class.
+        
+        
         List<LessonDto> all = lessonService.listByCourse(courseId);
         List<Integer> openedIds = classOpenedLessonService.findOpenedLessonIdsForStudentInCourse(current.getId(), courseId);
         if (openedIds.isEmpty()) {

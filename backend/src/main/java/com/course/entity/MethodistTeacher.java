@@ -7,11 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Explicit ownership link between METHODIST and TEACHER.
- *
- * Needed to enforce: a methodist can manage (edit/delete/assign) only their own teachers.
- */
+
 @Entity
 @Table(
         name = "methodist_teachers",

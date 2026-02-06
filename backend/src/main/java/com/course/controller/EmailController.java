@@ -14,11 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/**
- * Simple endpoint to send an email to a user whose email is stored in DB.
- *
- * No DTOs by request: subject/text are passed as query parameters.
- */
+
 @RestController
 @RequiredArgsConstructor
 @Validated

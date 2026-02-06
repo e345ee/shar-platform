@@ -2,9 +2,7 @@ package com.course.repository;
 
 import java.time.LocalDateTime;
 
-/**
- * Projection for pending manual-grading attempts (native query result).
- */
+
 public interface PendingAttemptProjection {
     Integer getAttemptId();
     Integer getTestId();

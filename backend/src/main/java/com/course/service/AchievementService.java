@@ -179,7 +179,7 @@ public class AchievementService {
 
         Achievement saved = achievementRepository.save(a);
 
-        // if photo was replaced successfully, cleanup old one
+        
         if (form.getPhoto() != null && !form.getPhoto().isEmpty()) {
             photoStorageService.deleteByPublicUrl(oldUrl);
         }
@@ -217,7 +217,7 @@ public class AchievementService {
 
         String oldUrl = a.getPhotoUrl();
 
-        // Make deletion robust even if DB doesn't have ON DELETE CASCADE for student_achievements
+        
         studentAchievementService.deleteAllForAchievement(id);
 
         achievementRepository.delete(a);

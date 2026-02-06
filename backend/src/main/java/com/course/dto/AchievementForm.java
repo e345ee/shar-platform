@@ -5,10 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * Multipart form used for both create and update.
- * Photo is validated in service (content-type, size, etc).
- */
+
 @Data
 public class AchievementForm {
 
@@ -24,6 +21,6 @@ public class AchievementForm {
     @Size(min = 1, max = 2048)
     private String description;
 
-    // Optional; validated in service if present
+    
     private MultipartFile photo;
 }

@@ -21,7 +21,7 @@ public class TestDto {
     private String topic;
     private LocalDateTime deadline;
 
-    /** DRAFT or READY */
+    
     private String status;
     private LocalDateTime publishedAt;
 

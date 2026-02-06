@@ -82,7 +82,7 @@ public class LessonPresentationStorageService {
 
             return s3Client.getObject(req, ResponseTransformer.toBytes()).asByteArray();
         } catch (S3Exception e) {
-            // MinIO often returns 404 for missing keys.
+            
             if (e.statusCode() == 404) {
                 throw new LessonPresentationNotFoundException("Lesson presentation not found");
             }

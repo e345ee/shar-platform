@@ -15,7 +15,7 @@ public class StudentAchievementDto {
     private String achievementTitle;
     private String achievementPhotoUrl;
 
-    // For "My achievements" page: show conditions / rules to get an achievement
+    
     private Integer achievementCourseId;
     private String achievementJokeDescription;
     private String achievementDescription;

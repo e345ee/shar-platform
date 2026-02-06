@@ -18,12 +18,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
 
-    /**
-     * Username can be either email OR name.
-     *
-     * This is convenient for demos like "admin" / "admin" while still
-     * supporting email-based login.
-     */
+    
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(username)
@@ -39,7 +34,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         );
 
         return org.springframework.security.core.userdetails.User
-                // Keep the canonical username as email (if present)
+                
                 .withUsername(username)
                 .password(user.getPassword())
                 .authorities(authorities)

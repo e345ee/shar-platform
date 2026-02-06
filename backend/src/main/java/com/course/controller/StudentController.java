@@ -29,64 +29,48 @@ public class StudentController {
     private final TestService testService;
     private final CourseCompletionEmailService courseCompletionEmailService;
 
-    /**
-     * Aggregated course page payload for the student:
-     * opened lessons + lesson-bound activities (HOMEWORK/CONTROL) + weekly activity of current week
-     * with latest attempt status per activity.
-     */
+    
     @GetMapping("/courses/{courseId}/page")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<StudentCoursePageDto> getCoursePage(@PathVariable Integer courseId) {
         return ResponseEntity.ok(studentCoursePageService.getCoursePage(courseId));
     }
 
-    /**
-     * Student gets all courses where they are enrolled (via any class in the course).
-     */
+    
     @GetMapping("/courses")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<CourseDto>> listMyCourses() {
         return ResponseEntity.ok(studentContentService.listMyCourses());
     }
 
-    /**
-     * Student gets all lessons inside a course they belong to.
-     */
+    
     @GetMapping("/courses/{courseId}/lessons")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<LessonDto>> listMyLessonsInCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(studentContentService.listMyLessonsInCourse(courseId));
     }
 
-    /**
-     * Student gets latest submitted/graded attempt details for a test.
-     */
+    
     @GetMapping("/tests/{testId}/attempts/latest")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TestAttemptDto> getLatestCompletedAttempt(@PathVariable Integer testId) {
         return ResponseEntity.ok(testAttemptService.getLatestCompletedAttemptForTest(testId));
     }
 
-    /**
-     * Convenience endpoint: by lessonId (test is attached to a lesson).
-     * If lesson has no tests -> 404.
-     */
+    
     @GetMapping("/lessons/{lessonId}/test/attempts/latest")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TestAttemptDto> getLatestCompletedAttemptByLesson(@PathVariable Integer lessonId) {
         List<TestSummaryDto> tests = testService.listByLesson(lessonId);
         if (tests == null || tests.isEmpty()) {
-            // TestService throws Lesson access checks; here we just align behavior
+            
             throw new com.course.exception.ResourceNotFoundException("No test for lesson " + lessonId);
         }
         Integer testId = tests.get(0).getId();
         return ResponseEntity.ok(testAttemptService.getLatestCompletedAttemptForTest(testId));
     }
 
-    /**
-     * Student sends an email to own mailbox confirming course completion.
-     * Allowed only after teacher/methodist closes the course for the student.
-     */
+    
     @PostMapping("/courses/{courseId}/completion-email")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<Void> sendCompletionEmail(@PathVariable Integer courseId) {

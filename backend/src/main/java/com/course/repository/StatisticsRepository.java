@@ -7,9 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-/**
- * Native (read-only) aggregations for analytics/statistics.
- */
+
 public interface StatisticsRepository extends JpaRepository<TestAttempt, Integer> {
 
     @Query(value = """

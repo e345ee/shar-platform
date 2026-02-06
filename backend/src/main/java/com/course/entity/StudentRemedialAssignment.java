@@ -8,14 +8,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/**
- * Explicit assignment of a REMEDIAL_TASK activity to a concrete student.
- *
- * Rationale:
- * - REMEDIAL_TASK activities exist in a course (like weekly activities), but should not be visible
- *   to everyone.
- * - When a student has low results on a topic, the system assigns a matching remedial activity.
- */
+
 @Entity
 @Table(
         name = "student_remedial_assignments",
@@ -50,15 +43,11 @@ public class StudentRemedialAssignment {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    /**
-     * Denormalized topic of the assigned remedial activity (copied from Test.topic).
-     */
+    
     @Column(name = "topic", length = 127, nullable = false)
     private String topic;
 
-    /**
-     * If the remedial activity is assigned to a week (like WEEKLY_STAR), store the same week start.
-     */
+    
     @Column(name = "assigned_week_start")
     private LocalDate assignedWeekStart;
 

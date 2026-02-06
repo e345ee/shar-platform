@@ -62,7 +62,7 @@ public class LessonService {
 
         String url = presentationStorageService.uploadPresentation(courseId, form.getPresentation());
 
-        // Create at the end first, then reorder (to avoid unique constraint conflicts)
+        
         int maxOrder = lessonRepository.findMaxOrderIndexInCourse(courseId);
         int appendIndex = maxOrder + 1;
 
@@ -309,7 +309,7 @@ public class LessonService {
             throw new LessonAccessDeniedException("Forbidden");
         }
 
-        // METHODIST can view only lessons inside own courses
+        
         if (isRole(current, ROLE_METHODIST)) {
             User owner = lesson.getCourse().getCreatedBy();
             if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
@@ -318,7 +318,7 @@ public class LessonService {
             return;
         }
 
-        // TEACHER can view only lessons inside courses they teach (have at least one class)
+        
         if (isRole(current, ROLE_TEACHER)) {
             Integer courseId = lesson.getCourse().getId();
             studyClassService.assertTeacherCanManageCourse(courseId, current);
@@ -333,8 +333,8 @@ public class LessonService {
                     "Student does not belong to this course"
             );
 
-            // Lesson content (and associated tests) becomes visible to a student only after
-            // the responsible teacher opens the lesson for the student's class.
+            
+            
             classOpenedLessonService.assertLessonOpenedForStudent(
                     current.getId(),
                     lesson.getId(),
@@ -350,9 +350,7 @@ public class LessonService {
                 && role == user.getRole().getRolename();
     }
 
-    /**
-     * Moves the lesson to the given 1-based position within its course and normalizes orderIndex.
-     */
+    
     private void reorderWithinCourse(Integer courseId, Integer lessonId, Integer desiredOrderIndex) {
         if (courseId == null || lessonId == null || desiredOrderIndex == null || desiredOrderIndex < 1) {
             return;
@@ -395,7 +393,7 @@ public class LessonService {
             return;
         }
 
-        // Step 1: move all orderIndex out of the [1..n] range to avoid unique constraint conflicts.
+        
         final int OFFSET = 1_000_000;
         for (int i = 0; i < lessons.size(); i++) {
             Lesson l = lessons.get(i);
@@ -404,7 +402,7 @@ public class LessonService {
         lessonRepository.saveAll(lessons);
         lessonRepository.flush();
 
-        // Step 2: assign normalized 1..n
+        
         for (int i = 0; i < lessons.size(); i++) {
             lessons.get(i).setOrderIndex(i + 1);
         }

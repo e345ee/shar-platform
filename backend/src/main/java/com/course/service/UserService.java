@@ -45,18 +45,13 @@ public class UserService {
     private static final char[] TEMP_PASSWORD_ALPHABET =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%".toCharArray();
 
-    /**
-     * Business operation:
-     * TEACHER, METHODIST or STUDENT can update own profile.
-     * Email and Telegram ID cannot be changed yet.
-     * Password is changed via changeOwnPassword().
-     */
+    
     public UserDto updateOwnProfile(User currentUser, UpdateProfileDto dto) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
-        // Only ADMIN, TEACHER, METHODIST or STUDENT
+        
         boolean isAdmin = currentUser.getRole() != null
                 && currentUser.getRole().getRolename() == ROLE_ADMIN;
         boolean isTeacher = currentUser.getRole() != null
@@ -69,7 +64,7 @@ public class UserService {
             throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can update profile");
         }
 
-        // name
+        
         if (dto.getName() != null) {
             String newName = dto.getName().trim();
             if (newName.isBlank()) {
@@ -81,13 +76,13 @@ public class UserService {
             currentUser.setName(newName);
         }
 
-        // bio (can be set to empty string if needed)
+        
         if (dto.getBio() != null) {
             currentUser.setBio(dto.getBio());
         }
-        // photo is managed via S3 avatar endpoints, not via profile update
+        
 
-        // Password is changed via dedicated endpoint.
+        
         if (dto.getPassword() != null) {
             throw new IllegalArgumentException("Password cannot be changed via profile update. Use /api/users/me/password");
         }
@@ -96,11 +91,7 @@ public class UserService {
         return convertToDto(saved);
     }
 
-    /**
-     * Business operation:
-     * Any authenticated user can change own password.
-     * Requires current password verification.
-     */
+    
     public void changeOwnPassword(User currentUser, String currentPassword, String newPassword) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
@@ -117,7 +108,7 @@ public class UserService {
             throw new IllegalArgumentException("Password must be between 1 and 127 characters");
         }
 
-        // verify current password
+        
         if (currentUser.getPassword() == null || !passwordEncoder.matches(currentPassword, currentUser.getPassword())) {
             throw new ForbiddenOperationException("Current password is incorrect");
         }
@@ -126,10 +117,7 @@ public class UserService {
         userRepository.save(currentUser);
     }
 
-    /**
-     * TEACHER/METHODIST/STUDENT: upload (or replace) own avatar.
-     * Validates file format & size in AvatarStorageService.
-     */
+    
     public UserDto uploadOwnAvatar(User currentUser, org.springframework.web.multipart.MultipartFile file) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
@@ -147,7 +135,7 @@ public class UserService {
             throw new ForbiddenOperationException("Only ADMIN, TEACHER, METHODIST or STUDENT can upload avatar");
         }
 
-        // delete previous avatar if it was stored in our S3 bucket
+        
         avatarStorageService.deleteByPublicUrl(currentUser.getPhoto());
 
         String publicUrl = avatarStorageService.uploadAvatar(currentUser.getId(), file);
@@ -155,9 +143,7 @@ public class UserService {
         return convertToDto(userRepository.save(currentUser));
     }
 
-    /**
-     * TEACHER/METHODIST/STUDENT: delete own avatar (only if it was stored in our S3 bucket).
-     */
+    
     public UserDto deleteOwnAvatar(User currentUser) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
@@ -180,13 +166,7 @@ public class UserService {
         return convertToDto(userRepository.save(currentUser));
     }
 
-    /**
-     * Business operation:
-     * METHODIST can register a new TEACHER in the system.
-     *
-     * NOTE: This method does NOT rely on authentication yet.
-     * The caller must provide metodistUserId.
-     */
+    
     public UserDto createTeacherByMethodist(Integer metodistUserId, UserDto dto) {
         assertUserHasRole(metodistUserId, ROLE_METHODIST);
 
@@ -208,19 +188,16 @@ public class UserService {
         teacher.setTgId(dto.getTgId());
 
         User saved = userRepository.save(teacher);
-        // ownership link (methodist can manage only own teachers)
+        
         methodistTeacherService.linkTeacher(methodist, saved);
         return convertToDto(saved);
     }
 
-    /**
-     * Business operation:
-     * METHODIST can delete only TEACHER users.
-     */
+    
     public void deleteTeacherByMethodist(Integer metodistUserId, Integer teacherUserId) {
         assertUserHasRole(metodistUserId, ROLE_METHODIST);
 
-        // Ensure this teacher belongs to this methodist
+        
         methodistTeacherService.assertMethodistOwnsTeacher(
                 metodistUserId,
                 teacherUserId,
@@ -235,14 +212,14 @@ public class UserService {
             throw new ForbiddenOperationException("Methodist can delete only TEACHER users");
         }
 
-        // If the teacher is linked to multiple methodists, do not allow deletion.
+        
         long owners = methodistTeacherService.countOwners(teacherUserId);
         if (owners > 1) {
             throw new ForbiddenOperationException("Teacher is linked to another methodist");
         }
 
-        // SRS 3.1.2 alt flow: if teacher is assigned to any existing classes,
-        // backend must block deletion and let UI propose selecting another teacher.
+        
+        
         var assignedClasses = studyClassRepository.findAllByTeacherId(teacherUserId);
         if (assignedClasses != null && !assignedClasses.isEmpty()) {
             String classList = assignedClasses.stream()
@@ -261,12 +238,7 @@ public class UserService {
         userRepository.delete(teacher);
     }
 
-    /**
-     * Admin operation:
-     * create a new METHODIST.
-     *
-     * Role is enforced on the backend.
-     */
+    
     public UserDto createMethodist(UserDto dto) {
         validateUserCreateCommon(dto);
 
@@ -286,10 +258,7 @@ public class UserService {
         return convertToDto(saved);
     }
 
-    /**
-     * Admin operation:
-     * delete only METHODIST users.
-     */
+    
     public void deleteMethodist(Integer methodistUserId) {
         User methodist = userRepository.findById(methodistUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + methodistUserId + " not found"));
@@ -302,10 +271,7 @@ public class UserService {
         userRepository.delete(methodist);
     }
 
-    /**
-     * Admin operation:
-     * change password of the currently authenticated ADMIN.
-     */
+    
     public void changeAdminPassword(String usernameOrEmail, String newPassword) {
         if (newPassword == null || newPassword.isBlank()) {
             throw new IllegalArgumentException("Password cannot be blank");
@@ -337,16 +303,12 @@ public class UserService {
         }
     }
 
-    /**
-     * Helper for other services: convert entity to safe DTO (password is always null).
-     */
+    
     public UserDto toDto(User user) {
         return convertToDto(user);
     }
 
-    /**
-     * Generic create (admin-like) endpoint: create a user with the role supplied via roleId.
-     */
+    
     public UserDto createUser(UserDto dto) {
         if (dto.getRoleId() == null) {
             throw new IllegalArgumentException("Role ID cannot be null");
@@ -446,9 +408,9 @@ public class UserService {
         userRepository.delete(user);
     }
 
-    // -----------------------------
-    // Entity-level helpers (used by other services)
-    // -----------------------------
+    
+    
+    
 
     @Transactional(readOnly = true)
     public User getUserEntityById(Integer id) {
@@ -484,9 +446,9 @@ public class UserService {
     }
 
 
-    // -----------------------------
-    // Lightweight checks for other services (avoid direct repository injection)
-    // -----------------------------
+    
+    
+    
 
     @Transactional(readOnly = true)
     public boolean existsByEmail(String email) {
@@ -503,14 +465,7 @@ public class UserService {
         return tgId != null && userRepository.existsByTgId(tgId);
     }
 
-    /**
-     * Business operation used by ClassJoinRequestService:
-     * create a new STUDENT user from an approved join request.
-     *
-     * - validates uniqueness of email and tgId
-     * - if name already exists, makes it unique
-     * - generates a temporary password (encoded)
-     */
+    
     public User createStudentFromJoinRequest(String requestedName, String email, String tgId) {
         if (email == null || email.isBlank()) {
             throw new IllegalArgumentException("Email cannot be blank");
@@ -578,7 +533,7 @@ public class UserService {
     }
 
     private UserDto convertToDto(User user) {
-        // Do NOT expose password.
+        
         return new UserDto(
                 user.getId(),
                 user.getRole() != null ? user.getRole().getId() : null,

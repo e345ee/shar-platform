@@ -24,18 +24,12 @@ public class Test {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    /**
-     * Lesson attachment (optional): for HOMEWORK_TEST and CONTROL_WORK.
-     * WEEKLY_STAR is not attached to a lesson.
-     */
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lesson_id")
     private Lesson lesson;
 
-    /**
-     * Course owner of the activity (always present).
-     * For lesson-attached activities it is derived from the lesson's course.
-     */
+    
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
@@ -44,23 +38,14 @@ public class Test {
     @Column(name = "activity_type", length = 32, nullable = false)
     private ActivityType activityType = ActivityType.HOMEWORK_TEST;
 
-    /**
-     * Weight multiplier applied to score/maxScore when calculating weighted results.
-     * For CONTROL_WORK and WEEKLY_STAR it is typically > 1.
-     */
+    
     @Column(name = "weight_multiplier", nullable = false)
     private Integer weightMultiplier = 1;
 
-    /**
-     * For WEEKLY_STAR: week start date (Monday) when this activity is assigned/visible.
-     * Null means not assigned yet.
-     */
+    
     @Column(name = "assigned_week_start")
     private java.time.LocalDate assignedWeekStart;
-    /**
-     * Time limit in seconds for CONTROL_WORK after a student starts an attempt.
-     * Null means no per-attempt time limit.
-     */
+    
     @Column(name = "time_limit_seconds")
     private Integer timeLimitSeconds;
 

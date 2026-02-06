@@ -18,11 +18,7 @@ public class TestQuestionDto {
     private String option3;
     private String option4;
 
-    /**
-     * Sensitive fields.
-     * For students/teachers, service layer nulls these fields.
-     * We also omit them from JSON when null to avoid leaking their existence.
-     */
+    
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Integer correctOption;
 

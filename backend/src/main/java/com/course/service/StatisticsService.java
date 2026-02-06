@@ -38,7 +38,7 @@ public class StatisticsService {
         if (isRole(current, ROLE_METHODIST)) {
             methodistId = current.getId();
         } else {
-            // ADMIN may request stats for a specific methodist
+            
             methodistId = methodistIdOverrideForAdmin;
         }
 
@@ -61,9 +61,7 @@ public class StatisticsService {
                 }).toList();
     }
 
-    /**
-     * CSV export for SRS 3.1.4.
-     */
+    
     public String exportTeacherStatsCsv(Integer methodistIdOverrideForAdmin) {
         List<TeacherStatsDto> rows = getTeacherStatsForCurrentMethodist(methodistIdOverrideForAdmin);
 
@@ -258,7 +256,7 @@ public class StatisticsService {
                 }).toList();
     }
 
-    // ---- small helpers ----
+    
 
     private static Long nullSafe(Long v) {
         return v == null ? 0L : v;

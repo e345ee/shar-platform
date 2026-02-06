@@ -32,10 +32,7 @@ public class ClassStudent {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    /**
-     * When set, the course is considered closed/completed for the student (for this class/course).
-     * Teacher/Methodist marks completion explicitly.
-     */
+    
     @Column(name = "course_closed_at")
     private LocalDateTime courseClosedAt;
 

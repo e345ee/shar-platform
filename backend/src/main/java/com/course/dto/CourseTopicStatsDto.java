@@ -8,9 +8,9 @@ public class CourseTopicStatsDto {
     private String courseName;
     private String topic;
 
-    /** Total students enrolled in the course (distinct). */
+    
     private Long studentsTotal;
-    /** Students with at least one finished attempt in this topic. */
+    
     private Long studentsWithActivity;
 
     private Double avgPercent;

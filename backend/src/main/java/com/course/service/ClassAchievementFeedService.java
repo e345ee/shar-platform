@@ -17,15 +17,11 @@ public class ClassAchievementFeedService {
 
     private final ClassAchievementFeedRepository feedRepository;
 
-    // cross-service calls (no direct access to чужим репозиториям)
+    
     private final ClassStudentService classStudentService;
     private final StudyClassService studyClassService;
 
-    /**
-     * Create class feed records for a newly awarded student achievement.
-     * This method is idempotent at the StudentAchievement level (a student cannot have the same achievement twice)
-     * but it intentionally keeps feed history (e.g. revoke + re-award creates a new record).
-     */
+    
     @Transactional
     public void publishAward(StudentAchievement awarded) {
         if (awarded == null || awarded.getId() == null) {
@@ -77,7 +73,7 @@ public class ClassAchievementFeedService {
     private StudentAchievementDto toDto(ClassAchievementFeed f) {
         if (f == null) return null;
         StudentAchievementDto dto = new StudentAchievementDto();
-        // Use feed id as item id (for UI keys). Award record id is available via awardedAt+achievement+student if needed.
+        
         dto.setId(f.getId());
         dto.setAwardedAt(f.getAwardedAt());
 

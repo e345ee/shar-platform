@@ -27,7 +27,7 @@ public class SmtpMailService implements MailService {
     private final UserRepository userRepository;
     private final MailProperties mailProperties;
 
-    // conservative email regex; we also validate user.email at persistence level
+    
     private static final Pattern SIMPLE_EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     @Override

@@ -40,9 +40,7 @@ public class Lesson {
     @Size(max = 512)
     private String presentationUrl;
 
-    /**
-     * 1-based ordering of lessons inside a course.
-     */
+    
     @Column(name = "order_index", nullable = false)
     @Min(1)
     private Integer orderIndex;

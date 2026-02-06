@@ -6,9 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Single DTO for both requests (create/update) and responses.
- */
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

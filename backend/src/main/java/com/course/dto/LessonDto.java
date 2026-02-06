@@ -9,13 +9,13 @@ public class LessonDto {
     private Integer id;
     private Integer courseId;
 
-    /** 1-based ordering of lessons inside a course. */
+    
     private Integer orderIndex;
 
     private String title;
     private String description;
 
-    /** Public URL to the uploaded PDF (presentation). */
+    
     private String presentationUrl;
 
     private Integer createdById;

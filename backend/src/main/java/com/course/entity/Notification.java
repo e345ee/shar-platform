@@ -38,7 +38,7 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
-    // Optional references for UI routing
+    
     @Column(name = "course_id")
     private Integer courseId;
 

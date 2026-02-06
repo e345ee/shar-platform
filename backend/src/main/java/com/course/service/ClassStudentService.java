@@ -121,13 +121,7 @@ public class ClassStudentService {
         }
     }
 
-    /**
-     * Business operation (SRS 3.2.1): remove a student from a specific study class.
-     *
-     * Access rules:
-     * - TEACHER: only for own classes (class.teacher == current user)
-     * - METHODIST: only for classes created by current user (class.createdBy == current user)
-     */
+    
     @Transactional
     public void removeStudentFromClass(Integer classId, Integer studentId) {
         if (classId == null || studentId == null) {
@@ -136,7 +130,7 @@ public class ClassStudentService {
 
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
-            // keep consistent with other services in the project
+            
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
@@ -173,10 +167,7 @@ public class ClassStudentService {
         classStudentRepository.delete(cs);
     }
 
-    /**
-     * Teacher/Methodist marks course as closed for a student in a specific class.
-     * This is an explicit action (button click) on teacher side.
-     */
+    
     @Transactional
     public void closeCourseForStudent(Integer classId, Integer studentId) {
         if (classId == null || studentId == null) {

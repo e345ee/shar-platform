@@ -42,14 +42,14 @@ public class TestService {
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
         Lesson lesson = lessonService.getEntityById(lessonId);
-        // In this project, the creator of the lesson/course is the owner.
+        
         assertOwner(lesson.getCreatedBy(), current, "Only lesson creator can create tests");
 
         if (dto == null) {
             throw new TestValidationException("Test data is required");
         }
 
-        // Allow multiple HOMEWORK_TEST activities per lesson.
+        
 
         String title = safeTrim(dto.getTitle());
         String description = safeTrim(dto.getDescription());
@@ -82,15 +82,10 @@ public class TestService {
         return toDto(testRepository.save(test), true);
     }
 
-    /**
-     * Creates a generic activity in a course.
-     * HOMEWORK_TEST is lesson-attached (lessonId required) - use create(lessonId, ...) normally.
-     * CONTROL_WORK can be lesson-attached (lessonId optional).
-     * WEEKLY_STAR is course-level (lessonId must be null) and must be assigned to a week separately.
-     */
+    
     public TestDto createActivity(Integer courseId, CreateActivityDto dto) {
         User current = authService.getCurrentUserEntity();
-        // allow methodists (course owners) to create activities; teachers may create only in their courses in future
+        
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
         Course course = courseService.getEntityById(courseId);
@@ -117,7 +112,7 @@ public class TestService {
             if (!lesson.getCourse().getId().equals(courseId)) {
                 throw new TestValidationException("Lesson does not belong to course");
             }
-            // Allow multiple HOMEWORK_TEST activities per lesson.
+            
         } else if (type == ActivityType.CONTROL_WORK) {
             if (lessonId != null) {
                 lesson = lessonService.getEntityById(lessonId);
@@ -188,10 +183,7 @@ public class TestService {
         return toDto(testRepository.save(test), true);
     }
 
-    /**
-     * Assigns a WEEKLY_STAR activity to a course week (Monday date).
-     * After assignment and READY, it becomes visible to students on course page.
-     */
+    
     public TestDto assignWeeklyActivity(Integer activityId, AssignWeeklyActivityDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
@@ -206,7 +198,7 @@ public class TestService {
             throw new TestValidationException("weekStart is required");
         }
         LocalDate weekStart = dto.getWeekStart();
-        // normalize to Monday
+        
         if (weekStart.getDayOfWeek().getValue() != 1) {
             throw new TestValidationException("weekStart must be a Monday date");
         }
@@ -218,7 +210,7 @@ public class TestService {
         test.setAssignedWeekStart(weekStart);
         Test saved = testRepository.save(test);
 
-        // Notify all students enrolled in this course that a weekly assignment is available.
+        
         if (saved.getCourse() != null && saved.getCourse().getId() != null) {
             Integer courseId = saved.getCourse().getId();
             java.util.List<Integer> studentIds = classStudentService.findDistinctStudentIdsByCourseId(courseId);
@@ -236,7 +228,7 @@ public class TestService {
                             null,
                             null);
                 } catch (Exception ignored) {
-                    // best-effort; do not block assigning weekly activity
+                    
                 }
             }
         }
@@ -246,7 +238,7 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestSummaryDto> listWeeklyActivitiesForCourse(Integer courseId) {
-        // Access: course participants or admins/methodists
+        
         User current = authService.getCurrentUserEntity();
         Course course = courseService.getEntityById(courseId);
 
@@ -271,7 +263,7 @@ public class TestService {
 
     @Transactional(readOnly = true)
     public List<TestSummaryDto> listByLesson(Integer lessonId) {
-        // ensures access to lesson (incl. student membership)
+        
         lessonService.getEntityByIdForCurrentUser(lessonId);
 
         User current = authService.getCurrentUserEntity();
@@ -281,8 +273,8 @@ public class TestService {
                 ? testRepository.findAllByLesson_Id(lessonId)
                 : testRepository.findAllByLesson_IdAndStatus(lessonId, TestStatus.READY);
 
-        // SRS 3.2.3: for students, lesson-bound tests become visible only after the teacher opens the test
-        // for the student's class.
+        
+        
         if (isRole(current, ROLE_STUDENT) && !tests.isEmpty()) {
             List<Integer> opened = classOpenedTestService.findOpenedTestIdsForStudentInLesson(current.getId(), lessonId);
             if (opened.isEmpty()) {
@@ -294,10 +286,7 @@ public class TestService {
         return tests.stream().map(this::toSummaryDto).toList();
     }
 
-    /**
-     * Returns TestDto for admin/methodist (includes correct answers),
-     * otherwise returns the same TestDto with sensitive fields nulled.
-     */
+    
     @Transactional(readOnly = true)
     public TestDto getById(Integer testId) {
         Test test = getEntityForCurrentUser(testId);
@@ -363,9 +352,7 @@ public class TestService {
         testRepository.delete(test);
     }
 
-    /**
-     * Publishes test (DRAFT -> READY). After this it becomes visible to all course participants.
-     */
+    
     public TestDto markReady(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
@@ -384,7 +371,7 @@ public class TestService {
         return toDto(testRepository.save(test), true);
     }
 
-    // -------- Questions --------
+    
 
     public TestQuestionDto createQuestion(Integer testId, TestQuestionUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
@@ -431,7 +418,7 @@ public class TestService {
             q.setCorrectOption(dto.getCorrectOption());
             q.setCorrectTextAnswer(null);
         } else if (type == TestQuestionType.TEXT) {
-            // for TEXT questions, options/correctOption are not used
+            
             q.setOption1(null);
             q.setOption2(null);
             q.setOption3(null);
@@ -439,7 +426,7 @@ public class TestService {
             q.setCorrectOption(null);
             q.setCorrectTextAnswer(safeTrim(dto.getCorrectTextAnswer()));
         } else if (type == TestQuestionType.OPEN) {
-            // open-ended: no auto-correct answers
+            
             q.setOption1(null);
             q.setOption2(null);
             q.setOption3(null);
@@ -541,7 +528,7 @@ public class TestService {
         questionRepository.delete(q);
     }
 
-    // -------- Entity access helpers --------
+    
 
     @Transactional(readOnly = true)
     public Test getEntityById(Integer testId) {
@@ -554,10 +541,10 @@ public class TestService {
         Test test = getEntityById(testId);
 
         if (test.getLesson() != null && test.getLesson().getId() != null) {
-            // ensures lesson access (incl. student-in-course + lesson opened gating)
+            
             lessonService.getEntityByIdForCurrentUser(test.getLesson().getId());
 
-            // SRS 3.2.3: for students, access is opened per-test (in addition to lesson open gating)
+            
             User currentUser = authService.getCurrentUserEntity();
             if (isRole(currentUser, ROLE_STUDENT)) {
                 classOpenedTestService.assertTestOpenedForStudent(
@@ -567,7 +554,7 @@ public class TestService {
                 );
             }
         } else {
-            // course-level activity (e.g. WEEKLY_STAR) - not bound to a lesson
+            
             if (test.getCourse() == null || test.getCourse().getId() == null) {
                 throw new TestValidationException("Test course is missing");
             }
@@ -581,7 +568,7 @@ public class TestService {
             } else if (isRole(currentUser, ROLE_STUDENT)) {
                 classStudentService.assertStudentInCourse(currentUser.getId(), courseId, "Student is not enrolled in this course");
 
-                // Remedial tasks are visible only when explicitly assigned to the student.
+                
                 if (test.getActivityType() == ActivityType.REMEDIAL_TASK) {
                     boolean assigned = studentRemedialAssignmentRepository.existsByStudent_IdAndTest_Id(currentUser.getId(), test.getId());
                     if (!assigned) {
@@ -599,7 +586,7 @@ public class TestService {
         return test;
     }
 
-    // -------- Mappers --------
+    
 
     private TestDto toDto(Test test, boolean includeCorrectAnswers) {
         TestDto dto = new TestDto();
@@ -638,7 +625,7 @@ public class TestService {
         dto.setCreatedAt(test.getCreatedAt());
         dto.setUpdatedAt(test.getUpdatedAt());
         if (!includeCorrectAnswers) {
-            // Student/public view: do not expose draft status, creator or audit timestamps.
+            
             dto.setStatus(null);
             dto.setCreatedById(null);
             dto.setCreatedByName(null);
@@ -661,9 +648,7 @@ public class TestService {
     }
 
 
-    /**
-     * Internal mapper used by controllers/services that need a light-weight view.
-     */
+    
     public TestSummaryDto toSummaryDto(Test test) {
         TestSummaryDto dto = new TestSummaryDto();
         dto.setId(test.getId());
@@ -722,7 +707,7 @@ public class TestService {
         return dto;
     }
 
-    // -------- Validation / util --------
+    
 
     private void validateQuestionEntity(TestQuestion q) {
         if (q == null) {
@@ -750,8 +735,8 @@ public class TestService {
                 throw new TestQuestionValidationException("correctTextAnswer must be provided for TEXT");
             }
         } else if (type == TestQuestionType.OPEN) {
-            // OPEN: student writes an open-ended answer, teacher grades it manually.
-            // No options, no correct answer.
+            
+            
             if (StringUtils.hasText(q.getOption1()) || StringUtils.hasText(q.getOption2())
                     || StringUtils.hasText(q.getOption3()) || StringUtils.hasText(q.getOption4())) {
                 throw new TestQuestionValidationException("Options must not be provided for OPEN");

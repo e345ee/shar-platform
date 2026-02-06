@@ -14,12 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * Generic activities API (beyond lesson tests).
- *
- * Note: Internally activities reuse the Test domain model (questions/attempts),
- * but are differentiated by activityType.
- */
+
 @RestController
 @RequiredArgsConstructor
 public class ActivityController {
@@ -36,9 +31,7 @@ public class ActivityController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    /**
-     * Assign WEEKLY_STAR to a specific week (Monday date). Activity must be READY.
-     */
+    
     @PostMapping(value = "/api/activities/{id}/assign-week", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<TestDto> assignWeek(
@@ -48,11 +41,7 @@ public class ActivityController {
         return ResponseEntity.ok(testService.assignWeeklyActivity(id, dto));
     }
 
-    /**
-     * Weekly "star" activities visible on course page.
-     * For students: only READY and assigned.
-     * For methodists/admins: currently returns READY+assigned (drafts are not shown on course page).
-     */
+    
     @GetMapping("/api/courses/{courseId}/weekly-activities")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
     public ResponseEntity<List<TestSummaryDto>> listWeeklyActivities(@PathVariable Integer courseId) {

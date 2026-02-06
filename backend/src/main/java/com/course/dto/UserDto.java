@@ -7,15 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Single DTO for both requests (create/update) and responses.
- *
- * For security, backend never returns password (it will always be null in responses).
- *
- * Validation annotations are mainly for request bodies.
- * roleId is intentionally optional because some business endpoints
- * (e.g., METHODIST creates TEACHER) set the role on the backend.
- */
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

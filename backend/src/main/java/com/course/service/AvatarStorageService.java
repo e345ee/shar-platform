@@ -27,9 +27,7 @@ public class AvatarStorageService {
     private final S3Client s3Client;
     private final S3Properties props;
 
-    /**
-     * Uploads avatar to S3/MinIO and returns a public URL.
-     */
+    
     public String uploadAvatar(Integer userId, MultipartFile file) {
         validateAvatar(file);
 
@@ -52,9 +50,7 @@ public class AvatarStorageService {
         return buildPublicUrl(key);
     }
 
-    /**
-     * Deletes an avatar object by its public URL (only if it matches configured bucket/publicUrl).
-     */
+    
     public void deleteByPublicUrl(String publicUrl) {
         if (!StringUtils.hasText(publicUrl)) {
             return;
@@ -62,7 +58,7 @@ public class AvatarStorageService {
 
         String prefix = props.getPublicUrl().replaceAll("/+$", "") + "/" + props.getBucket() + "/";
         if (!publicUrl.startsWith(prefix)) {
-            // Not managed by this storage
+            
             return;
         }
 

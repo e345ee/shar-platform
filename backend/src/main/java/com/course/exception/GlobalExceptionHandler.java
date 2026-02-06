@@ -193,7 +193,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
             MethodArgumentTypeMismatchException ex, WebRequest request) {
-        // Example: /api/classes/CLASS_ID -> classId must be a number
+        
         String name = ex.getName() != null ? ex.getName() : "parameter";
         ErrorResponse errorResponse = new ErrorResponse(
                 "Invalid value for parameter '" + name + "'",
@@ -267,14 +267,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
             DataIntegrityViolationException ex, WebRequest request) {
-        // Make length/size validation errors consistent (400) even if they
-        // were enforced at the database level (e.g. CHECK constraints / VARCHAR limits).
+        
+        
         String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
         String msg = raw != null ? raw : "Database constraint violation";
 
-        // Postgres examples:
-        //  - "value too long for type character varying(4096)"
-        //  - "violates check constraint \"chk_attempt_text_len\""
+        
+        
+        
         if (msg.contains("chk_attempt_text_len") || msg.contains("character varying(4096)")) {
             return new ResponseEntity<>(new ErrorResponse(
                     "textAnswer is too long (max 4096)",
@@ -292,7 +292,7 @@ public class GlobalExceptionHandler {
             ), HttpStatus.BAD_REQUEST);
         }
 
-        // Keep other DB constraint issues as conflict.
+        
         ErrorResponse errorResponse = new ErrorResponse(
                 "Database constraint violation",
                 HttpStatus.CONFLICT.value(),

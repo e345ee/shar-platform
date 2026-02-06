@@ -17,18 +17,14 @@ public class TeacherStatisticsController {
 
     private final StatisticsService statisticsService;
 
-    /**
-     * Teacher sees statistics by topics for a specific class.
-     */
+    
     @GetMapping("/classes/{classId}/topics")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<ClassTopicStatsDto>> classTopics(@PathVariable Integer classId) {
         return ResponseEntity.ok(statisticsService.getClassTopicStatsForTeacher(classId));
     }
 
-    /**
-     * Teacher sees statistics by topics for a concrete student inside a course.
-     */
+    
     @GetMapping("/students/{studentId}/topics")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<StudentTopicStatsDto>> studentTopics(

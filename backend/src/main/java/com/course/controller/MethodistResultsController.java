@@ -16,9 +16,7 @@ public class MethodistResultsController {
 
     private final TestAttemptService testAttemptService;
 
-    /**
-     * Methodist sees results (attempt summaries) for all tests in their course.
-     */
+    
     @GetMapping("/courses/{courseId}/test-attempts")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
     public ResponseEntity<List<CourseTestAttemptSummaryDto>> listCourseAttempts(@PathVariable Integer courseId) {

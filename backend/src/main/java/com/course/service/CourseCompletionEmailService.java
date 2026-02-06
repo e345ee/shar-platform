@@ -35,10 +35,9 @@ public class CourseCompletionEmailService {
     private final TestAttemptRepository testAttemptRepository;
     private final TestQuestionRepository testQuestionRepository;
     private final MailService mailService;
+    private final CertificatePdfService certificatePdfService;
 
-    /**
-     * Student sends a "congrats" email to their own email after the course is closed by teacher/methodist.
-     */
+    
     @Transactional
     public void sendMyCompletionEmail(Integer courseId) {
         if (courseId == null) {
@@ -58,15 +57,52 @@ public class CourseCompletionEmailService {
         ScorePair pair = computeCourseScore(current.getId(), courseId);
 
         String courseName = course != null && course.getName() != null ? course.getName() : ("#" + courseId);
-        String subject = "Поздравляем! Курс завершён: " + courseName;
-        String text = "Ты молодец, закрыл курс \"" + courseName + "\"!\n" +
-                "Твои баллы: " + pair.earned + " из " + pair.max + ".";
 
-        mailService.sendToUser(current.getId(), subject, text);
+
+java.util.List<Integer> teacherIds = classStudentService.findDistinctTeacherIdsByStudentInCourse(current.getId(), courseId);
+String teacherName = teacherIds == null || teacherIds.isEmpty()
+        ? (course != null && course.getCreatedBy() != null ? course.getCreatedBy().getName() : "—")
+        : teacherIds.stream()
+            .filter(java.util.Objects::nonNull)
+            .distinct()
+            .map(id -> {
+                try {
+                    return userService.getUserEntityById(id).getName();
+                } catch (Exception ex) {
+                    return null;
+                }
+            })
+            .filter(java.util.Objects::nonNull)
+            .filter(s -> !s.isBlank())
+            .distinct()
+            .reduce((a, b) -> a + ", " + b)
+            .orElse("—");
+
+byte[] pdf = certificatePdfService.generateCourseCertificate(course, teacherName, current, pair.earned, pair.max);
+
+	String subject = "Сертификат: " + courseName;
+	String text = "Поздравляем с завершением курса \"" + courseName + "\"!\n"
+	        + "Ваш сертификат во вложении (PDF).";
+
+String filename = ("certificate_" + courseName)
+        .replaceAll("[^a-zA-Z0-9а-яА-Я._-]+", "_")
+        .replaceAll("_+", "_");
+if (!filename.toLowerCase().endsWith(".pdf")) {
+    filename = filename + ".pdf";
+}
+
+mailService.sendToUserWithAttachment(
+        current.getId(),
+        subject,
+        text,
+        filename,
+        pdf,
+        "application/pdf"
+);
     }
 
     private ScorePair computeCourseScore(Integer studentId, Integer courseId) {
-        // Required activities only (same as completion stats): HOMEWORK_TEST + CONTROL_WORK, READY.
+        
         List<Test> tests = testRepository.findAllByCourse_IdAndStatusAndActivityTypeIn(
                 courseId,
                 TestStatus.READY,

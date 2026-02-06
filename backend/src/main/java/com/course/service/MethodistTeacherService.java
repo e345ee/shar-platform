@@ -8,12 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Encapsulates access rules for METHODIST <-> TEACHER ownership.
- *
- * IMPORTANT RULE: this service uses ONLY its repository.
- * If it needs a User entity, it must be passed in from UserService.
- */
+
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -40,7 +35,7 @@ public class MethodistTeacherService {
             throw new IllegalArgumentException("Methodist and teacher are required");
         }
         if (methodistTeacherRepository.existsByMethodist_IdAndTeacher_Id(methodist.getId(), teacher.getId())) {
-            return; // idempotent
+            return; 
         }
 
         MethodistTeacher link = new MethodistTeacher();

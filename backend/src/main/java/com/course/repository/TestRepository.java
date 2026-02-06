@@ -36,10 +36,7 @@ public interface TestRepository extends JpaRepository<Test, Integer> {
             Collection<ActivityType> activityTypes
     );
 
-    /**
-     * Candidates for remedial assignments: course-level REMEDIAL_TASK activities by topic.
-     * Prefer those assigned to later weeks (if assigned_week_start is used).
-     */
+    
     List<Test> findAllByCourse_IdAndActivityTypeAndStatusAndTopicOrderByAssignedWeekStartDescIdDesc(
             Integer courseId,
             ActivityType activityType,

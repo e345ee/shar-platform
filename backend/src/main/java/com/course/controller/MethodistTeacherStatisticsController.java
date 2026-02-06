@@ -14,9 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * SRS 3.1.3/3.1.4: teacher statistics and CSV export.
- */
+
 @RestController
 @RequiredArgsConstructor
 public class MethodistTeacherStatisticsController {

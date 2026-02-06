@@ -19,13 +19,7 @@ import java.util.*;
 @Transactional
 public class TestAttemptService {
 
-    /**
-     * Result of starting an attempt.
-     * <ul>
-     *   <li>{@code created=true}  -> a new attempt was created (HTTP 201)</li>
-     *   <li>{@code created=false} -> an existing IN_PROGRESS attempt was returned (HTTP 200)</li>
-     * </ul>
-     */
+    
     public record StartAttemptResult(TestAttemptDto attempt, boolean created) {}
 
     private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
@@ -48,11 +42,7 @@ public class TestAttemptService {
 
     private final NotificationService notificationService;
 
-    /**
-     * Teacher grades OPEN questions in an attempt.
-     * Supports partial grading (you can grade a subset of OPEN questions).
-     * Attempt becomes GRADED automatically when all OPEN questions are graded.
-     */
+    
     public TestAttemptDto gradeOpenAttempt(Integer attemptId, GradeTestAttemptDto dto) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
@@ -67,7 +57,7 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Only SUBMITTED or GRADED attempts can be graded");
         }
 
-        // Weekly activities are not bound to a lesson, so course must be taken from test.course
+        
         if (attempt.getTest() == null || attempt.getTest().getCourse() == null) {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
@@ -78,13 +68,13 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
 
-        // Teacher can grade only own students.
+        
         if (isRole(current, ROLE_TEACHER)) {
             classStudentService.assertStudentInTeacherCourse(studentId, current.getId(), courseId,
                     "Teacher can grade only own students");
         }
 
-        // Methodist/admin access is validated by course/lesson access rules.
+        
         testService.getEntityForCurrentUser(attempt.getTest().getId());
 
         List<TestAttemptAnswer> answers = answerRepository.findAllByAttempt_IdOrderByIdAsc(attemptId);
@@ -92,7 +82,7 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Attempt has no answers");
         }
 
-        // Build maps for OPEN answers
+        
         Map<Integer, TestAttemptAnswer> openByQuestionId = new HashMap<>();
         for (TestAttemptAnswer a : answers) {
             TestQuestion q = a.getQuestion();
@@ -104,7 +94,7 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Attempt does not contain OPEN questions");
         }
 
-        // Validate: grades refer to existing OPEN questions (duplicates not allowed)
+        
         Set<Integer> seen = new HashSet<>();
         for (GradeTestAttemptAnswerDto g : dto.getGrades()) {
             if (g == null || g.getQuestionId() == null) {
@@ -126,7 +116,7 @@ public class TestAttemptService {
             }
         }
 
-        // Apply grades
+        
         for (GradeTestAttemptAnswerDto g : dto.getGrades()) {
             TestAttemptAnswer ans = openByQuestionId.get(g.getQuestionId());
             int max = (ans.getQuestion() != null && ans.getQuestion().getPoints() != null && ans.getQuestion().getPoints() > 0)
@@ -134,13 +124,13 @@ public class TestAttemptService {
                     : 1;
             int pa = g.getPointsAwarded() == null ? 0 : g.getPointsAwarded();
             ans.setPointsAwarded(pa);
-            // treat full points as correct (optional semantics)
+            
             ans.setIsCorrect(pa == max);
             ans.setFeedback(safeTrim(g.getFeedback()));
             ans.setGradedAt(LocalDateTime.now());
         }
 
-        // Recalculate totals
+        
         int awardedTotal = 0;
         int maxTotal = 0;
         for (TestAttemptAnswer a : answers) {
@@ -153,17 +143,17 @@ public class TestAttemptService {
         attempt.setMaxScore(maxTotal);
         attempt.setScore(awardedTotal);
 
-        // Attempt becomes fully graded only when ALL OPEN answers have gradedAt
+        
         boolean allOpenGraded = openByQuestionId.values().stream().allMatch(a -> a.getGradedAt() != null);
         attempt.setStatus(allOpenGraded ? TestAttemptStatus.GRADED : TestAttemptStatus.SUBMITTED);
 
         TestAttempt saved = attemptRepository.save(attempt);
 
-        // If the attempt just became fully graded, consider assigning a remedial task by topic.
+        
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
 
-            // Student got a final grade.
+            
             if (saved.getStudent() != null && saved.getStudent().getId() != null) {
                 notificationService.create(saved.getStudent(),
                         NotificationType.GRADE_RECEIVED,
@@ -186,7 +176,7 @@ public class TestAttemptService {
                         null);
             }
         }
-        // Remedial attempts (should not have OPEN questions) are still safe to mark as completed here.
+        
         remedialAssignmentService.markCompletedIfRemedial(saved);
 
         return toDto(saved, true);
@@ -230,15 +220,12 @@ public class TestAttemptService {
         }).toList();
     }
 
-    /**
-     * Starts a new attempt for a READY test.
-     * If there is an existing IN_PROGRESS attempt for the student, returns it.
-     */
+    
     public StartAttemptResult startAttempt(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
-        Test test = testService.getEntityForCurrentUser(testId); // ensures course membership + READY
+        Test test = testService.getEntityForCurrentUser(testId); 
         assertReady(test);
         assertBeforeDeadline(test);
 
@@ -250,7 +237,7 @@ public class TestAttemptService {
         if (existing.isPresent()) {
             TestAttempt inProgress = existing.get();
             if (isTimeLimitExceeded(inProgress, test, LocalDateTime.now())) {
-                // Don't keep student stuck in an IN_PROGRESS attempt forever.
+                
                 finalizeExpiredAttempt(inProgress, test);
             } else {
                 return new StartAttemptResult(toDto(inProgress, true), false);
@@ -269,15 +256,13 @@ public class TestAttemptService {
         return new StartAttemptResult(toDto(attemptRepository.save(attempt), true), true);
     }
 
-    /**
-     * Lists attempts of the current student for a test.
-     */
+    
     @Transactional(readOnly = true)
     public List<TestAttemptSummaryDto> listMyAttempts(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
-        // ensures access & that test is visible
+        
         Test test = testService.getEntityForCurrentUser(testId);
         assertReady(test);
 
@@ -286,16 +271,13 @@ public class TestAttemptService {
                 .stream().map(this::toSummaryDto).toList();
     }
 
-/**
- * Student gets latest FINISHED attempt details for a test.
- * Returns 404 if there are no finished attempts.
- */
+
 @Transactional(readOnly = true)
 public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
     User current = authService.getCurrentUserEntity();
     userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
-    // ensures student belongs to course and can see the test
+    
     Test test = testService.getEntityForCurrentUser(testId);
 
     Optional<TestAttempt> latest = attemptRepository.findFirstByTest_IdAndStudent_IdAndStatusInOrderByAttemptNumberDesc(
@@ -312,16 +294,14 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 }
 
 
-    /**
-     * Lists all attempts for a test (teacher/methodist/admin).
-     */
+    
     @Transactional(readOnly = true)
     public List<TestAttemptSummaryDto> listAllAttempts(Integer testId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
 
         Test test = testService.getEntityById(testId);
-        // ensure the caller can view the activity (lesson gating for lesson-attached; course membership for weekly)
+        
         testService.getEntityForCurrentUser(testId);
 
         Integer courseId = null;
@@ -331,7 +311,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             courseId = test.getCourse().getId();
         }
 
-        // TEACHER: only attempts of own students (in teacher's classes within the course)
+        
         if (isRole(current, ROLE_TEACHER)) {
             if (courseId == null) {
                 throw new TestAttemptValidationException("Course is missing");
@@ -341,22 +321,19 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                     .stream().map(this::toSummaryDto).toList();
         }
 
-        // METHODIST/ADMIN: lesson access already restricts METHODIST to own courses; ADMIN can see all
+        
         return attemptRepository
                 .findAllByTest_IdOrderByCreatedAtDesc(testId)
                 .stream().map(this::toSummaryDto).toList();
     }
 
-    /**
-     * Methodist/admin: list all test attempts for a given course.
-     * Methodists see only their own courses.
-     */
+    
     @Transactional(readOnly = true)
     public List<CourseTestAttemptSummaryDto> listAttemptsForCourse(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
 
-        // Ensure course exists and that the methodist owns it
+        
         var course = courseService.getEntityById(courseId);
         if (isRole(current, ROLE_METHODIST)) {
             if (course.getCreatedBy() == null || course.getCreatedBy().getId() == null
@@ -369,23 +346,18 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 .stream().map(this::toCourseSummaryDto).toList();
     }
 
-    /**
-     * Returns an attempt. Student can read only their own attempts.
-     * Teacher/methodist/admin can read attempts within the course/lesson.
-     */
+    
     @Transactional(readOnly = true)
     public TestAttemptDto getAttempt(Integer attemptId) {
         TestAttempt attempt = getEntityById(attemptId);
         assertCanViewAttempt(attempt);
 
-        // show answers; hide correctness while IN_PROGRESS
+        
         boolean includeAnswers = true;
         return toDto(attempt, includeAnswers);
     }
 
-    /**
-     * Submit attempt answers (student). Performs autograde.
-     */
+    
     public TestAttemptDto submit(Integer attemptId, SubmitTestAttemptDto dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
@@ -406,7 +378,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             throw new TestAttemptValidationException("Attempt test is missing");
         }
 
-        // also ensures the current student belongs to the course
+        
         testService.getEntityForCurrentUser(test.getId());
         assertReady(test);
         assertBeforeDeadline(test);
@@ -424,7 +396,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             }
         }
 
-        // Validate uniqueness and completeness
+        
         Set<Integer> seen = new HashSet<>();
         for (SubmitTestAttemptAnswerDto a : dto.getAnswers()) {
             if (a == null || a.getQuestionId() == null) {
@@ -456,7 +428,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             throw new TestAttemptValidationException("All questions must be answered. Expected " + questions.size() + ", got " + seen.size());
         }
 
-        // Remove any existing answers (defensive; should be empty for new attempts)
+        
         attempt.getAnswers().clear();
 
         int awardedTotal = 0;
@@ -481,7 +453,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 textAnswer = safeTrim(a.getTextAnswer());
                 isCorrect = isTextAnswerCorrect(textAnswer, q.getCorrectTextAnswer());
             } else if (type == TestQuestionType.OPEN) {
-                // OPEN questions are graded manually by the responsible teacher
+                
                 textAnswer = safeTrim(a.getTextAnswer());
                 isCorrect = false;
             } else {
@@ -510,7 +482,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
         TestAttempt saved = attemptRepository.save(attempt);
 
-        // Notifications
+        
         Integer courseId = null;
         if (saved.getTest() != null && saved.getTest().getLesson() != null && saved.getTest().getLesson().getCourse() != null) {
             courseId = saved.getTest().getLesson().getCourse().getId();
@@ -519,7 +491,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         }
 
         if (saved.getStatus() == TestAttemptStatus.SUBMITTED) {
-            // Needs manual grading => notify responsible teachers (and methodist can see via pending lists anyway).
+            
             if (courseId != null) {
                 java.util.List<Integer> teacherIds = classStudentService.findDistinctTeacherIdsByStudentInCourse(current.getId(), courseId);
                 for (Integer tid : teacherIds) {
@@ -536,11 +508,11 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                                 saved.getId(),
                                 null);
                     } catch (Exception ignored) {
-                        // best-effort
+                        
                     }
                 }
 
-                // Also notify course creator (METHODIST) so they see pending work in own courses.
+                
                 User courseCreator = null;
                 if (saved.getTest() != null && saved.getTest().getCourse() != null) {
                     courseCreator = saved.getTest().getCourse().getCreatedBy();
@@ -561,12 +533,12 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                                 saved.getId(),
                                 null);
                     } catch (Exception ignored) {
-                        // best-effort
+                        
                     }
                 }
             }
         } else if (saved.getStatus() == TestAttemptStatus.GRADED) {
-            // Auto-graded attempt => notify student about grade.
+            
             notificationService.create(current,
                     NotificationType.GRADE_RECEIVED,
                     "Получена оценка",
@@ -578,17 +550,17 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                     null);
         }
 
-        // Auto-graded attempt: if it became GRADED, consider remedial assignment by topic (< 50%).
+        
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
         }
-        // If the student completed a remedial activity, mark it as completed in the assignment table.
+        
         remedialAssignmentService.markCompletedIfRemedial(saved);
 
         return toDto(saved, true);
     }
 
-    // -------- Entity access helpers --------
+    
 
     @Transactional(readOnly = true)
     public TestAttempt getEntityById(Integer attemptId) {
@@ -596,7 +568,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 .orElseThrow(() -> new TestAttemptNotFoundException("Attempt with id " + attemptId + " not found"));
     }
 
-    // -------- Mappers --------
+    
 
     private TestAttemptDto toDto(TestAttempt attempt, boolean includeAnswers) {
         TestAttemptDto dto = new TestAttemptDto();
@@ -646,7 +618,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                     && attempt.getStudent() != null
                     && attempt.getStudent().getId() != null
                     && attempt.getStudent().getId().equals(viewer.getId());
-            // Must be effectively final because it's referenced inside a lambda below.
+            
             boolean canCheckTeacherResponsibility = isRole(viewer, ROLE_TEACHER)
                     && attempt.getStudent() != null && attempt.getStudent().getId() != null
                     && attempt.getTest() != null && attempt.getTest().getLesson() != null
@@ -671,11 +643,11 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 }
                 adto.setSelectedOption(a.getSelectedOption());
 
-                // Open-ended answers are visible only to:
-                // - student who wrote them
-                // - responsible teacher for the student's class
-                // - course methodist (for own courses)
-                // - admin
+                
+                
+                
+                
+                
                 TestQuestionType qType = (a.getQuestion() != null && a.getQuestion().getQuestionType() != null)
                         ? a.getQuestion().getQuestionType()
                         : TestQuestionType.SINGLE_CHOICE;
@@ -780,7 +752,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         return s == null ? null : s.trim();
     }
 
-    // -------- Time limit (CONTROL_WORK) --------
+    
 
     private boolean isControlWorkTimeLimited(Test test) {
         return test != null
@@ -802,10 +774,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         }
     }
 
-    /**
-     * Marks an expired IN_PROGRESS attempt as finished with 0 points.
-     * This prevents students from being stuck forever in an expired attempt.
-     */
+    
     private void finalizeExpiredAttempt(TestAttempt attempt, Test test) {
         if (attempt == null || test == null || test.getId() == null) {
             return;
@@ -813,7 +782,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         if (attempt.getStatus() != TestAttemptStatus.IN_PROGRESS) {
             return;
         }
-        // score/maxScore are based on question points.
+        
         List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
         int maxTotal = 0;
         for (TestQuestion q : questions) {
@@ -828,9 +797,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         attemptRepository.save(attempt);
     }
 
-    /**
-     * TEXT matching rule: trim + case-insensitive compare.
-     */
+    
     private boolean isTextAnswerCorrect(String studentAnswer, String correctAnswer) {
         if (correctAnswer == null) {
             return false;
@@ -843,7 +810,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         return c.equalsIgnoreCase(s);
     }
 
-    // -------- Guards --------
+    
 
     private void assertReady(Test test) {
         if (test == null || test.getStatus() != TestStatus.READY) {
@@ -869,7 +836,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
     }
 
     private void assertCanViewAttempt(TestAttempt attempt) {
-        // Weekly activities are not bound to a lesson, so don't require test.lesson here.
+        
         if (attempt == null || attempt.getTest() == null || attempt.getTest().getCourse() == null) {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
@@ -894,7 +861,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             );
         }
 
-        // ensures course/lesson access for everyone (students checked above; others pass)
+        
         testService.getEntityForCurrentUser(attempt.getTest().getId());
     }
 

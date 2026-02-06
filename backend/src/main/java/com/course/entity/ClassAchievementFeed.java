@@ -7,12 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Class-wide feed of awarded achievements.
- *
- * Each time a teacher awards an achievement to a student, we create feed records
- * for every class where the student is enrolled for the corresponding course.
- */
+
 @Entity
 @Table(name = "class_achievement_feed")
 @Data

@@ -52,10 +52,7 @@ public class TeacherClassesController {
         return ResponseEntity.ok(classService.getMyClassById(id));
     }
 
-    /**
-     * Teacher opens a lesson for a specific class.
-     * Until a lesson is opened, students in the class cannot view the lesson content or its test(s).
-     */
+    
     @PostMapping("/api/teachers/me/classes/{classId}/lessons/{lessonId}/open")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> openLessonForClass(@PathVariable Integer classId, @PathVariable Integer lessonId) {
@@ -85,12 +82,7 @@ public class TeacherClassesController {
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * Teacher opens a TEST for a specific class.
-     *
-     * SRS 3.2.3: "Открыть доступ к тесту".
-     * Students will be able to see/start this test only after it is opened for their class.
-     */
+    
     @PostMapping("/api/teachers/me/classes/{classId}/tests/{testId}/open")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> openTestForClass(@PathVariable Integer classId, @PathVariable Integer testId) {
@@ -116,7 +108,7 @@ public class TeacherClassesController {
             return ResponseEntity.badRequest().build();
         }
 
-        // We open only READY tests, otherwise the action is meaningless for students.
+        
         if (test.getStatus() == null || test.getStatus() != TestStatus.READY) {
             return ResponseEntity.badRequest().build();
         }
@@ -125,10 +117,7 @@ public class TeacherClassesController {
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * Teacher/Methodist marks that a student has completed (closed) the course.
-     * The student will see it on the course page.
-     */
+    
     @PostMapping("/api/teachers/me/classes/{classId}/students/{studentId}/close-course")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> closeCourseForStudent(@PathVariable Integer classId, @PathVariable Integer studentId) {

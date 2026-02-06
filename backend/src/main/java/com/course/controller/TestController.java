@@ -17,7 +17,7 @@ public class TestController {
 
     private final TestService testService;
 
-    // -------- Tests --------
+    
 
     @PostMapping(value = "/api/lessons/{lessonId}/tests", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
@@ -57,16 +57,14 @@ public class TestController {
         return ResponseEntity.noContent().build();
     }
 
-    /**
-     * Methodist publishes test (DRAFT -> READY). After this it becomes visible to all course participants.
-     */
+    
     @PostMapping("/api/tests/{id}/ready")
     @PreAuthorize("hasRole('METHODIST')")
     public ResponseEntity<TestDto> markReady(@PathVariable Integer id) {
         return ResponseEntity.ok(testService.markReady(id));
     }
 
-    // -------- Questions --------
+    
 
     @PostMapping(value = "/api/tests/{testId}/questions", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")

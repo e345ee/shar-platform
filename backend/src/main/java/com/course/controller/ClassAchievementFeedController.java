@@ -22,11 +22,7 @@ public class ClassAchievementFeedController {
     private final ClassStudentService classStudentService;
     private final StudyClassService studyClassService;
 
-    /**
-     * Class feed of awarded achievements.
-     * Students see feed only for classes they are enrolled in.
-     * Teachers/Methodists see feed only for their own classes.
-     */
+    
     @GetMapping("/api/classes/{classId}/achievement-feed")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
     public ResponseEntity<List<StudentAchievementDto>> getClassAchievementFeed(@PathVariable Integer classId) {
@@ -40,10 +36,10 @@ public class ClassAchievementFeedController {
             userService.assertUserEntityHasRole(current, RoleName.STUDENT);
             classStudentService.assertStudentInClass(current.getId(), classId, "Student can view feed only for own classes");
         } else if (RoleName.TEACHER == role || RoleName.METHODIST == role) {
-            // Will throw if class does not belong to the teacher/methodist
+            
             studyClassService.getMyClassById(classId);
         }
-        // ADMIN can view any class
+        
 
         return ResponseEntity.ok(feedService.getFeedForClass(classId));
     }

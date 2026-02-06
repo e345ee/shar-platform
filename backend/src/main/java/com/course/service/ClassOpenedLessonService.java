@@ -46,7 +46,7 @@ public class ClassOpenedLessonService {
         if (studyClass == null || lesson == null) {
             throw new ForbiddenOperationException("Invalid class/lesson");
         }
-        // teacher validation should be done by caller
+        
         if (classOpenedLessonRepository.existsByStudyClass_IdAndLesson_Id(studyClass.getId(), lesson.getId())) {
             return;
         }

@@ -55,7 +55,7 @@ public class ClassJoinRequestService {
 
         ClassJoinRequest saved = joinRequestRepository.save(req);
 
-        // Notify both responsible teacher (if present) and class creator (methodist) about a new join request.
+        
         String title = "Новая заявка на вступление";
         String msg = "Поступила заявка в класс '" + sc.getName() + "' от " + dto.getName();
         if (sc.getTeacher() != null && sc.getTeacher().getId() != null) {

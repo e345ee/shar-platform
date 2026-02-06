@@ -15,18 +15,13 @@ import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 
-/**
- * Assigns "задания для отстающих" (REMEDIAL_TASK) to students who show low results on a topic.
- */
+
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class RemedialAssignmentService {
 
-    /**
-     * Threshold: if a student's result (percent) is strictly below this value, we consider the topic "weak".
-     * Configurable via app.remedial.min-percent (default 50.0).
-     */
+    
     @Value("${app.remedial.min-percent:50.0}")
     private double minPercent;
 
@@ -34,10 +29,7 @@ public class RemedialAssignmentService {
     private final TestAttemptRepository attemptRepository;
     private final StudentRemedialAssignmentRepository assignmentRepository;
 
-    /**
-     * Called when an attempt becomes fully graded (autograded or after teacher grading).
-     * If the attempt belongs to a lesson/control activity and the score is low, we assign a matching remedial task.
-     */
+    
     public void considerAssignAfterGrading(TestAttempt attempt) {
         if (attempt == null || attempt.getStatus() != TestAttemptStatus.GRADED) {
             return;
@@ -52,7 +44,7 @@ public class RemedialAssignmentService {
         }
 
         Double percent = calcPercent(attempt.getScore(), attempt.getMaxScore());
-        // User requirement: assign remedial when result is < 50% (strictly below threshold)
+        
         if (percent == null || percent >= minPercent) {
             return;
         }
@@ -64,7 +56,7 @@ public class RemedialAssignmentService {
             return;
         }
 
-        // If there is already an active remedial assignment for this topic, do nothing.
+        
         if (assignmentRepository.existsByStudent_IdAndCourse_IdAndTopicAndCompletedAtIsNull(studentId, courseId, topic)) {
             return;
         }
@@ -77,7 +69,7 @@ public class RemedialAssignmentService {
             return;
         }
 
-        // Do not assign activities from a future week: student must see the remedial task immediately.
+        
         LocalDate currentWeekStart = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         candidates = candidates.stream()
                 .filter(t -> t.getAssignedWeekStart() == null || !t.getAssignedWeekStart().isAfter(currentWeekStart))
@@ -100,7 +92,7 @@ public class RemedialAssignmentService {
             if (completed.contains(cand.getId())) {
                 continue;
             }
-            // idempotency: already assigned -> no further action
+            
             if (assignmentRepository.existsByStudent_IdAndTest_Id(studentId, cand.getId())) {
                 return;
             }
@@ -119,9 +111,7 @@ public class RemedialAssignmentService {
         }
     }
 
-    /**
-     * Marks an existing remedial assignment as completed when the student finishes the remedial activity.
-     */
+    
     public void markCompletedIfRemedial(TestAttempt attempt) {
         if (attempt == null || attempt.getTest() == null || attempt.getStudent() == null) {
             return;

@@ -16,9 +16,7 @@ public class TestAttemptController {
 
     private final TestAttemptService attemptService;
 
-    /**
-     * Student starts an attempt for a READY test.
-     */
+    
     @PostMapping("/api/tests/{testId}/attempts/start")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TestAttemptDto> startAttempt(@PathVariable Integer testId) {
@@ -26,36 +24,28 @@ public class TestAttemptController {
         return ResponseEntity.status(result.created() ? 201 : 200).body(result.attempt());
     }
 
-    /**
-     * Student lists own attempts for a test.
-     */
+    
     @GetMapping("/api/tests/{testId}/attempts/my")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<List<TestAttemptSummaryDto>> listMyAttempts(@PathVariable Integer testId) {
         return ResponseEntity.ok(attemptService.listMyAttempts(testId));
     }
 
-    /**
-     * Teacher/methodist/admin lists all attempts for a test.
-     */
+    
     @GetMapping("/api/tests/{testId}/attempts")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
     public ResponseEntity<List<TestAttemptSummaryDto>> listAllAttempts(@PathVariable Integer testId) {
         return ResponseEntity.ok(attemptService.listAllAttempts(testId));
     }
 
-    /**
-     * Get attempt details.
-     */
+    
     @GetMapping("/api/attempts/{attemptId}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<TestAttemptDto> getAttempt(@PathVariable Integer attemptId) {
         return ResponseEntity.ok(attemptService.getAttempt(attemptId));
     }
 
-    /**
-     * Student submits attempt answers. Autograde is performed immediately.
-     */
+    
     @PostMapping(value = "/api/attempts/{attemptId}/submit", consumes = {"application/json"})
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<TestAttemptDto> submit(
@@ -65,10 +55,7 @@ public class TestAttemptController {
         return ResponseEntity.ok(attemptService.submit(attemptId, dto));
     }
 
-    /**
-     * Teacher grades an attempt with OPEN questions.
-     * Only the responsible teacher for the student's class (or ADMIN) can grade.
-     */
+    
     @PutMapping(value = "/api/attempts/{attemptId}/grade", consumes = {"application/json"})
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
     public ResponseEntity<TestAttemptDto> gradeOpenAttempt(
@@ -78,10 +65,7 @@ public class TestAttemptController {
         return ResponseEntity.ok(attemptService.gradeOpenAttempt(attemptId, dto));
     }
 
-    /**
-     * Teacher lists attempts that are waiting for manual grading (have OPEN answers not graded yet).
-     * Optional filters: courseId, testId, classId.
-     */
+    
     @GetMapping("/api/teachers/me/attempts/pending")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<PendingTestAttemptDto>> listPendingAttempts(

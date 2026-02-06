@@ -12,16 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Creates the default ADMIN on the very first start of a fresh database.
- *
- * Requirements:
- * - login: admin
- * - password: admin
- *
- * We create an admin with name="admin" and email="admin@example.com".
- * Authentication allows both email or name as username.
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

@@ -46,14 +46,14 @@ public class StudentCoursePageService {
 
         Course course = courseService.getEntityById(courseId);
 
-        // Opened lessons for this student inside the course
+        
         List<LessonDto> allLessons = lessonService.listByCourse(courseId);
         List<Integer> openedIds = classOpenedLessonService.findOpenedLessonIdsForStudentInCourse(current.getId(), courseId);
         List<LessonDto> openedLessons = openedIds.isEmpty()
                 ? List.of()
                 : allLessons.stream().filter(l -> l.getId() != null && openedIds.contains(l.getId())).toList();
 
-        // Lesson-bound activities (READY only) for opened lessons
+        
         List<Test> lessonActivities = openedLessons.isEmpty()
                 ? List.of()
                 : testRepository.findAllByLesson_IdInAndStatusAndActivityTypeIn(
@@ -62,8 +62,8 @@ public class StudentCoursePageService {
                         List.of(ActivityType.HOMEWORK_TEST, ActivityType.CONTROL_WORK)
                 );
 
-        // SRS 3.2.3: lesson-bound tests must be explicitly opened for the student's class.
-        // (Weekly activities are not lesson-bound and are controlled by week assignment.)
+        
+        
         if (!lessonActivities.isEmpty()) {
             List<Integer> openedTestIds = classOpenedTestService.findOpenedTestIdsForStudentInCourse(current.getId(), courseId);
             if (openedTestIds.isEmpty()) {
@@ -76,14 +76,14 @@ public class StudentCoursePageService {
             }
         }
 
-        // Weekly activities for current week
+        
         LocalDate weekStart = LocalDate.now().with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
         List<Test> weekly = testRepository.findAllByCourse_IdAndActivityTypeAndStatusAndAssignedWeekStart(
                 courseId, ActivityType.WEEKLY_STAR, TestStatus.READY, weekStart
         );
 
-        // Remedial activities assigned to this student (current week + unassigned week).
-        // Visibility is controlled via StudentRemedialAssignment.
+        
+        
         List<Test> remedial = studentRemedialAssignmentRepository
                 .findAllByStudent_IdAndCourse_Id(current.getId(), courseId)
                 .stream()
@@ -92,7 +92,7 @@ public class StudentCoursePageService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        // Collect all activity ids for latest attempt lookup
+        
         Set<Integer> testIds = new LinkedHashSet<>();
         lessonActivities.forEach(t -> testIds.add(t.getId()));
         weekly.forEach(t -> testIds.add(t.getId()));
@@ -100,7 +100,7 @@ public class StudentCoursePageService {
 
         Map<Integer, AttemptStatusDto> latestByTest = new HashMap<>();
         if (!testIds.isEmpty()) {
-            // JPQL approach: returns attempts ordered so that the first row per testId is the latest.
+            
             var attempts = testAttemptRepository.findAllForLatestMap(current.getId(), new ArrayList<>(testIds));
             for (var ta : attempts) {
                 if (ta == null || ta.getTest() == null || ta.getTest().getId() == null) {
@@ -108,7 +108,7 @@ public class StudentCoursePageService {
                 }
                 Integer tid = ta.getTest().getId();
                 if (latestByTest.containsKey(tid)) {
-                    continue; // already have latest for this test
+                    continue; 
                 }
                 AttemptStatusDto a = new AttemptStatusDto();
                 a.setTestId(tid);
@@ -124,7 +124,7 @@ public class StudentCoursePageService {
             }
         }
 
-        // Build lesson groups
+        
         Map<Integer, List<Test>> activitiesByLessonId = new HashMap<>();
         for (Test t : lessonActivities) {
             if (t.getLesson() != null && t.getLesson().getId() != null) {
@@ -152,7 +152,7 @@ public class StudentCoursePageService {
 
     private ActivityWithAttemptDto toActivityWithAttempt(Test t, AttemptStatusDto attempt) {
         ActivityWithAttemptDto dto = new ActivityWithAttemptDto();
-        // reuse existing mapper for summary
+        
         TestSummaryDto summary = testService.toSummaryDto(t);
         dto.setActivity(summary);
         dto.setLatestAttempt(attempt);

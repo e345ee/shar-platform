@@ -6,9 +6,7 @@ import lombok.Data;
 @Data
 public class AuthLoginRequestDto {
 
-    /**
-     * Username or email.
-     */
+    
     @NotBlank
     private String username;
 

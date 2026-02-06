@@ -7,20 +7,14 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * Generic activity creation request. Used for:
- * - HOMEWORK_TEST (lessonId required)
- * - CONTROL_WORK (lessonId optional)
- * - WEEKLY_STAR (lessonId must be null; assigned to a week separately)
- * - REMEDIAL_TASK (lessonId must be null; can be assigned to a week; shown only to assigned students)
- */
+
 @Data
 public class CreateActivityDto {
 
     @NotNull
-    private String activityType; // HOMEWORK_TEST | CONTROL_WORK | WEEKLY_STAR | REMEDIAL_TASK
+    private String activityType; 
 
-    /** Required for lesson-attached activities */
+    
     private Integer lessonId;
 
     @NotBlank
@@ -37,11 +31,9 @@ public class CreateActivityDto {
     @NotNull
     private LocalDateTime deadline;
 
-    /** Optional; if null will be set by defaults for the type */
+    
     private Integer weightMultiplier;
 
-    /**
-     * Optional; supported for CONTROL_WORK. Time limit in seconds after student starts an attempt.
-     */
+    
     private Integer timeLimitSeconds;
 }

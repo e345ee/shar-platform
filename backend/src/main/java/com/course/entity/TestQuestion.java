@@ -32,7 +32,7 @@ public class TestQuestion {
     @JoinColumn(name = "test_id", nullable = false)
     private Test test;
 
-    /** 1-based ordering of questions inside a test. */
+    
     @Column(name = "order_index", nullable = false)
     @Min(1)
     private Integer orderIndex;
@@ -46,9 +46,7 @@ public class TestQuestion {
     @Column(name = "question_type", length = 32, nullable = false)
     private TestQuestionType questionType = TestQuestionType.SINGLE_CHOICE;
 
-    /**
-     * How many points the question is worth.
-     */
+    
     @Column(name = "points", nullable = false)
     @NotNull
     @Min(1)
@@ -70,18 +68,13 @@ public class TestQuestion {
     @Size(max = 512)
     private String option4;
 
-    /**
-     * 1..4 (index of the correct option).
-     */
+    
     @Column(name = "correct_option")
     @Min(1)
     @Max(4)
     private Integer correctOption;
 
-    /**
-     * Correct answer for TEXT questions.
-     * Stored trimmed; matching is done with trim + case-insensitive compare.
-     */
+    
     @Column(name = "correct_text_answer", length = 512)
     @Size(max = 512)
     private String correctTextAnswer;

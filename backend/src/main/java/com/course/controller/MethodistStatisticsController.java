@@ -17,19 +17,14 @@ public class MethodistStatisticsController {
 
     private final StatisticsService statisticsService;
 
-    /**
-     * Course-level topic statistics (aggregated across all enrolled students).
-     */
+    
     @GetMapping("/courses/{courseId}/topics")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
     public ResponseEntity<List<CourseTopicStatsDto>> courseTopics(@PathVariable Integer courseId) {
         return ResponseEntity.ok(statisticsService.getCourseTopicStatsForMethodist(courseId));
     }
 
-    /**
-     * Topic statistics split by classes (and their teachers) inside a course.
-     * Useful to compare how different teachers/classes perform.
-     */
+    
     @GetMapping("/courses/{courseId}/classes/topics")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
     public ResponseEntity<List<TeacherClassTopicStatsDto>> classTopics(@PathVariable Integer courseId) {

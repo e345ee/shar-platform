@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class UpdateLessonDto {
 
-    /** Optional; if provided, reorders the lesson inside its course. */
+    
     @Min(1)
     private Integer orderIndex;
 

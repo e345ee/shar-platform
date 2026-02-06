@@ -23,10 +23,10 @@ public class MyAchievementsService {
     private final AuthService authService;
     private final UserService userService;
 
-    // own repository
+    
     private final StudentAchievementRepository studentAchievementRepository;
 
-    // cross-service calls
+    
     private final StudentContentService studentContentService;
     private final AchievementService achievementService;
     private final StudentAchievementService studentAchievementService;
@@ -35,14 +35,14 @@ public class MyAchievementsService {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
-        // Earned achievements
+        
         List<StudentAchievementDto> earned = studentAchievementRepository
                 .findAllByStudent_IdOrderByAwardedAtDesc(current.getId())
                 .stream()
                 .map(studentAchievementService::toDto)
                 .toList();
 
-        // All achievements in student's courses (for total progress & recommendations)
+        
         List<CourseDto> courses = studentContentService.listMyCourses();
 
         List<AchievementDto> allAvailable = new ArrayList<>();

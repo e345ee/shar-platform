@@ -7,11 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Teacher explicitly opens access to a concrete test for a class.
- *
- * SRS 3.2.3: "Открыть доступ к тесту" is an action on Test (not on Lesson).
- */
+
 @Entity
 @Table(
         name = "class_opened_tests",

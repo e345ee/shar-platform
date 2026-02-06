@@ -34,14 +34,14 @@ public class TestAnswer {
     @JoinColumn(name = "question_id", nullable = false)
     private TestQuestion question;
 
-    /** 1..4 */
+    
     @Column(name = "selected_option", nullable = false)
     @NotNull
     @Min(1)
     @Max(4)
     private Integer selectedOption;
 
-    /** Filled on submission (auto-check). */
+    
     @Column(name = "is_correct")
     private Boolean isCorrect;
 

@@ -57,26 +57,14 @@ public class StudentAchievementController {
         return ResponseEntity.ok(studentAchievementService.getMyAchievements());
     }
 
-    /**
-     * "My achievements" page:
-     * - earned achievements (with conditions)
-     * - overall progress (earned/available)
-     * - recommendations (not yet earned)
-     */
+    
     @GetMapping("/api/users/me/achievements/page")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<MyAchievementsPageDto> getMyAchievementsPage() {
         return ResponseEntity.ok(myAchievementsService.getMyAchievementsPage());
     }
 
-    /**
-     * View achievements of a specific student.
-     *
-     * Access rules:
-     * - ADMIN: can view any student
-     * - TEACHER: can view only students from own classes
-     * - METHODIST: can view students who are enrolled in methodist's courses
-     */
+    
     @GetMapping("/api/students/{studentId}/achievements")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
     public ResponseEntity<List<StudentAchievementDto>> getStudentAchievements(@PathVariable Integer studentId) {
