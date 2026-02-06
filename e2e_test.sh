@@ -29,6 +29,9 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 
+# Email sending can be enabled by setting APP_MAIL_ENABLED=true and configuring
+# SPRING_MAIL_* env vars for a real SMTP provider.
+
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 
@@ -120,6 +123,20 @@ need_tool() {
 
 need_tool curl
 need_tool base64
+
+urlenc() {
+  # URL-encode a string (best-effort). Prefers python3.
+  local s="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - <<'PY' "$s"
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1]))
+PY
+  else
+    # Fallback: encode space only (enough for our test strings)
+    echo "${s// /%20}"
+  fi
+}
 
 json_get() {
   local json="$1"
@@ -548,6 +565,28 @@ STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 # Backward-compatible var name used across the script: now stores JWT (Bearer)
 STUDENT_AUTH="$STUDENT_JWT"
 pass "Student JWT acquired"
+
+# ------------------------------------------------------------
+# 7b) EMAIL: send a test email to the student (requires real SMTP config)
+# ------------------------------------------------------------
+RUN_EMAIL_E2E="${RUN_EMAIL_E2E:-0}"
+if [[ "$RUN_EMAIL_E2E" == "1" ]]; then
+  log "Send EMAIL to student (real SMTP)"
+
+  EMAIL_SUBJECT="E2E test email $SUF"
+  EMAIL_TEXT="Hello student! This is an e2e email $SUF"
+
+  SUBJECT_ENC="$(urlenc "$EMAIL_SUBJECT")"
+  TEXT_ENC="$(urlenc "$EMAIL_TEXT")"
+
+  # Use ADMIN token to send
+  request_json POST "/api/emails/users/$STUDENT_ID?subject=$SUBJECT_ENC&text=$TEXT_ENC" "$ADMIN_JWT" \
+    -H "Accept: application/json"
+  expect_code 200 "send email"
+  pass "Email request accepted (delivery depends on SMTP provider)"
+else
+  echo "[SKIP] Email e2e skipped (set RUN_EMAIL_E2E=1 and configure SMTP env vars)"
+fi
 
 # ------------------------------------------------------------
 # 7c) ACHIEVEMENTS: create 2 achievements + verify "My achievements" page + award + class feed
@@ -2067,10 +2106,37 @@ request_json DELETE "/api/classes/$CLASS_ID/students/$STUDENT_ID" "$TEACHER_AUTH
 expect_code 404 "delete student again -> 404"
 pass "Second delete returns 404 as expected"
 
+# ------------------------------------------------------------
+# 20z) Course closing + student completion email (requires real SMTP config)
+# ------------------------------------------------------------
+RUN_EMAIL_E2E="${RUN_EMAIL_E2E:-0}"
+if [[ "$RUN_EMAIL_E2E" == "1" ]]; then
+  log "Teacher closes course for student"
+  request_json POST "/api/teachers/me/classes/$CLASS_ID/students/$STUDENT_ID/close-course" "$TEACHER_AUTH" -H "Accept: application/json"
+  expect_code 200 "close course"
+  pass "Course closed for student"
+
+  log "Student course page shows courseClosed=true"
+  request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
+  expect_code 200 "get course page"
+  CLOSED_FLAG=$(json_get "$HTTP_BODY" '.courseClosed')
+  [[ "$CLOSED_FLAG" == "true" || "$CLOSED_FLAG" == "True" || "$CLOSED_FLAG" == "1" ]] || fail "Expected courseClosed=true, got: $CLOSED_FLAG; body=$HTTP_BODY"
+  pass "courseClosed flag present"
+
+  log "Student sends completion email"
+  request_json POST "/api/student/courses/$COURSE_ID/completion-email" "$STUDENT_AUTH" -H "Accept: application/json"
+  expect_code 200 "send completion email"
+
+  pass "Completion email request accepted (delivery depends on SMTP provider)"
+else
+  echo "[SKIP] Course completion email e2e skipped (set RUN_EMAIL_E2E=1 and configure SMTP env vars)"
+fi
+
 
 # ------------------------------------------------------------
 # 21) SRS 3.1.2: Deleting teacher - alternative flow (teacher has active classes)
 # ------------------------------------------------------------
+
 log "SRS 3.1.2 alt: METHODIST tries to delete TEACHER #1 who is still assigned to class1 -> should return 409"
 request_json DELETE "/api/users/methodists/$METHODIST_ID/teachers/$TEACHER_ID" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 409 "delete teacher1 with active classes -> 409"

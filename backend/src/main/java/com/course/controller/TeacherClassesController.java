@@ -15,6 +15,7 @@ import com.course.service.ClassOpenedTestService;
 import com.course.service.LessonService;
 import com.course.service.TestService;
 import com.course.service.UserService;
+import com.course.service.ClassStudentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -37,6 +38,7 @@ public class TeacherClassesController {
     private final ClassOpenedLessonService classOpenedLessonService;
     private final TestService testService;
     private final ClassOpenedTestService classOpenedTestService;
+    private final ClassStudentService classStudentService;
 
     @GetMapping("/api/teachers/me/classes")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
@@ -120,6 +122,17 @@ public class TeacherClassesController {
         }
 
         classOpenedTestService.openTestForClass(sc, test);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Teacher/Methodist marks that a student has completed (closed) the course.
+     * The student will see it on the course page.
+     */
+    @PostMapping("/api/teachers/me/classes/{classId}/students/{studentId}/close-course")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
+    public ResponseEntity<Void> closeCourseForStudent(@PathVariable Integer classId, @PathVariable Integer studentId) {
+        classStudentService.closeCourseForStudent(classId, studentId);
         return ResponseEntity.ok().build();
     }
 }

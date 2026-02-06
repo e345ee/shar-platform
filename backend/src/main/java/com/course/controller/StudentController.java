@@ -9,6 +9,7 @@ import com.course.service.StudentContentService;
 import com.course.service.StudentCoursePageService;
 import com.course.service.TestAttemptService;
 import com.course.service.TestService;
+import com.course.service.CourseCompletionEmailService;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ public class StudentController {
     private final StudentCoursePageService studentCoursePageService;
     private final TestAttemptService testAttemptService;
     private final TestService testService;
+    private final CourseCompletionEmailService courseCompletionEmailService;
 
     /**
      * Aggregated course page payload for the student:
@@ -79,5 +81,16 @@ public class StudentController {
         }
         Integer testId = tests.get(0).getId();
         return ResponseEntity.ok(testAttemptService.getLatestCompletedAttemptForTest(testId));
+    }
+
+    /**
+     * Student sends an email to own mailbox confirming course completion.
+     * Allowed only after teacher/methodist closes the course for the student.
+     */
+    @PostMapping("/courses/{courseId}/completion-email")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<Void> sendCompletionEmail(@PathVariable Integer courseId) {
+        courseCompletionEmailService.sendMyCompletionEmail(courseId);
+        return ResponseEntity.ok().build();
     }
 }

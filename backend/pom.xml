@@ -44,6 +44,12 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- SMTP email sending (simple coursework mail; later can attach PDFs) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Spring Security (JWT Bearer) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

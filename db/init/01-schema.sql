@@ -170,6 +170,7 @@ CREATE TABLE "class_students" (
     class_id     INT NOT NULL REFERENCES "classes"(id) ON DELETE CASCADE,
     student_id   INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
     created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+    course_closed_at TIMESTAMP,
 
     CONSTRAINT uq_class_student UNIQUE (class_id, student_id)
 );

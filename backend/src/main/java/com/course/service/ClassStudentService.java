@@ -69,6 +69,13 @@ public class ClassStudentService {
         return classStudentRepository.existsStudentInCourse(studentId, courseId);
     }
 
+    public boolean isCourseClosedForStudent(Integer studentId, Integer courseId) {
+        if (studentId == null || courseId == null) {
+            return false;
+        }
+        return classStudentRepository.existsClosedCourseForStudent(studentId, courseId);
+    }
+
     public void assertStudentInCourse(Integer studentId, Integer courseId, String message) {
         if (!existsStudentInCourse(studentId, courseId)) {
             throw new ForbiddenOperationException(message);
@@ -164,5 +171,55 @@ public class ClassStudentService {
                         "Student with id " + studentId + " is not enrolled in class " + classId));
 
         classStudentRepository.delete(cs);
+    }
+
+    /**
+     * Teacher/Methodist marks course as closed for a student in a specific class.
+     * This is an explicit action (button click) on teacher side.
+     */
+    @Transactional
+    public void closeCourseForStudent(Integer classId, Integer studentId) {
+        if (classId == null || studentId == null) {
+            throw new IllegalArgumentException("classId and studentId are required");
+        }
+
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        RoleName role = current.getRole().getRolename();
+        boolean isTeacher = role == ROLE_TEACHER;
+        boolean isMethodist = role == ROLE_METHODIST;
+        if (!isTeacher && !isMethodist) {
+            throw new ClassStudentAccessDeniedException("Only TEACHER or METHODIST can close courses");
+        }
+
+        StudyClass sc = classService.getEntityById(classId);
+
+        if (isTeacher) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || current.getId() == null
+                    || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class teacher can close courses");
+            }
+        }
+        if (isMethodist) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || current.getId() == null
+                    || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class creator can close courses");
+            }
+        }
+
+        User student = userService.getUserEntityById(studentId);
+        userService.assertUserEntityHasRole(student, ROLE_STUDENT);
+
+        ClassStudent cs = classStudentRepository.findByStudyClassIdAndStudentId(classId, studentId)
+                .orElseThrow(() -> new StudentNotEnrolledInClassException(
+                        "Student with id " + studentId + " is not enrolled in class " + classId));
+
+        if (cs.getCourseClosedAt() == null) {
+            cs.setCourseClosedAt(java.time.LocalDateTime.now());
+            classStudentRepository.save(cs);
+        }
     }
 }

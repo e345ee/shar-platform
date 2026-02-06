@@ -63,6 +63,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/users/me/achievements").hasRole(RoleName.STUDENT.name())
                         .requestMatchers(HttpMethod.GET, "/api/users/me/achievements/page").hasRole(RoleName.STUDENT.name())
 
+                        // Send email to user by DB email (coursework feature)
+                        .requestMatchers(HttpMethod.POST, "/api/emails/users/*").hasAnyRole(RoleName.ADMIN.name(), RoleName.TEACHER.name(), RoleName.METHODIST.name())
+
                         .requestMatchers("/api/users/**").hasRole(RoleName.ADMIN.name())
 
                         

@@ -143,6 +143,7 @@ public class StudentCoursePageService {
 
         StudentCoursePageDto dto = new StudentCoursePageDto();
         dto.setCourse(toCourseDto(course));
+        dto.setCourseClosed(classStudentService.isCourseClosedForStudent(current.getId(), courseId));
         dto.setLessons(lessonBlocks);
         dto.setWeeklyThisWeek(weekly.stream().map(t -> toActivityWithAttempt(t, latestByTest.get(t.getId()))).toList());
         dto.setRemedialThisWeek(remedial.stream().map(t -> toActivityWithAttempt(t, latestByTest.get(t.getId()))).toList());

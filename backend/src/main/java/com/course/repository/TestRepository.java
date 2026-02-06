@@ -46,4 +46,10 @@ public interface TestRepository extends JpaRepository<Test, Integer> {
             TestStatus status,
             String topic
     );
+
+    List<Test> findAllByCourse_IdAndStatusAndActivityTypeIn(
+            Integer courseId,
+            TestStatus status,
+            Collection<ActivityType> activityTypes
+    );
 }
