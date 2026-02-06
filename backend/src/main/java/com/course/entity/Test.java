@@ -57,6 +57,12 @@ public class Test {
      */
     @Column(name = "assigned_week_start")
     private java.time.LocalDate assignedWeekStart;
+    /**
+     * Time limit in seconds for CONTROL_WORK after a student starts an attempt.
+     * Null means no per-attempt time limit.
+     */
+    @Column(name = "time_limit_seconds")
+    private Integer timeLimitSeconds;
 
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

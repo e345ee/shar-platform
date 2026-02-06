@@ -48,6 +48,20 @@ public class ClassStudentService {
         return classStudentRepository.findClassIdsByStudentInCourse(studentId, courseId);
     }
 
+    public java.util.List<Integer> findDistinctStudentIdsByCourseId(Integer courseId) {
+        if (courseId == null) {
+            return java.util.List.of();
+        }
+        return classStudentRepository.findDistinctStudentIdsByCourseId(courseId);
+    }
+
+    public java.util.List<Integer> findDistinctTeacherIdsByStudentInCourse(Integer studentId, Integer courseId) {
+        if (studentId == null || courseId == null) {
+            return java.util.List.of();
+        }
+        return classStudentRepository.findDistinctTeacherIdsByStudentInCourse(studentId, courseId);
+    }
+
     public boolean existsStudentInCourse(Integer studentId, Integer courseId) {
         if (studentId == null || courseId == null) {
             return false;

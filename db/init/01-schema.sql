@@ -7,7 +7,11 @@ DROP TABLE IF EXISTS
     "role"
     CASCADE;
 
+DROP TABLE IF EXISTS "notifications" CASCADE;
+
 DROP TYPE IF EXISTS role_name CASCADE;
+
+DROP TYPE IF EXISTS notification_type CASCADE;
 
 ----------------------------------------------------------------------
 -- 1. СОЗДАНИЕ ТАБЛИЦ 
@@ -15,6 +19,16 @@ DROP TYPE IF EXISTS role_name CASCADE;
 
 -- Postgres-native enum for roles
 CREATE TYPE role_name AS ENUM ('ADMIN', 'METHODIST', 'TEACHER', 'STUDENT');
+
+-- Postgres-native enum for notifications
+CREATE TYPE notification_type AS ENUM (
+    'CLASS_JOIN_REQUEST',
+    'MANUAL_GRADING_REQUIRED',
+    'GRADE_RECEIVED',
+    'OPEN_ANSWER_CHECKED',
+    'WEEKLY_ASSIGNMENT_AVAILABLE',
+    'ACHIEVEMENT_AWARDED'
+);
 
 CREATE TABLE "role" (
     id          SERIAL PRIMARY KEY,
@@ -31,6 +45,21 @@ CREATE TABLE "users" (
     bio         TEXT,
     photo       TEXT,
     tg_id       VARCHAR(127) UNIQUE
+);
+
+CREATE TABLE "notifications" (
+    id              SERIAL PRIMARY KEY,
+    user_id         INT NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+    type            notification_type NOT NULL,
+    title           VARCHAR(255) NOT NULL,
+    message         TEXT,
+    is_read         BOOLEAN NOT NULL DEFAULT FALSE,
+    course_id       INT,
+    class_id        INT,
+    test_id         INT,
+    attempt_id      INT,
+    achievement_id  INT,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 ----------------------------------------------------------------------
@@ -218,6 +247,7 @@ CREATE TABLE "tests" (
     activity_type      VARCHAR(32) NOT NULL DEFAULT 'HOMEWORK_TEST',
     weight_multiplier  INT NOT NULL DEFAULT 1,
     assigned_week_start DATE,
+    time_limit_seconds INT,
 
     title        VARCHAR(127) NOT NULL,
     description  VARCHAR(2048),
@@ -233,6 +263,7 @@ CREATE TABLE "tests" (
     -- multiple activities per lesson are allowed
     CONSTRAINT chk_activity_type CHECK (activity_type IN ('HOMEWORK_TEST','CONTROL_WORK','WEEKLY_STAR','REMEDIAL_TASK')),
     CONSTRAINT chk_weight_multiplier CHECK (weight_multiplier BETWEEN 1 AND 100),
+    CONSTRAINT chk_time_limit_seconds CHECK (time_limit_seconds IS NULL OR time_limit_seconds BETWEEN 1 AND 86400),
     CONSTRAINT chk_weekly_requires_no_lesson CHECK (activity_type NOT IN ('WEEKLY_STAR','REMEDIAL_TASK') OR lesson_id IS NULL),
     CONSTRAINT chk_weekly_requires_week_monday CHECK (
         assigned_week_start IS NULL OR EXTRACT(ISODOW FROM assigned_week_start) = 1

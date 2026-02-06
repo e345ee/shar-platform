@@ -7,6 +7,7 @@ import com.course.entity.Test;
 import com.course.entity.TestStatus;
 import com.course.entity.User;
 import com.course.entity.RoleName;
+import com.course.exception.ForbiddenOperationException;
 import com.course.service.StudyClassService;
 import com.course.service.AuthService;
 import com.course.service.ClassOpenedLessonService;
@@ -54,14 +55,22 @@ public class TeacherClassesController {
      * Until a lesson is opened, students in the class cannot view the lesson content or its test(s).
      */
     @PostMapping("/api/teachers/me/classes/{classId}/lessons/{lessonId}/open")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> openLessonForClass(@PathVariable Integer classId, @PathVariable Integer lessonId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, RoleName.TEACHER);
+        RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
         StudyClass sc = classService.getEntityById(classId);
-        if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
-            return ResponseEntity.status(403).build();
+        if (role == RoleName.TEACHER) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ForbiddenOperationException("Teacher can open lessons only for own classes");
+            }
+        } else if (role == RoleName.METHODIST) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ForbiddenOperationException("Methodist can open lessons only for own classes");
+            }
+        } else {
+            throw new ForbiddenOperationException("Forbidden");
         }
 
         Lesson lesson = lessonService.getEntityById(lessonId);
@@ -81,14 +90,22 @@ public class TeacherClassesController {
      * Students will be able to see/start this test only after it is opened for their class.
      */
     @PostMapping("/api/teachers/me/classes/{classId}/tests/{testId}/open")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> openTestForClass(@PathVariable Integer classId, @PathVariable Integer testId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, RoleName.TEACHER);
+        RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
         StudyClass sc = classService.getEntityById(classId);
-        if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
-            return ResponseEntity.status(403).build();
+        if (role == RoleName.TEACHER) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ForbiddenOperationException("Teacher can open tests only for own classes");
+            }
+        } else if (role == RoleName.METHODIST) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ForbiddenOperationException("Methodist can open tests only for own classes");
+            }
+        } else {
+            throw new ForbiddenOperationException("Forbidden");
         }
 
         Test test = testService.getEntityById(testId);

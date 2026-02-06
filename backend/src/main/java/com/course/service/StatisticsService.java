@@ -142,11 +142,17 @@ public class StatisticsService {
 
     public List<ClassTopicStatsDto> getClassTopicStatsForTeacher(Integer classId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, ROLE_TEACHER);
+        assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
         StudyClass sc = studyClassService.getEntityById(classId);
-        if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
-            throw new com.course.exception.ForbiddenOperationException("Teacher can view statistics only for own classes");
+        if (isRole(current, ROLE_TEACHER)) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new com.course.exception.ForbiddenOperationException("Teacher can view statistics only for own classes");
+            }
+        } else {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new com.course.exception.ForbiddenOperationException("Methodist can view teacher statistics only for own classes");
+            }
         }
 
         return statisticsRepository.findClassTopicStats(classId)
@@ -166,14 +172,23 @@ public class StatisticsService {
 
     public List<StudentTopicStatsDto> getStudentTopicStatsForTeacher(Integer studentId, Integer courseId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, ROLE_TEACHER);
+        assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
         if (courseId == null) {
             throw new com.course.exception.TestAttemptValidationException("courseId is required");
         }
 
-        classStudentService.assertStudentInTeacherCourse(studentId, current.getId(), courseId,
-                "Teacher can view statistics only for own students in the course");
+        if (isRole(current, ROLE_TEACHER)) {
+            classStudentService.assertStudentInTeacherCourse(studentId, current.getId(), courseId,
+                    "Teacher can view statistics only for own students in the course");
+        } else {
+            Course course = courseService.getEntityById(courseId);
+            if (course.getCreatedBy() == null || course.getCreatedBy().getId() == null || !course.getCreatedBy().getId().equals(current.getId())) {
+                throw new com.course.exception.ForbiddenOperationException("Methodist can view teacher statistics only for own courses");
+            }
+            classStudentService.assertStudentInCourse(studentId, courseId,
+                    "Student is not enrolled in the course");
+        }
 
         return statisticsRepository.findStudentTopicStats(studentId, courseId)
                 .stream().map(p -> {

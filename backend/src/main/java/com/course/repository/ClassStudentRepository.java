@@ -33,6 +33,13 @@ public interface ClassStudentRepository extends JpaRepository<ClassStudent, Inte
         "where cs.student.id = :studentId order by c.name asc")
 java.util.List<com.course.entity.Course> findDistinctCoursesByStudentId(@Param("studentId") Integer studentId);
 
+    @Query("select distinct cs.student.id from ClassStudent cs where cs.studyClass.course.id = :courseId")
+    java.util.List<Integer> findDistinctStudentIdsByCourseId(@Param("courseId") Integer courseId);
+
+    @Query("select distinct cs.studyClass.teacher.id from ClassStudent cs where cs.student.id = :studentId and cs.studyClass.course.id = :courseId and cs.studyClass.teacher.id is not null")
+    java.util.List<Integer> findDistinctTeacherIdsByStudentInCourse(@Param("studentId") Integer studentId,
+                                                                    @Param("courseId") Integer courseId);
+
 }
 
 

@@ -33,7 +33,7 @@ public class StudentAchievementController {
     private final MyAchievementsService myAchievementsService;
 
     @PostMapping("/api/achievements/{achievementId}/award/{studentId}")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<StudentAchievementDto> award(
             @PathVariable Integer achievementId,
             @PathVariable Integer studentId) {
@@ -42,7 +42,7 @@ public class StudentAchievementController {
     }
 
     @DeleteMapping("/api/achievements/{achievementId}/award/{studentId}")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> revoke(
             @PathVariable Integer achievementId,
             @PathVariable Integer studentId) {

@@ -98,6 +98,56 @@ public interface TestAttemptRepository extends JpaRepository<TestAttempt, Intege
     );
 
     /**
+     * Methodist view: attempts waiting for manual grading (OPEN answers not graded yet)
+     * within methodist's own courses (classes created by the methodist).
+     */
+    @Query(value = """
+            SELECT
+              ta.id AS attemptId,
+              ta.test_id AS testId,
+              t.lesson_id AS lessonId,
+              t.course_id AS courseId,
+              c.id AS classId,
+              c.name AS className,
+              u.id AS studentId,
+              u.name AS studentName,
+              (
+                SELECT COUNT(*)
+                FROM test_attempt_answers taa
+                JOIN test_questions tq ON tq.id = taa.question_id
+                WHERE taa.attempt_id = ta.id
+                  AND tq.question_type = 'OPEN'
+                  AND taa.graded_at IS NULL
+              ) AS ungradedOpenCount,
+              ta.submitted_at AS submittedAt
+            FROM test_attempts ta
+            JOIN tests t ON t.id = ta.test_id
+            JOIN class_students cs ON cs.student_id = ta.student_id
+            JOIN classes c ON c.id = cs.class_id AND c.course_id = t.course_id
+            JOIN users u ON u.id = ta.student_id
+            WHERE ta.status = 'SUBMITTED'
+              AND c.created_by = :methodistId
+              AND (:courseId IS NULL OR t.course_id = :courseId)
+              AND (:testId IS NULL OR ta.test_id = :testId)
+              AND (:classId IS NULL OR c.id = :classId)
+              AND EXISTS (
+                SELECT 1
+                FROM test_attempt_answers taa2
+                JOIN test_questions tq2 ON tq2.id = taa2.question_id
+                WHERE taa2.attempt_id = ta.id
+                  AND tq2.question_type = 'OPEN'
+                  AND taa2.graded_at IS NULL
+              )
+            ORDER BY ta.submitted_at DESC NULLS LAST, ta.id DESC
+            """, nativeQuery = true)
+    List<PendingAttemptProjection> findPendingAttemptsForMethodist(
+            @Param("methodistId") Integer methodistId,
+            @Param("courseId") Integer courseId,
+            @Param("testId") Integer testId,
+            @Param("classId") Integer classId
+    );
+
+    /**
      * For a student and a list of tests, returns the latest attempt per test.
      */
     @Query(value = """

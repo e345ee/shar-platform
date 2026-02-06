@@ -43,12 +43,19 @@ public class StudyClassService {
         User teacher = null;
         if (dto.getTeacherId() != null) {
             teacher = userService.getUserEntityById(dto.getTeacherId());
-            userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
-            methodistTeacherService.assertMethodistOwnsTeacher(
-                    current.getId(),
-                    teacher.getId(),
-                    "Methodist can assign only own teachers"
-            );
+            userService.assertUserEntityHasAnyRole(teacher, ROLE_TEACHER, ROLE_METHODIST);
+            if (teacher.getRole().getRolename() == ROLE_TEACHER) {
+                methodistTeacherService.assertMethodistOwnsTeacher(
+                        current.getId(),
+                        teacher.getId(),
+                        "Methodist can assign only own teachers"
+                );
+            } else {
+                // Methodist can be a teacher, but only for own classes.
+                if (teacher.getId() == null || current.getId() == null || !teacher.getId().equals(current.getId())) {
+                    throw new ForbiddenOperationException("Methodist can assign only self as methodist-teacher");
+                }
+            }
         }
 
         StudyClass sc = new StudyClass();
@@ -166,12 +173,19 @@ public class StudyClassService {
             sc.setTeacher(null);
         } else {
             User teacher = userService.getUserEntityById(dto.getTeacherId());
-            userService.assertUserEntityHasRole(teacher, ROLE_TEACHER);
-            methodistTeacherService.assertMethodistOwnsTeacher(
-                    current.getId(),
-                    teacher.getId(),
-                    "Methodist can assign only own teachers"
-            );
+            userService.assertUserEntityHasAnyRole(teacher, ROLE_TEACHER, ROLE_METHODIST);
+            if (teacher.getRole().getRolename() == ROLE_TEACHER) {
+                methodistTeacherService.assertMethodistOwnsTeacher(
+                        current.getId(),
+                        teacher.getId(),
+                        "Methodist can assign only own teachers"
+                );
+            } else {
+                // Methodist can be a teacher, but only for own classes.
+                if (teacher.getId() == null || current.getId() == null || !teacher.getId().equals(current.getId())) {
+                    throw new ForbiddenOperationException("Methodist can assign only self as methodist-teacher");
+                }
+            }
             sc.setTeacher(teacher);
         }
 

@@ -13,6 +13,7 @@ public class TestSummaryDto {
     private String activityType;
     private Integer weightMultiplier;
     private java.time.LocalDate assignedWeekStart;
+    private Integer timeLimitSeconds;
 
     private String title;
     private String description;

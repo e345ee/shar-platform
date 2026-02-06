@@ -35,6 +35,7 @@ public class TestService {
     private final UserService userService;
     private final AuthService authService;
     private final StudentRemedialAssignmentRepository studentRemedialAssignmentRepository;
+    private final NotificationService notificationService;
 
     public TestDto create(Integer lessonId, TestUpsertDto dto) {
         User current = authService.getCurrentUserEntity();
@@ -158,6 +159,17 @@ public class TestService {
             throw new TestValidationException("weightMultiplier must be between 1 and 100");
         }
 
+        Integer timeLimitSeconds = null;
+        if (type == ActivityType.CONTROL_WORK) {
+            Integer tls = dto.getTimeLimitSeconds();
+            timeLimitSeconds = tls != null ? tls : 3600;
+            if (timeLimitSeconds < 1 || timeLimitSeconds > 86400) {
+                throw new TestValidationException("timeLimitSeconds must be between 1 and 86400");
+            }
+        } else if (dto.getTimeLimitSeconds() != null) {
+            throw new TestValidationException("timeLimitSeconds is supported only for CONTROL_WORK");
+        }
+
         Test test = new Test();
         test.setCourse(course);
         test.setLesson(lesson);
@@ -171,6 +183,7 @@ public class TestService {
         test.setStatus(TestStatus.DRAFT);
         test.setPublishedAt(null);
         test.setAssignedWeekStart(null);
+        test.setTimeLimitSeconds(timeLimitSeconds);
 
         return toDto(testRepository.save(test), true);
     }
@@ -203,7 +216,32 @@ public class TestService {
         }
 
         test.setAssignedWeekStart(weekStart);
-        return toDto(testRepository.save(test), true);
+        Test saved = testRepository.save(test);
+
+        // Notify all students enrolled in this course that a weekly assignment is available.
+        if (saved.getCourse() != null && saved.getCourse().getId() != null) {
+            Integer courseId = saved.getCourse().getId();
+            java.util.List<Integer> studentIds = classStudentService.findDistinctStudentIdsByCourseId(courseId);
+            for (Integer sid : studentIds) {
+                if (sid == null) continue;
+                try {
+                    User student = userService.getUserEntityById(sid);
+                    notificationService.create(student,
+                            NotificationType.WEEKLY_ASSIGNMENT_AVAILABLE,
+                            "Доступно новое недельное задание",
+                            "В курсе '" + saved.getCourse().getName() + "' доступно недельное задание: " + saved.getTitle(),
+                            courseId,
+                            null,
+                            saved.getId(),
+                            null,
+                            null);
+                } catch (Exception ignored) {
+                    // best-effort; do not block assigning weekly activity
+                }
+            }
+        }
+
+        return toDto(saved, true);
     }
 
     @Transactional(readOnly = true)
@@ -300,6 +338,17 @@ public class TestService {
         test.setDescription(description);
         test.setTopic(topic);
         test.setDeadline(deadline);
+
+        if (dto.getTimeLimitSeconds() != null) {
+            if (test.getActivityType() != ActivityType.CONTROL_WORK) {
+                throw new TestValidationException("timeLimitSeconds is supported only for CONTROL_WORK");
+            }
+            Integer tls = dto.getTimeLimitSeconds();
+            if (tls < 1 || tls > 86400) {
+                throw new TestValidationException("timeLimitSeconds must be between 1 and 86400");
+            }
+            test.setTimeLimitSeconds(tls);
+        }
         return toDto(testRepository.save(test), true);
     }
 
@@ -559,6 +608,7 @@ public class TestService {
         dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
         dto.setWeightMultiplier(test.getWeightMultiplier());
         dto.setAssignedWeekStart(test.getAssignedWeekStart());
+        dto.setTimeLimitSeconds(test.getTimeLimitSeconds());
 
         if (test.getLesson() != null) {
             dto.setLessonId(test.getLesson().getId());
@@ -621,6 +671,7 @@ public class TestService {
         dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
         dto.setWeightMultiplier(test.getWeightMultiplier());
         dto.setAssignedWeekStart(test.getAssignedWeekStart());
+        dto.setTimeLimitSeconds(test.getTimeLimitSeconds());
 
         if (test.getLesson() != null) {
             dto.setLessonId(test.getLesson().getId());

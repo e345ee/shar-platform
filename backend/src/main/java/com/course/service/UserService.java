@@ -470,6 +470,19 @@ public class UserService {
         }
     }
 
+    public void assertUserEntityHasAnyRole(User user, RoleName... roles) {
+        if (user == null || user.getRole() == null || user.getRole().getRolename() == null || roles == null) {
+            throw new ForbiddenOperationException("User has invalid role");
+        }
+        RoleName actual = user.getRole().getRolename();
+        for (RoleName r : roles) {
+            if (r == actual) {
+                return;
+            }
+        }
+        throw new ForbiddenOperationException("User must have one of roles " + java.util.Arrays.toString(roles));
+    }
+
 
     // -----------------------------
     // Lightweight checks for other services (avoid direct repository injection)

@@ -475,6 +475,20 @@ CLASS_CODE=$(json_get "$HTTP_BODY" '.joinCode')
 pass "Class created: id=$CLASS_ID joinCode=$CLASS_CODE"
 
 # ------------------------------------------------------------
+# 4b) Methodist can be a TEACHER: create CLASS with teacherId = METHODIST_ID
+# ------------------------------------------------------------
+MTC_CLASS_NAME="Class_MethodistTeacher_$SUF"
+log "Create CLASS where teacherId is the same METHODIST (methodist can be a teacher)"
+request_json POST "/api/classes" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$MTC_CLASS_NAME\",\"courseId\":$COURSE_ID,\"teacherId\":$METHODIST_ID}"
+expect_code 201 "create methodist-teacher class"
+MTC_CLASS_ID=$(json_get "$HTTP_BODY" '.id')
+MTC_TEACHER_ID=$(json_get "$HTTP_BODY" '.teacherId')
+[[ "$MTC_TEACHER_ID" == "$METHODIST_ID" ]] || fail "Expected teacherId=$METHODIST_ID for methodist-teacher class, got $MTC_TEACHER_ID ($HTTP_BODY)"
+pass "Methodist-teacher class created: id=$MTC_CLASS_ID"
+
+# ------------------------------------------------------------
 # 5) Create JOIN REQUEST (anonymous)
 # ------------------------------------------------------------
 STUDENT_NAME="student_$SUF"
@@ -488,6 +502,15 @@ request_json POST "/api/join-requests" "" \
 expect_code 201 "create join request"
 REQUEST_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Join request created: id=$REQUEST_ID"
+
+# ------------------------------------------------------------
+# 5a) Notifications: teacher should see join request notification
+# ------------------------------------------------------------
+log "Teacher NOTIFICATIONS should include CLASS_JOIN_REQUEST"
+request_json GET "/api/notifications" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "get teacher notifications"
+echo "$HTTP_BODY" | grep -q "CLASS_JOIN_REQUEST" || fail "Expected teacher notifications to contain CLASS_JOIN_REQUEST, got: $HTTP_BODY"
+pass "Teacher join-request notification present"
 
 # ------------------------------------------------------------
 # 6) Approve JOIN REQUEST (TEACHER)
@@ -578,6 +601,12 @@ expect_code 200 "award achievement"
 AW_AID=$(json_get "$HTTP_BODY" '.achievementId')
 [[ "$AW_AID" == "$ACH1_ID" ]] || fail "Expected awarded achievementId=$ACH1_ID, got $AW_AID ($HTTP_BODY)"
 pass "Achievement awarded"
+
+log "Student NOTIFICATIONS should include ACHIEVEMENT_AWARDED"
+request_json GET "/api/notifications" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get student notifications (after achievement)"
+echo "$HTTP_BODY" | grep -q "ACHIEVEMENT_AWARDED" || fail "Expected student notifications to contain ACHIEVEMENT_AWARDED, got: $HTTP_BODY"
+pass "Student achievement notification present"
 
 log "Student MY ACHIEVEMENTS PAGE after awarding: should have 1 earned and 1 recommendation"
 request_json GET "/api/users/me/achievements/page" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -943,6 +972,29 @@ TEST2_READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 pass "Second test published"
 
 # ------------------------------------------------------------
+# CONTROL_WORK activity with per-attempt time limit
+# ------------------------------------------------------------
+log "Create CONTROL_WORK activity with timeLimitSeconds=1 (DRAFT) as METHODIST"
+request_json POST "/api/courses/$COURSE_ID/activities" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"activityType\":\"CONTROL_WORK\",\"title\":\"Control_$SUF\",\"description\":\"Timed control\",\"topic\":\"ControlTopic_$SUF\",\"deadline\":\"$DEADLINE\",\"weightMultiplier\":2,\"timeLimitSeconds\":1}"
+expect_code 201 "create control work"
+CONTROL_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Control work created: id=$CONTROL_ID"
+
+log "Add CONTROL_WORK question #1 (SINGLE_CHOICE, points=1)"
+request_json POST "/api/tests/$CONTROL_ID/questions" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":1,\"questionText\":\"2+3=?\",\"option1\":\"4\",\"option2\":\"5\",\"option3\":\"6\",\"option4\":\"23\",\"correctOption\":2}"
+expect_code 201 "create control work q1"
+CQ1_ID=$(json_get "$HTTP_BODY" '.id')
+
+log "Publish CONTROL_WORK activity: DRAFT -> READY"
+request_json POST "/api/tests/$CONTROL_ID/ready" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "publish control work ready"
+pass "Control work published"
+
+# ------------------------------------------------------------
 # WEEKLY_STAR activity: create -> add questions -> publish -> assign current week
 # ------------------------------------------------------------
 WEEK_START=$(date -d "$(date +%F) -$(( $(date +%u) - 1 )) days" +%F)
@@ -978,6 +1030,12 @@ request_json POST "/api/activities/$WEEKLY_ID/assign-week" "$METHODIST_AUTH" \
   -d "{\"weekStart\":\"$WEEK_START\"}"
 expect_code 200 "assign weekly"
 pass "Weekly activity published and assigned"
+
+log "Student NOTIFICATIONS should include WEEKLY_ASSIGNMENT_AVAILABLE"
+request_json GET "/api/notifications" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get student notifications (after weekly assign)"
+echo "$HTTP_BODY" | grep -q "WEEKLY_ASSIGNMENT_AVAILABLE" || fail "Expected student notifications to contain WEEKLY_ASSIGNMENT_AVAILABLE, got: $HTTP_BODY"
+pass "Student weekly assignment notification present"
 
 log "Student COURSE PAGE should now include weeklyThisWeek with WEEKLY_ID"
 request_json GET "/api/student/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -1057,10 +1115,10 @@ fi
 pass "Course page does not include remedial before assignment"
 
 
-log "TEACHER opens lesson2 for the class (required for student visibility)"
-request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
-expect_code_one_of "teacher open lesson2" 200 201 204
-pass "Lesson2 opened for class"
+log "METHODIST opens lesson2 for the class (methodist can do teacher actions)"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/lessons/$LESSON2_ID/open" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "methodist open lesson2" 200 201 204
+pass "Lesson2 opened for class by methodist"
 
 log "SRS 3.2.3: Student list tests in lesson2: should be EMPTY until teacher opens the TEST"
 request_json GET "/api/lessons/$LESSON2_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -1093,10 +1151,10 @@ LIST_COUNT=$(json_get "$HTTP_BODY" 'length')
 [[ "$LIST_COUNT" == "0" ]] || fail "Expected 0 visible tests in lesson1 before open, got $LIST_COUNT: $HTTP_BODY"
 pass "Student cannot see lesson1 tests before teacher opens them"
 
-log "TEACHER opens TEST2 for the class"
-request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$TEST2_ID/open" "$TEACHER_AUTH" -H "Accept: application/json"
-expect_code_one_of "teacher open test2" 200 201 204
-pass "Test2 opened for class"
+log "METHODIST opens TEST2 for the class (methodist can do teacher actions)"
+request_json POST "/api/teachers/me/classes/$CLASS_ID/tests/$TEST2_ID/open" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code_one_of "methodist open test2" 200 201 204
+pass "Test2 opened for class by methodist"
 
 log "Student list tests in lesson1: should now include READY test2"
 request_json GET "/api/lessons/$LESSON_ID/tests" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -1238,6 +1296,23 @@ raise SystemExit(1)' "$REMEDIAL_ID" "$REM_ATT_ID" <<<"$HTTP_BODY"
 pass "Course page includes remedial latestAttempt"
 
 
+# ---------------- CONTROL_WORK time limit ----------------
+log "Student START CONTROL_WORK attempt (timeLimitSeconds=1)"
+request_json POST "/api/tests/$CONTROL_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 201 "start control work attempt"
+CATT_ID=$(json_get "$HTTP_BODY" '.id')
+pass "Control work attempt started: id=$CATT_ID"
+
+log "Wait for CONTROL_WORK time limit to expire (sleep 2s)"
+sleep 2
+
+log "Student SUBMIT CONTROL_WORK attempt after time limit: should be rejected"
+request_json POST "/api/attempts/$CATT_ID/submit" "$STUDENT_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"questionId\":$CQ1_ID,\"selectedOption\":2}]}"
+expect_code_one_of "submit control work after time limit" 400 422
+pass "Time limit enforcement works for CONTROL_WORK"
+
 # ---------------- Student attempt flow ----------------
 log "Student START attempt"
 request_json POST "/api/tests/$TEST_ID/attempts/start" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -1258,6 +1333,12 @@ STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$MAXS" == "10" ]] || fail "Expected maxScore=10 (2+3+5), got $MAXS ($HTTP_BODY)"
 [[ "$STATUS" == "SUBMITTED" ]] || fail "Expected status SUBMITTED (needs manual grading), got $STATUS"
 pass "Attempt submitted: $SCORE/$MAXS (manual grading pending)"
+
+log "Teacher NOTIFICATIONS should include MANUAL_GRADING_REQUIRED"
+request_json GET "/api/notifications" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "get teacher notifications (after open submit)"
+echo "$HTTP_BODY" | grep -q "MANUAL_GRADING_REQUIRED" || fail "Expected teacher notifications to contain MANUAL_GRADING_REQUIRED, got: $HTTP_BODY"
+pass "Teacher manual-grading notification present"
 
 log "Student GET attempt detail: should show isCorrect flags"
 request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
@@ -1298,9 +1379,9 @@ expect_code 200 "teacher get attempt detail"
 pass "Teacher can view attempt detail"
 
 # ---------------- Teacher pending queue + partial manual grading ----------------
-log "Teacher PENDING attempts list (should include our SUBMITTED attempt with 1 ungraded OPEN answer)"
-request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"
-expect_code 200 "teacher pending attempts"
+log "Methodist PENDING attempts list (methodist can do teacher actions; should include our SUBMITTED attempt with 1 ungraded OPEN answer)"
+request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "methodist pending attempts"
 # must contain ATTEMPT_ID somewhere
 if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
   fail "Expected pending list to contain attemptId=$ATTEMPT_ID, got: $HTTP_BODY"
@@ -1310,17 +1391,17 @@ if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$WATT_ID"; then
 fi
 pass "Pending queue contains submitted attempt"
 
-log "Negative: Teacher grade with too-long feedback should fail (validation max=2048)"
+log "Negative: Methodist grade with too-long feedback should fail (validation max=2048)"
 LONG_FEEDBACK="$(python3 - <<'PY'
 print('x'*2050)
 PY
 )"
-request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$TEACHER_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"$LONG_FEEDBACK\"}]}"
+request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"$LONG_FEEDBACK\"}]}"
 expect_code_one_of "too-long feedback rejected" 400 422
 pass "Feedback length validation works"
 
-log "Teacher PARTIAL grade: grade only OPEN question with pointsAwarded=4 and feedback"
-request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$TEACHER_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"Good explanation, but add an example.\"}]}"
+log "Methodist grades OPEN question with pointsAwarded=4 and feedback"
+request_json PUT "/api/attempts/$ATTEMPT_ID/grade" "$METHODIST_AUTH"   -H "Content-Type: application/json"   -d "{\"grades\":[{\"questionId\":$Q3_ID,\"pointsAwarded\":4,\"feedback\":\"Good explanation, but add an example.\"}]}"
 expect_code 200 "grade open question"
 STATUS_G=$(json_get "$HTTP_BODY" '.status')
 SCORE_G=$(json_get "$HTTP_BODY" '.score')
@@ -1329,6 +1410,13 @@ MAXS_G=$(json_get "$HTTP_BODY" '.maxScore')
 [[ "$SCORE_G" == "9" ]] || fail "Expected score=9 after grading (5+4), got $SCORE_G ($HTTP_BODY)"
 [[ "$MAXS_G" == "10" ]] || fail "Expected maxScore=10, got $MAXS_G ($HTTP_BODY)"
 pass "Attempt graded: $SCORE_G/$MAXS_G"
+
+log "Student NOTIFICATIONS should include GRADE_RECEIVED and OPEN_ANSWER_CHECKED"
+request_json GET "/api/notifications" "$STUDENT_AUTH" -H "Accept: application/json"
+expect_code 200 "get student notifications (after grading)"
+echo "$HTTP_BODY" | grep -q "GRADE_RECEIVED" || fail "Expected student notifications to contain GRADE_RECEIVED, got: $HTTP_BODY"
+echo "$HTTP_BODY" | grep -q "OPEN_ANSWER_CHECKED" || fail "Expected student notifications to contain OPEN_ANSWER_CHECKED, got: $HTTP_BODY"
+pass "Student grade notifications present"
 
 log "Teacher PENDING attempts list should NOT include attempt anymore"
 request_json GET "/api/teachers/me/attempts/pending?courseId=$COURSE_ID" "$TEACHER_AUTH" -H "Accept: application/json"

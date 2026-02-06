@@ -26,4 +26,9 @@ public class TestUpsertDto {
 
     @NotNull
     private LocalDateTime deadline;
+
+    /**
+     * Optional; supported for CONTROL_WORK. Time limit in seconds after student starts an attempt.
+     */
+    private Integer timeLimitSeconds;
 }

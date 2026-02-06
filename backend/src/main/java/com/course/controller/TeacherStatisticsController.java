@@ -21,7 +21,7 @@ public class TeacherStatisticsController {
      * Teacher sees statistics by topics for a specific class.
      */
     @GetMapping("/classes/{classId}/topics")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<ClassTopicStatsDto>> classTopics(@PathVariable Integer classId) {
         return ResponseEntity.ok(statisticsService.getClassTopicStatsForTeacher(classId));
     }
@@ -30,7 +30,7 @@ public class TeacherStatisticsController {
      * Teacher sees statistics by topics for a concrete student inside a course.
      */
     @GetMapping("/students/{studentId}/topics")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<StudentTopicStatsDto>> studentTopics(
             @PathVariable Integer studentId,
             @RequestParam Integer courseId

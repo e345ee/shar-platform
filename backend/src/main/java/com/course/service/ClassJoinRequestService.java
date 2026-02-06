@@ -32,6 +32,7 @@ public class ClassJoinRequestService {
     private final StudyClassService classService;
     private final AuthService authService;
     private final UserService userService;
+    private final NotificationService notificationService;
 
     public ClassJoinRequestDto createRequest(CreateClassJoinRequestDto dto) {
         String classCode = dto.getClassCode().trim().toUpperCase();
@@ -52,7 +53,36 @@ public class ClassJoinRequestService {
         req.setEmail(dto.getEmail());
         req.setTgId(dto.getTgId());
 
-        return toDto(joinRequestRepository.save(req));
+        ClassJoinRequest saved = joinRequestRepository.save(req);
+
+        // Notify both responsible teacher (if present) and class creator (methodist) about a new join request.
+        String title = "Новая заявка на вступление";
+        String msg = "Поступила заявка в класс '" + sc.getName() + "' от " + dto.getName();
+        if (sc.getTeacher() != null && sc.getTeacher().getId() != null) {
+            notificationService.create(sc.getTeacher(),
+                    com.course.entity.NotificationType.CLASS_JOIN_REQUEST,
+                    title,
+                    msg,
+                    sc.getCourse() != null ? sc.getCourse().getId() : null,
+                    sc.getId(),
+                    null,
+                    null,
+                    null);
+        }
+        if (sc.getCreatedBy() != null && sc.getCreatedBy().getId() != null
+                && (sc.getTeacher() == null || sc.getTeacher().getId() == null || !sc.getCreatedBy().getId().equals(sc.getTeacher().getId()))) {
+            notificationService.create(sc.getCreatedBy(),
+                    com.course.entity.NotificationType.CLASS_JOIN_REQUEST,
+                    title,
+                    msg,
+                    sc.getCourse() != null ? sc.getCourse().getId() : null,
+                    sc.getId(),
+                    null,
+                    null,
+                    null);
+        }
+
+        return toDto(saved);
     }
 
     @Transactional(readOnly = true)

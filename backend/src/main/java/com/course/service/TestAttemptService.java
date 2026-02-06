@@ -46,6 +46,8 @@ public class TestAttemptService {
 
     private final RemedialAssignmentService remedialAssignmentService;
 
+    private final NotificationService notificationService;
+
     /**
      * Teacher grades OPEN questions in an attempt.
      * Supports partial grading (you can grade a subset of OPEN questions).
@@ -53,7 +55,7 @@ public class TestAttemptService {
      */
     public TestAttemptDto gradeOpenAttempt(Integer attemptId, GradeTestAttemptDto dto) {
         User current = authService.getCurrentUserEntity();
-        assertAnyRole(current, ROLE_TEACHER, ROLE_ADMIN);
+        assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
 
         if (dto == null || dto.getGrades() == null || dto.getGrades().isEmpty()) {
             throw new TestAttemptValidationException("grades are required");
@@ -76,12 +78,13 @@ public class TestAttemptService {
             throw new TestAttemptValidationException("Attempt data is invalid");
         }
 
-        // teacher can grade only own students
+        // Teacher can grade only own students.
         if (isRole(current, ROLE_TEACHER)) {
-            classStudentService.assertStudentInTeacherCourse(studentId, current.getId(), courseId, "Teacher can grade only own students");
+            classStudentService.assertStudentInTeacherCourse(studentId, current.getId(), courseId,
+                    "Teacher can grade only own students");
         }
 
-        // methodists/admins can view course/lesson, but grading is only teacher/admin
+        // Methodist/admin access is validated by course/lesson access rules.
         testService.getEntityForCurrentUser(attempt.getTest().getId());
 
         List<TestAttemptAnswer> answers = answerRepository.findAllByAttempt_IdOrderByIdAsc(attemptId);
@@ -159,6 +162,29 @@ public class TestAttemptService {
         // If the attempt just became fully graded, consider assigning a remedial task by topic.
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
+
+            // Student got a final grade.
+            if (saved.getStudent() != null && saved.getStudent().getId() != null) {
+                notificationService.create(saved.getStudent(),
+                        NotificationType.GRADE_RECEIVED,
+                        "Получена оценка",
+                        "Проверено задание: " + (saved.getTest() != null ? saved.getTest().getTitle() : "") + ". Оценка: " + saved.getScore() + "/" + saved.getMaxScore(),
+                        courseId,
+                        null,
+                        saved.getTest() != null ? saved.getTest().getId() : null,
+                        saved.getId(),
+                        null);
+
+                notificationService.create(saved.getStudent(),
+                        NotificationType.OPEN_ANSWER_CHECKED,
+                        "Открытый ответ проверен",
+                        "Учитель проверил открытый ответ в задании: " + (saved.getTest() != null ? saved.getTest().getTitle() : ""),
+                        courseId,
+                        null,
+                        saved.getTest() != null ? saved.getTest().getId() : null,
+                        saved.getId(),
+                        null);
+            }
         }
         // Remedial attempts (should not have OPEN questions) are still safe to mark as completed here.
         remedialAssignmentService.markCompletedIfRemedial(saved);
@@ -169,14 +195,24 @@ public class TestAttemptService {
     @Transactional(readOnly = true)
     public List<PendingTestAttemptDto> listPendingAttemptsForTeacher(Integer courseId, Integer testId, Integer classId) {
         User current = authService.getCurrentUserEntity();
-        userService.assertUserEntityHasRole(current, ROLE_TEACHER);
+        assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
-        List<PendingAttemptProjection> rows = attemptRepository.findPendingAttemptsForTeacher(
-                current.getId(),
-                courseId,
-                testId,
-                classId
-        );
+        List<PendingAttemptProjection> rows;
+        if (isRole(current, ROLE_TEACHER)) {
+            rows = attemptRepository.findPendingAttemptsForTeacher(
+                    current.getId(),
+                    courseId,
+                    testId,
+                    classId
+            );
+        } else {
+            rows = attemptRepository.findPendingAttemptsForMethodist(
+                    current.getId(),
+                    courseId,
+                    testId,
+                    classId
+            );
+        }
 
         return rows.stream().map(r -> {
             PendingTestAttemptDto dto = new PendingTestAttemptDto();
@@ -212,7 +248,13 @@ public class TestAttemptService {
                 TestAttemptStatus.IN_PROGRESS
         );
         if (existing.isPresent()) {
-            return new StartAttemptResult(toDto(existing.get(), true), false);
+            TestAttempt inProgress = existing.get();
+            if (isTimeLimitExceeded(inProgress, test, LocalDateTime.now())) {
+                // Don't keep student stuck in an IN_PROGRESS attempt forever.
+                finalizeExpiredAttempt(inProgress, test);
+            } else {
+                return new StartAttemptResult(toDto(inProgress, true), false);
+            }
         }
 
         int previousCount = attemptRepository.countByTest_IdAndStudent_Id(testId, current.getId());
@@ -368,6 +410,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         testService.getEntityForCurrentUser(test.getId());
         assertReady(test);
         assertBeforeDeadline(test);
+        assertWithinTimeLimit(attempt, test);
 
         List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
         if (questions.isEmpty()) {
@@ -467,6 +510,74 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
         TestAttempt saved = attemptRepository.save(attempt);
 
+        // Notifications
+        Integer courseId = null;
+        if (saved.getTest() != null && saved.getTest().getLesson() != null && saved.getTest().getLesson().getCourse() != null) {
+            courseId = saved.getTest().getLesson().getCourse().getId();
+        } else if (saved.getTest() != null && saved.getTest().getCourse() != null) {
+            courseId = saved.getTest().getCourse().getId();
+        }
+
+        if (saved.getStatus() == TestAttemptStatus.SUBMITTED) {
+            // Needs manual grading => notify responsible teachers (and methodist can see via pending lists anyway).
+            if (courseId != null) {
+                java.util.List<Integer> teacherIds = classStudentService.findDistinctTeacherIdsByStudentInCourse(current.getId(), courseId);
+                for (Integer tid : teacherIds) {
+                    if (tid == null) continue;
+                    try {
+                        User teacher = userService.getUserEntityById(tid);
+                        notificationService.create(teacher,
+                                NotificationType.MANUAL_GRADING_REQUIRED,
+                                "Новая задача на проверку",
+                                "Есть задание на проверку: " + (saved.getTest() != null ? saved.getTest().getTitle() : "") + " от " + current.getName(),
+                                courseId,
+                                null,
+                                saved.getTest() != null ? saved.getTest().getId() : null,
+                                saved.getId(),
+                                null);
+                    } catch (Exception ignored) {
+                        // best-effort
+                    }
+                }
+
+                // Also notify course creator (METHODIST) so they see pending work in own courses.
+                User courseCreator = null;
+                if (saved.getTest() != null && saved.getTest().getCourse() != null) {
+                    courseCreator = saved.getTest().getCourse().getCreatedBy();
+                } else if (saved.getTest() != null && saved.getTest().getLesson() != null
+                        && saved.getTest().getLesson().getCourse() != null) {
+                    courseCreator = saved.getTest().getLesson().getCourse().getCreatedBy();
+                }
+                if (courseCreator != null && courseCreator.getId() != null
+                        && (teacherIds == null || !teacherIds.contains(courseCreator.getId()))) {
+                    try {
+                        notificationService.create(courseCreator,
+                                NotificationType.MANUAL_GRADING_REQUIRED,
+                                "Новая задача на проверку",
+                                "Есть задание на проверку: " + (saved.getTest() != null ? saved.getTest().getTitle() : "") + " от " + current.getName(),
+                                courseId,
+                                null,
+                                saved.getTest() != null ? saved.getTest().getId() : null,
+                                saved.getId(),
+                                null);
+                    } catch (Exception ignored) {
+                        // best-effort
+                    }
+                }
+            }
+        } else if (saved.getStatus() == TestAttemptStatus.GRADED) {
+            // Auto-graded attempt => notify student about grade.
+            notificationService.create(current,
+                    NotificationType.GRADE_RECEIVED,
+                    "Получена оценка",
+                    "Оценка за задание: " + (saved.getTest() != null ? saved.getTest().getTitle() : "") + ": " + saved.getScore() + "/" + saved.getMaxScore(),
+                    courseId,
+                    null,
+                    saved.getTest() != null ? saved.getTest().getId() : null,
+                    saved.getId(),
+                    null);
+        }
+
         // Auto-graded attempt: if it became GRADED, consider remedial assignment by topic (< 50%).
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
@@ -563,19 +674,19 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 // Open-ended answers are visible only to:
                 // - student who wrote them
                 // - responsible teacher for the student's class
+                // - course methodist (for own courses)
                 // - admin
-                // Methodists can see results, but not the open-ended answer content.
                 TestQuestionType qType = (a.getQuestion() != null && a.getQuestion().getQuestionType() != null)
                         ? a.getQuestion().getQuestionType()
                         : TestQuestionType.SINGLE_CHOICE;
-                boolean canSeeOpenAnswerText = viewerIsAdmin || viewerIsStudentOwner || viewerIsResponsibleTeacher;
-                if (qType == TestQuestionType.OPEN && (!canSeeOpenAnswerText || viewerIsMethodist)) {
+                boolean canSeeOpenAnswerText = viewerIsAdmin || viewerIsStudentOwner || viewerIsResponsibleTeacher || viewerIsMethodist;
+                if (qType == TestQuestionType.OPEN && !canSeeOpenAnswerText) {
                     adto.setTextAnswer(null);
                 } else {
                     adto.setTextAnswer(a.getTextAnswer());
                 }
 
-                if (qType == TestQuestionType.OPEN && (!canSeeOpenAnswerText || viewerIsMethodist)) {
+                if (qType == TestQuestionType.OPEN && !canSeeOpenAnswerText) {
                     adto.setFeedback(null);
                 } else {
                     adto.setFeedback(a.getFeedback());
@@ -667,6 +778,54 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
     private String safeTrim(String s) {
         return s == null ? null : s.trim();
+    }
+
+    // -------- Time limit (CONTROL_WORK) --------
+
+    private boolean isControlWorkTimeLimited(Test test) {
+        return test != null
+                && test.getActivityType() == ActivityType.CONTROL_WORK
+                && test.getTimeLimitSeconds() != null
+                && test.getTimeLimitSeconds() > 0;
+    }
+
+    private boolean isTimeLimitExceeded(TestAttempt attempt, Test test, LocalDateTime now) {
+        if (!isControlWorkTimeLimited(test) || attempt == null || attempt.getStartedAt() == null || now == null) {
+            return false;
+        }
+        return now.isAfter(attempt.getStartedAt().plusSeconds(test.getTimeLimitSeconds()));
+    }
+
+    private void assertWithinTimeLimit(TestAttempt attempt, Test test) {
+        if (isTimeLimitExceeded(attempt, test, LocalDateTime.now())) {
+            throw new TestAttemptTimeLimitExceededException("Time limit exceeded");
+        }
+    }
+
+    /**
+     * Marks an expired IN_PROGRESS attempt as finished with 0 points.
+     * This prevents students from being stuck forever in an expired attempt.
+     */
+    private void finalizeExpiredAttempt(TestAttempt attempt, Test test) {
+        if (attempt == null || test == null || test.getId() == null) {
+            return;
+        }
+        if (attempt.getStatus() != TestAttemptStatus.IN_PROGRESS) {
+            return;
+        }
+        // score/maxScore are based on question points.
+        List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
+        int maxTotal = 0;
+        for (TestQuestion q : questions) {
+            int pts = (q != null && q.getPoints() != null && q.getPoints() > 0) ? q.getPoints() : 1;
+            maxTotal += pts;
+        }
+
+        attempt.setStatus(TestAttemptStatus.GRADED);
+        attempt.setSubmittedAt(LocalDateTime.now());
+        attempt.setScore(0);
+        attempt.setMaxScore(maxTotal);
+        attemptRepository.save(attempt);
     }
 
     /**

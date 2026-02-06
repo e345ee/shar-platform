@@ -39,4 +39,9 @@ public class CreateActivityDto {
 
     /** Optional; if null will be set by defaults for the type */
     private Integer weightMultiplier;
+
+    /**
+     * Optional; supported for CONTROL_WORK. Time limit in seconds after student starts an attempt.
+     */
+    private Integer timeLimitSeconds;
 }

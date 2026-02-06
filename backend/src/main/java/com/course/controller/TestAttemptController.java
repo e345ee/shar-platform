@@ -70,7 +70,7 @@ public class TestAttemptController {
      * Only the responsible teacher for the student's class (or ADMIN) can grade.
      */
     @PutMapping(value = "/api/attempts/{attemptId}/grade", consumes = {"application/json"})
-    @PreAuthorize("hasAnyRole('ADMIN','TEACHER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
     public ResponseEntity<TestAttemptDto> gradeOpenAttempt(
             @PathVariable Integer attemptId,
             @Valid @RequestBody GradeTestAttemptDto dto
@@ -83,7 +83,7 @@ public class TestAttemptController {
      * Optional filters: courseId, testId, classId.
      */
     @GetMapping("/api/teachers/me/attempts/pending")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<List<PendingTestAttemptDto>> listPendingAttempts(
             @RequestParam(required = false) Integer courseId,
             @RequestParam(required = false) Integer testId,
