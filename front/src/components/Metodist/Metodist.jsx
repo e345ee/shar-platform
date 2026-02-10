@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "./Metodist.css";
 import "./Profile/Profile"
-import Teachers from "./Teacher/Teacher";
+import Teachers from "./ControlTeacher/ControlTeacher";
 import StudyMaterial from "./StudyMaterial/StudyMaterial";
 
 import {

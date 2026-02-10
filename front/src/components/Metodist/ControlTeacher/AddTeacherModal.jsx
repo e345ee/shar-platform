@@ -1,7 +1,7 @@
 import { useState } from "react";
-import "./Teacher.css";
+import "./ControlTeacher.css";
 import { CloseIcon } from "../../../svgs/MethodistSvg.jsx";
-import { EmailIcon, PhoneIcon, UserIcon, ImageIcon, TelegramIcon, LockIcon, ChatIcon } from "../../../svgs/TeacherSvg.jsx";
+import { EmailIcon, PhoneIcon, UserIcon, ImageIcon, TelegramIcon, LockIcon, ChatIcon } from "../../../svgs/ControlTeacherSvg.jsx";
 
 function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
     const [formData, setFormData] = useState({

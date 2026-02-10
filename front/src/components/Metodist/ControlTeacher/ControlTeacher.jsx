@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./Teacher.css";
+import "./ControlTeacher.css";
 import {
     TeachersIcon,
     PlusIcon,
@@ -8,7 +8,7 @@ import {
     HomeIcon,
 } from "../../../svgs/MethodistSvg.jsx";
 import { BookIcon } from "../../../svgs/ClassSvg.jsx";
-import { EmailIcon, PhoneIcon } from "../../../svgs/TeacherSvg.jsx";
+import { EmailIcon, PhoneIcon } from "../../../svgs/ControlTeacherSvg.jsx";
 import AddTeacherModal from "./AddTeacherModal";
 
 function Teachers({ onBackToMain }) {
