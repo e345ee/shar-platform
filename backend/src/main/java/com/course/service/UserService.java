@@ -332,6 +332,30 @@ public class UserService {
         return convertToDto(savedUser);
     }
 
+    /**
+     * Create a STUDENT account.
+     *
+     * REST-layer enforces access (ADMIN/METHODIST). Here we also enforce role = STUDENT
+     * regardless of any roleId sent by client.
+     */
+    public UserDto createStudent(UserDto dto) {
+        validateUserCreateCommon(dto);
+
+        Role studentRole = roleRepository.findByRolename(ROLE_STUDENT)
+                .orElseThrow(() -> new ResourceNotFoundException("Role '" + ROLE_STUDENT + "' not found"));
+
+        User student = new User();
+        student.setRole(studentRole);
+        student.setName(dto.getName());
+        student.setEmail(dto.getEmail());
+        student.setPassword(passwordEncoder.encode(dto.getPassword()));
+        student.setBio(dto.getBio());
+        student.setPhoto(dto.getPhoto());
+        student.setTgId(dto.getTgId());
+
+        return convertToDto(userRepository.save(student));
+    }
+
     @Transactional(readOnly = true)
     public UserDto getUserById(Integer id) {
         User user = userRepository.findById(id)

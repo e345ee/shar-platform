@@ -16,45 +16,49 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/roles")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
-public class RoleController {
+public class RolesController {
 
     private final RoleService roleService;
 
     @PostMapping
-    public ResponseEntity<RoleDto> createRole(@Valid @RequestBody RoleDto dto) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoleDto> create(@Valid @RequestBody RoleDto dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(roleService.createRole(dto));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<RoleDto> getRoleById(@PathVariable Integer id) {
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
+    public ResponseEntity<RoleDto> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(roleService.getRoleById(id));
     }
 
     @GetMapping("/name/{rolename}")
-    public ResponseEntity<RoleDto> getRoleByName(@PathVariable String rolename) {
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
+    public ResponseEntity<RoleDto> getByName(@PathVariable String rolename) {
         return ResponseEntity.ok(roleService.getRoleByName(rolename));
     }
 
     @GetMapping
-    public ResponseEntity<List<RoleDto>> getAllRoles() {
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
+    public ResponseEntity<List<RoleDto>> getAll() {
         return ResponseEntity.ok(roleService.getAllRoles());
     }
 
     @GetMapping("/paginated")
-    public ResponseEntity<PageDto<RoleDto>> getAllRolesPaginated(Pageable pageable) {
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
+    public ResponseEntity<PageDto<RoleDto>> getAllPaginated(Pageable pageable) {
         return ResponseEntity.ok(roleService.getAllRolesPaginated(pageable));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<RoleDto> updateRole(
-            @PathVariable Integer id,
-            @Valid @RequestBody RoleDto dto) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<RoleDto> update(@PathVariable Integer id, @Valid @RequestBody RoleDto dto) {
         return ResponseEntity.ok(roleService.updateRole(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteRole(@PathVariable Integer id) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Integer id) {
         roleService.deleteRole(id);
         return ResponseEntity.noContent().build();
     }

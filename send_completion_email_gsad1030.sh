@@ -59,6 +59,23 @@ request() {
     auth=(-H "Authorization: Bearer $token")
   fi
 
+  echo
+  echo "---- HTTP ----"
+  echo ">>> $method $BASE_URL$url"
+  if [[ -n "$token" ]]; then
+    echo ">>> Authorization: Bearer <redacted>"
+  else
+    echo ">>> Authorization: <none>"
+  fi
+  if [[ -n "$data" && "$data" != "{}" ]]; then
+    echo ">>> Request body:"
+    if command -v jq >/dev/null 2>&1; then
+      echo "$data" | jq . 2>/dev/null || echo "$data"
+    else
+      python3 -m json.tool <<<"$data" 2>/dev/null || echo "$data"
+    fi
+  fi
+
   if [[ "$method" == "GET" ]]; then
     HTTP_BODY=$(curl -sS -w "\n%{http_code}" "${auth[@]}" -H "Accept: application/json" "$BASE_URL$url")
   else
@@ -67,7 +84,22 @@ request() {
 
   HTTP_CODE=$(echo "$HTTP_BODY" | tail -n 1)
   HTTP_BODY=$(echo "$HTTP_BODY" | sed '$d')
+
+  echo "<<< HTTP $HTTP_CODE"
+  if [[ -z "$HTTP_BODY" ]]; then
+    echo "<<< (empty body)"
+  elif [[ "$HTTP_BODY" =~ ^[[:space:]]*\{ || "$HTTP_BODY" =~ ^[[:space:]]*\[ ]]; then
+    if command -v jq >/dev/null 2>&1; then
+      echo "$HTTP_BODY" | jq . || echo "$HTTP_BODY"
+    else
+      python3 -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
+    fi
+  else
+    echo "$HTTP_BODY"
+  fi
+  echo "-------------"
 }
+
 
 expect() {
   local code="$1"; shift
@@ -121,7 +153,7 @@ expect 200 "admin login"
 ADMIN_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
 # 2) Create methodist
-request POST "/api/users/admin/methodists" "$ADMIN_JWT" "{\"name\":\"$METHODIST_NAME\",\"email\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
+request POST "/api/users/methodists" "$ADMIN_JWT" "{\"name\":\"$METHODIST_NAME\",\"email\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
 expect 201 "create methodist"
 METHODIST_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -131,7 +163,7 @@ expect 200 "methodist login"
 METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
 # 3) Create teacher
-request POST "/api/users/methodists/$METHODIST_ID/teachers" "$METHODIST_JWT" "{\"name\":\"$TEACHER_NAME\",\"email\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
+request POST "/api/users/teachers" "$METHODIST_JWT" "{\"name\":\"$TEACHER_NAME\",\"email\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
 expect 201 "create teacher"
 TEACHER_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -157,7 +189,7 @@ expect 201 "create join request"
 REQUEST_ID=$(json_get "$HTTP_BODY" '.id')
 
 # 7) Teacher approves
-request POST "/api/classes/$CLASS_ID/join-requests/$REQUEST_ID/approve" "$TEACHER_JWT" "{}"
+request POST "/api/join-requests/$REQUEST_ID/approve?classId=$CLASS_ID" "$TEACHER_JWT" "{}"
 expect 200 "approve join request"
 STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -181,16 +213,16 @@ expect 201 "create control work"
 ACTIVITY_ID=$(json_get "$HTTP_BODY" '.id')
 
 # Add one question
-request POST "/api/tests/$ACTIVITY_ID/questions" "$METHODIST_JWT" "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":2,\"questionText\":\"2+2=?\",\"option1\":\"3\",\"option2\":\"4\",\"option3\":\"5\",\"option4\":\"22\",\"correctOption\":2}"
+request POST "/api/activities/$ACTIVITY_ID/questions" "$METHODIST_JWT" "{\"orderIndex\":1,\"questionType\":\"SINGLE_CHOICE\",\"points\":2,\"questionText\":\"2+2=?\",\"option1\":\"3\",\"option2\":\"4\",\"option3\":\"5\",\"option4\":\"22\",\"correctOption\":2}"
 expect 201 "add question"
 Q_ID=$(json_get "$HTTP_BODY" '.id')
 
 # Publish READY
-request POST "/api/tests/$ACTIVITY_ID/ready" "$METHODIST_JWT" "{}"
+request POST "/api/activities/$ACTIVITY_ID/publish" "$METHODIST_JWT" "{}"
 expect 200 "publish activity"
 
 # Teacher opens test for class
-request POST "/api/teachers/me/classes/$CLASS_ID/tests/$ACTIVITY_ID/open" "$TEACHER_JWT" "{}"
+request POST "/api/classes/$CLASS_ID/activities/$ACTIVITY_ID/open" "$TEACHER_JWT" "{}"
 if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" && "$HTTP_CODE" != "204" ]]; then
   echo "[FAIL] open test (expected 200/201/204 got $HTTP_CODE)" >&2
   echo "$HTTP_BODY" >&2
@@ -198,7 +230,7 @@ if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" && "$HTTP_CODE" != "204" ]]
 fi
 
 # Student starts attempt
-request POST "/api/tests/$ACTIVITY_ID/attempts/start" "$STUDENT_JWT" "{}"
+request POST "/api/activities/$ACTIVITY_ID/attempts" "$STUDENT_JWT" "{}"
 expect 201 "start attempt"
 ATTEMPT_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -207,11 +239,11 @@ request POST "/api/attempts/$ATTEMPT_ID/submit" "$STUDENT_JWT" "{\"answers\":[{\
 expect 200 "submit attempt"
 
 # 10) Teacher closes course for student
-request POST "/api/teachers/me/classes/$CLASS_ID/students/$STUDENT_ID/close-course" "$TEACHER_JWT" "{}"
+request POST "/api/classes/$CLASS_ID/students/$STUDENT_ID/close-course" "$TEACHER_JWT" "{}"
 expect 200 "close course"
 
 # 11) Student triggers completion email
-request POST "/api/student/courses/$COURSE_ID/completion-email" "$STUDENT_JWT" "{}"
+request POST "/api/me/courses/$COURSE_ID/completion-email" "$STUDENT_JWT" "{}"
 expect 200 "send completion email"
 
 echo "[OK] Completion email requested. Check inbox of $TARGET_STUDENT_EMAIL."

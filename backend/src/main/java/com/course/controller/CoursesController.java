@@ -14,7 +14,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/courses")
 @RequiredArgsConstructor
-public class CourseController {
+public class CoursesController {
 
     private final CourseService courseService;
 

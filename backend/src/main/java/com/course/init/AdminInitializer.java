@@ -36,18 +36,33 @@ public class AdminInitializer implements CommandLineRunner {
                     return roleRepository.save(r);
                 });
 
-        boolean adminExists = userRepository.existsByName("admin") || userRepository.existsByEmail("admin@example.com");
-        if (adminExists) {
-            return;
-        }
+        // If an admin user already exists (e.g. from seed scripts), ensure it has a valid bcrypt password.
+        // This prevents a common dev/test failure when someone seeds placeholder values like "admin_hash".
+        userRepository.findByName("admin")
+                .or(() -> userRepository.findByEmail("admin@example.com"))
+                .ifPresentOrElse(existing -> {
+                    boolean passwordLooksBcrypt = existing.getPassword() != null
+                            && (existing.getPassword().startsWith("$2a$")
+                            || existing.getPassword().startsWith("$2b$")
+                            || existing.getPassword().startsWith("$2y$"));
 
-        User admin = new User();
-        admin.setRole(adminRole);
-        admin.setName("admin");
-        admin.setEmail("admin@example.com");
-        admin.setPassword(passwordEncoder.encode("admin"));
+                    if (!passwordLooksBcrypt) {
+                        existing.setPassword(passwordEncoder.encode("admin"));
+                        if (existing.getRole() == null) {
+                            existing.setRole(adminRole);
+                        }
+                        userRepository.save(existing);
+                        log.info("Existing ADMIN password normalized (login: admin, password: admin)");
+                    }
+                }, () -> {
+                    User admin = new User();
+                    admin.setRole(adminRole);
+                    admin.setName("admin");
+                    admin.setEmail("admin@example.com");
+                    admin.setPassword(passwordEncoder.encode("admin"));
 
-        userRepository.save(admin);
-        log.info("Default ADMIN created (login: admin, password: admin)");
+                    userRepository.save(admin);
+                    log.info("Default ADMIN created (login: admin, password: admin)");
+                });
     }
 }
