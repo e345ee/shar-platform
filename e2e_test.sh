@@ -103,8 +103,8 @@ need_tool base64
 urlenc() {
 
   local s="$1"
-  if command -v python3 >/dev/null 2>&1; then
-    python3 - <<'PY' "$s"
+  if command -v python >/dev/null 2>&1; then
+    python - <<'PY' "$s"
 import sys, urllib.parse
 print(urllib.parse.quote(sys.argv[1]))
 PY
@@ -121,8 +121,8 @@ json_get() {
     echo "$json" | jq -r "$expr"
     return 0
   fi
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c '
+  if command -v python >/dev/null 2>&1; then
+    python -c '
 import json,sys,re
 expr=sys.argv[1].strip()
 obj=json.load(sys.stdin)
@@ -159,7 +159,7 @@ else:
 ' "$expr" <<<"$json"
     return 0
   fi
-  fail "Need jq or python3 for JSON parsing"
+  fail "Need jq or python for JSON parsing"
 }
 
 json_len() {
@@ -168,7 +168,7 @@ json_len() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq 'length'
   else
-    python3 -c 'import json,sys; obj=json.load(sys.stdin); print(len(obj) if isinstance(obj,list) else 0)' <<<"$json"
+    python -c 'import json,sys; obj=json.load(sys.stdin); print(len(obj) if isinstance(obj,list) else 0)' <<<"$json"
   fi
 }
 
@@ -180,7 +180,7 @@ json_filter_first() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -c --arg f "$field" --arg v "$value" 'map(select(.[$f] == $v))[0]'
   else
-    python3 -c 'import json,sys
+    python -c 'import json,sys
 field=sys.argv[1]; value=sys.argv[2]
 arr=json.load(sys.stdin)
 res=None
@@ -200,7 +200,7 @@ json_filter_first2() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -c --arg f1 "$f1" --arg v1 "$v1" --arg f2 "$f2" --arg v2 "$v2" 'map(select(.[$f1] == $v1 and .[$f2] == $v2))[0]'
   else
-    python3 -c 'import json,sys
+    python -c 'import json,sys
 f1,v1,f2,v2=sys.argv[1],sys.argv[2],sys.argv[3],sys.argv[4]
 arr=json.load(sys.stdin)
 res=None
@@ -214,7 +214,7 @@ print("null" if res is None else json.dumps(res))' "$f1" "$v1" "$f2" "$v2" <<<"$
 
 float_ge() {
 
-  python3 - "$1" "$2" <<'PY'
+  python - "$1" "$2" <<'PY'
 import sys
 a=float(sys.argv[1]); b=float(sys.argv[2])
 sys.exit(0 if a>=b else 1)
@@ -223,7 +223,7 @@ PY
 
 float_between() {
 
-  python3 - "$1" "$2" "$3" <<'PY'
+  python - "$1" "$2" "$3" <<'PY'
 import sys
 x=float(sys.argv[1]); lo=float(sys.argv[2]); hi=float(sys.argv[3])
 sys.exit(0 if (lo<=x<=hi) else 1)
@@ -317,7 +317,7 @@ request_json() {
       if command -v jq >/dev/null 2>&1; then
         echo "$req_body" | jq . 2>/dev/null || echo "$req_body"
       else
-        python3 -c 'import json,sys;\nimport pprint\n\ntry:\n  obj=json.loads(sys.stdin.read())\n  print(json.dumps(obj, ensure_ascii=False, indent=2))\nexcept Exception:\n  print(sys.stdin.read())' <<<"$req_body" || true
+        python -c 'import json,sys;\nimport pprint\n\ntry:\n  obj=json.loads(sys.stdin.read())\n  print(json.dumps(obj, ensure_ascii=False, indent=2))\nexcept Exception:\n  print(sys.stdin.read())' <<<"$req_body" || true
       fi
     fi
 
@@ -332,7 +332,7 @@ request_json() {
       if command -v jq >/dev/null 2>&1; then
         echo "$HTTP_BODY" | jq . || echo "$HTTP_BODY"
       else
-        python3 -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
+        python -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
       fi
     else
 
@@ -1270,7 +1270,7 @@ if command -v jq >/dev/null 2>&1; then
   echo "$HTTP_BODY" | jq -e --argjson id "$REMEDIAL_ID" '.remedialThisWeek | any(.activity.id == $id)' >/dev/null && \
     fail "Course page must not include remedial id=$REMEDIAL_ID before assignment"
 else
-	  python3 -c 'import json,sys
+	  python -c 'import json,sys
 rid=int(sys.argv[1])
 obj=json.load(sys.stdin)
 arr=obj.get("remedialThisWeek") or []
@@ -1408,7 +1408,7 @@ if command -v jq >/dev/null 2>&1; then
   echo "$HTTP_BODY" | jq -e --argjson id "$REMEDIAL_ID" '.remedialThisWeek | any(.activity.id == $id)' >/dev/null || \
     fail "Course page does not include remedial id=$REMEDIAL_ID after assignment: $HTTP_BODY"
 else
-	  python3 -c 'import json,sys
+	  python -c 'import json,sys
 rid=int(sys.argv[1])
 obj=json.load(sys.stdin)
 arr=obj.get("remedialThisWeek") or []
@@ -1444,7 +1444,7 @@ expect_code 200 "student course page after remedial attempt"
 	  echo "$HTTP_BODY" | jq -e --argjson rid "$REMEDIAL_ID" --argjson aid "$REM_ATT_ID" \
 	    '.remedialThisWeek | any(.activity.id == $rid and (.latestAttempt.attemptId // -1) == $aid)' >/dev/null
 	else
-	  python3 -c 'import json,sys
+	  python -c 'import json,sys
 rid=int(sys.argv[1]); aid=int(sys.argv[2])
 obj=json.load(sys.stdin)
 arr=obj.get("remedialThisWeek") or []
@@ -1558,7 +1558,7 @@ fi
 pass "Pending queue contains submitted attempt"
 
 log "Negative: Methodist grade with too-long feedback should fail (validation max=2048)"
-LONG_FEEDBACK="$(python3 - <<'PY'
+LONG_FEEDBACK="$(python - <<'PY'
 print('x'*2050)
 PY
 )"
@@ -1664,7 +1664,7 @@ log "Negative: Student submit with too-long OPEN answer should fail (validation 
 request_json POST "/api/activities/$TEST_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code_one_of "start second attempt (platform dependent)" 200 201
 ATT3_ID=$(json_get "$HTTP_BODY" '.id')
-HUGE_ANSWER="$(python3 - <<'PY'
+HUGE_ANSWER="$(python - <<'PY'
 print('a'*4100)
 PY
 )"

@@ -23,7 +23,7 @@ json_get() {
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq -r "$path"
   else
-    python3 - "$json" "$path" <<'PY'
+    python - "$json" "$path" <<'PY'
 import json,sys
 obj=json.loads(sys.argv[1])
 path=sys.argv[2]
@@ -58,7 +58,7 @@ request() {
     if command -v jq >/dev/null 2>&1; then
       echo "$data" | jq . 2>/dev/null || echo "$data"
     else
-      python3 -m json.tool <<<"$data" 2>/dev/null || echo "$data"
+      python -m json.tool <<<"$data" 2>/dev/null || echo "$data"
     fi
   fi
 
@@ -78,7 +78,7 @@ request() {
     if command -v jq >/dev/null 2>&1; then
       echo "$HTTP_BODY" | jq . || echo "$HTTP_BODY"
     else
-      python3 -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
+      python -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
     fi
   else
     echo "$HTTP_BODY"
