@@ -1,316 +1,206 @@
 package com.course.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.web.HttpMediaTypeNotSupportedException;
-import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.web.context.request.WebRequest;
-import org.springframework.web.multipart.MaxUploadSizeExceededException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.servlet.resource.NoResourceFoundException;
-import org.springframework.web.bind.MissingServletRequestParameterException;
 
-import jakarta.validation.ConstraintViolationException;
-
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthenticationException(
-            AuthenticationException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Unauthenticated",
-                HttpStatus.UNAUTHORIZED.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
-    }
-
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
-            AccessDeniedException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Forbidden",
-                HttpStatus.FORBIDDEN.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException ex,
+                                                           HttpServletRequest request) {
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error(HttpStatus.NOT_FOUND.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     @ExceptionHandler(ForbiddenOperationException.class)
-    public ResponseEntity<ErrorResponse> handleForbiddenOperationException(
-            ForbiddenOperationException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.FORBIDDEN.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
-            ResourceNotFoundException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.NOT_FOUND.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
+    public ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenOperationException ex,
+                                                            HttpServletRequest request) {
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error(HttpStatus.FORBIDDEN.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(DuplicateResourceException.class)
-    public ResponseEntity<ErrorResponse> handleDuplicateResourceException(
-            DuplicateResourceException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.CONFLICT.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
+    public ResponseEntity<ApiErrorResponse> handleDuplicate(DuplicateResourceException ex,
+                                                            HttpServletRequest request) {
+        
+        String msg = ex.getMessage();
+        String field = null;
+        if (msg != null) {
+            String lower = msg.toLowerCase();
+            if (lower.contains("tg") && lower.contains("id")) {
+                field = "tgId";
+            } else if (lower.contains("email")) {
+                field = "email";
+            } else if (lower.contains("name")) {
+                field = "name";
+            } else if (lower.contains("title")) {
+                field = "title";
+            }
+        }
 
-    @ExceptionHandler(MailNotConfiguredException.class)
-    public ResponseEntity<ErrorResponse> handleMailNotConfiguredException(
-            MailNotConfiguredException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.SERVICE_UNAVAILABLE.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.SERVICE_UNAVAILABLE);
-    }
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(msg)
+                .path(request.getRequestURI())
+                .violations(List.of(ApiErrorResponse.Violation.builder()
+                        .field(field)
+                        .message(msg)
+                        .code("Duplicate")
+                        .build()))
+                .build();
 
-    @ExceptionHandler(InvalidEmailException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidEmailException(
-            InvalidEmailException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MailSendingException.class)
-    public ResponseEntity<ErrorResponse> handleMailSendingException(
-            MailSendingException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.BAD_GATEWAY.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_GATEWAY);
-    }
-
-    @ExceptionHandler(CourseNotClosedException.class)
-    public ResponseEntity<ErrorResponse> handleCourseNotClosedException(
-            CourseNotClosedException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.CONFLICT.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
-            IllegalArgumentException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationExceptions(
-            MethodArgumentNotValidException ex, WebRequest request) {
-        Map<String, String> errors = new HashMap<>();
-        ex.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
-        });
+    public ResponseEntity<ApiErrorResponse> handleBodyValidation(MethodArgumentNotValidException ex,
+                                                                 HttpServletRequest request) {
+        List<ApiErrorResponse.Violation> violations = new ArrayList<>();
+        for (FieldError fe : ex.getBindingResult().getFieldErrors()) {
+            violations.add(ApiErrorResponse.Violation.builder()
+                    .field(fe.getField())
+                    .message(fe.getDefaultMessage())
+                    .code(fe.getCode())
+                    .build());
+        }
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Validation failed");
-        response.put("status", HttpStatus.BAD_REQUEST.value());
-        response.put("timestamp", LocalDateTime.now());
-        response.put("errors", errors);
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Validation failed")
+                .path(request.getRequestURI())
+                .violations(violations)
+                .build();
 
-        return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
-            ConstraintViolationException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                ex.getMessage(),
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    public ResponseEntity<ApiErrorResponse> handleMethodValidation(ConstraintViolationException ex,
+                                                                   HttpServletRequest request) {
+        List<ApiErrorResponse.Violation> violations = new ArrayList<>();
+        for (ConstraintViolation<?> v : ex.getConstraintViolations()) {
+            String field = v.getPropertyPath() == null ? null : v.getPropertyPath().toString();
+            violations.add(ApiErrorResponse.Violation.builder()
+                    .field(field)
+                    .message(v.getMessage())
+                    .code(v.getConstraintDescriptor() == null ? null : v.getConstraintDescriptor()
+                            .getAnnotation().annotationType().getSimpleName())
+                    .build());
+        }
+
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Validation failed")
+                .path(request.getRequestURI())
+                .violations(violations)
+                .build();
+        return ResponseEntity.badRequest().body(body);
     }
 
-    @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
-            HttpMessageNotReadableException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Malformed JSON request",
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
-            MethodArgumentTypeMismatchException ex, WebRequest request) {
-        
-        String name = ex.getName() != null ? ex.getName() : "parameter";
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Invalid value for parameter '" + name + "'",
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
-            MissingServletRequestParameterException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Missing request parameter '" + ex.getParameterName() + "'",
-                HttpStatus.BAD_REQUEST.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
-    }
-
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> handleNoResourceFoundException(
-            NoResourceFoundException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Not found",
-                HttpStatus.NOT_FOUND.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
-    }
-
-    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedException(
-            HttpRequestMethodNotSupportedException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Method not allowed",
-                HttpStatus.METHOD_NOT_ALLOWED.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.METHOD_NOT_ALLOWED);
-    }
-
-    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMediaTypeNotSupportedException(
-            HttpMediaTypeNotSupportedException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Unsupported media type",
-                HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-    }
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(
-            MaxUploadSizeExceededException ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Uploaded file is too large",
-                HttpStatus.PAYLOAD_TOO_LARGE.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.PAYLOAD_TOO_LARGE);
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex,
+                                                                  HttpServletRequest request) {
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.badRequest().body(body);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ErrorResponse> handleDataIntegrityViolationException(
-            DataIntegrityViolationException ex, WebRequest request) {
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex,
+                                                                HttpServletRequest request) {
         
-        
-        String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        String msg = raw != null ? raw : "Database constraint violation";
+        String msg = "Database constraint violation";
+        String field = null;
+        String code = "DbConstraint";
 
-        
-        
-        
-        if (msg.contains("chk_attempt_text_len") || msg.contains("character varying(4096)")) {
-            return new ResponseEntity<>(new ErrorResponse(
-                    "textAnswer is too long (max 4096)",
-                    HttpStatus.BAD_REQUEST.value(),
-                    LocalDateTime.now(),
-                    request.getDescription(false).replace("uri=", "")
-            ), HttpStatus.BAD_REQUEST);
-        }
-        if (msg.contains("chk_attempt_feedback_len") || msg.contains("character varying(2048)")) {
-            return new ResponseEntity<>(new ErrorResponse(
-                    "feedback is too long (max 2048)",
-                    HttpStatus.BAD_REQUEST.value(),
-                    LocalDateTime.now(),
-                    request.getDescription(false).replace("uri=", "")
-            ), HttpStatus.BAD_REQUEST);
+        String rootMsg = null;
+        Throwable root = ex.getMostSpecificCause();
+        if (root != null) {
+            rootMsg = root.getMessage();
         }
 
-        
-        ErrorResponse errorResponse = new ErrorResponse(
-                "Database constraint violation",
-                HttpStatus.CONFLICT.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
-    }
+        if (rootMsg != null) {
+            String m = rootMsg;
+            
+            
+            
+            
+            
+            if (m.contains("ux_users_email_lower") || m.contains("users_email_key")) {
+                field = "email";
+                msg = "Email must be unique";
+                code = "Unique";
+            } else if (m.contains("users_name_key")) {
+                field = "name";
+                msg = "Name must be unique";
+                code = "Unique";
+            } else if (m.contains("uq_class_name_in_course")) {
+                field = "name";
+                msg = "Class name must be unique within the course";
+                code = "Unique";
+            } else if (m.contains("uq_lesson_title_in_course")) {
+                field = "title";
+                msg = "Lesson title must be unique within the course";
+                code = "Unique";
+            } else if (m.contains("uq_lesson_order_in_course") || m.contains("uq_test_question_order")) {
+                field = "orderIndex";
+                msg = "Order index must be unique within the parent";
+                code = "Unique";
+            } else {
+                
+                msg = rootMsg;
+            }
+        }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGlobalException(
-            Exception ex, WebRequest request) {
-        ErrorResponse errorResponse = new ErrorResponse(
-                "An internal error occurred",
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                LocalDateTime.now(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .message(msg)
+                .path(request.getRequestURI())
+                .violations(List.of(ApiErrorResponse.Violation.builder()
+                        .field(field)
+                        .message(msg)
+                        .code(code)
+                        .build()))
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 }

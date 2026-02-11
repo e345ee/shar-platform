@@ -1,6 +1,7 @@
 package com.course.service;
 
-import com.course.dto.StudyClassDto;
+import com.course.dto.classroom.StudyClassResponse;
+import com.course.dto.classroom.StudyClassUpsertRequest;
 import com.course.entity.Course;
 import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
@@ -34,7 +35,7 @@ public class StudyClassService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final char[] JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
 
-    public StudyClassDto create(StudyClassDto dto) {
+    public StudyClassResponse create(StudyClassUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -69,7 +70,7 @@ public class StudyClassService {
     }
 
     @Transactional(readOnly = true)
-    public StudyClassDto getById(Integer id) {
+    public StudyClassResponse getById(Integer id) {
         return toDto(getEntityById(id));
     }
 
@@ -86,14 +87,14 @@ public class StudyClassService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudyClassDto> getAllByCourse(Integer courseId) {
+    public List<StudyClassResponse> getAllByCourse(Integer courseId) {
         
         courseService.getEntityById(courseId);
         return classRepository.findAllByCourseId(courseId).stream().map(this::toDto).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<StudyClassDto> getMyClasses() {
+    public List<StudyClassResponse> getMyClasses() {
         User current = authService.getCurrentUserEntity();
         RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
@@ -114,7 +115,7 @@ public class StudyClassService {
 
 
     @Transactional(readOnly = true)
-    public StudyClassDto getMyClassById(Integer id) {
+    public StudyClassResponse getMyClassById(Integer id) {
         User current = authService.getCurrentUserEntity();
         RoleName role = current.getRole() != null ? current.getRole().getRolename() : null;
 
@@ -153,7 +154,7 @@ public class StudyClassService {
         }
     }
 
-    public StudyClassDto update(Integer id, StudyClassDto dto) {
+    public StudyClassResponse update(Integer id, StudyClassUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -202,8 +203,8 @@ public class StudyClassService {
         classRepository.delete(sc);
     }
 
-    private StudyClassDto toDto(StudyClass sc) {
-        StudyClassDto dto = new StudyClassDto();
+    private StudyClassResponse toDto(StudyClass sc) {
+        StudyClassResponse dto = new StudyClassResponse();
         dto.setId(sc.getId());
         dto.setName(sc.getName());
 

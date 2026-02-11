@@ -1,6 +1,11 @@
 package com.course.service;
 
-import com.course.dto.*;
+import com.course.dto.activity.ActivityCreateRequest;
+import com.course.dto.activity.ActivityQuestionResponse;
+import com.course.dto.activity.ActivityQuestionUpsertRequest;
+import com.course.dto.activity.ActivityResponse;
+import com.course.dto.activity.ActivityUpsertRequest;
+import com.course.dto.activity.WeeklyActivityAssignRequest;
 import com.course.entity.*;
 import com.course.exception.*;
 import com.course.repository.TestQuestionRepository;
@@ -37,7 +42,7 @@ public class TestService {
     private final StudentRemedialAssignmentRepository studentRemedialAssignmentRepository;
     private final NotificationService notificationService;
 
-    public TestDto create(Integer lessonId, TestUpsertDto dto) {
+    public ActivityResponse create(Integer lessonId, ActivityUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -83,7 +88,7 @@ public class TestService {
     }
 
     
-    public TestDto createActivity(Integer courseId, CreateActivityDto dto) {
+    public ActivityResponse createActivity(Integer courseId, ActivityCreateRequest dto) {
         User current = authService.getCurrentUserEntity();
         
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
@@ -184,7 +189,7 @@ public class TestService {
     }
 
     
-    public TestDto assignWeeklyActivity(Integer activityId, AssignWeeklyActivityDto dto) {
+    public ActivityResponse assignWeeklyActivity(Integer activityId, WeeklyActivityAssignRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -237,7 +242,7 @@ public class TestService {
     }
 
     @Transactional(readOnly = true)
-    public List<TestSummaryDto> listWeeklyActivitiesForCourse(Integer courseId) {
+    public List<ActivityResponse> listWeeklyActivitiesForCourse(Integer courseId) {
         
         User current = authService.getCurrentUserEntity();
         Course course = courseService.getEntityById(courseId);
@@ -262,7 +267,7 @@ public class TestService {
 
 
     @Transactional(readOnly = true)
-    public List<TestSummaryDto> listByLesson(Integer lessonId) {
+    public List<ActivityResponse> listByLesson(Integer lessonId) {
         
         lessonService.getEntityByIdForCurrentUser(lessonId);
 
@@ -288,7 +293,7 @@ public class TestService {
 
     
     @Transactional(readOnly = true)
-    public TestDto getById(Integer testId) {
+    public ActivityResponse getById(Integer testId) {
         Test test = getEntityForCurrentUser(testId);
         User current = authService.getCurrentUserEntity();
 
@@ -296,7 +301,7 @@ public class TestService {
         return toDto(test, canSeeCorrect);
     }
 
-    public TestDto update(Integer testId, TestUpsertDto dto) {
+    public ActivityResponse update(Integer testId, ActivityUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -353,7 +358,7 @@ public class TestService {
     }
 
     
-    public TestDto markReady(Integer testId) {
+    public ActivityResponse markReady(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -373,7 +378,7 @@ public class TestService {
 
     
 
-    public TestQuestionDto createQuestion(Integer testId, TestQuestionUpsertDto dto) {
+    public ActivityQuestionResponse createQuestion(Integer testId, ActivityQuestionUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -436,10 +441,10 @@ public class TestService {
         }
 
         validateQuestionEntity(q);
-        return toQuestionDto(questionRepository.save(q));
+        return (ActivityQuestionResponse) toQuestionDto(questionRepository.save(q));
     }
 
-    public TestQuestionDto updateQuestion(Integer testId, Integer questionId, TestQuestionUpsertDto dto) {
+    public ActivityQuestionResponse updateQuestion(Integer testId, Integer questionId, ActivityQuestionUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -507,7 +512,7 @@ public class TestService {
         }
 
         validateQuestionEntity(q);
-        return toQuestionDto(questionRepository.save(q));
+        return (ActivityQuestionResponse) toQuestionDto(questionRepository.save(q));
     }
 
     public void deleteQuestion(Integer testId, Integer questionId) {
@@ -588,8 +593,8 @@ public class TestService {
 
     
 
-    private TestDto toDto(Test test, boolean includeCorrectAnswers) {
-        TestDto dto = new TestDto();
+    private ActivityResponse toDto(Test test, boolean includeCorrectAnswers) {
+        ActivityResponse dto = new ActivityResponse();
         dto.setId(test.getId());
 
         dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
@@ -637,7 +642,7 @@ public class TestService {
         List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
         dto.setQuestionCount(questions.size());
         dto.setQuestions(questions.stream().map(q -> {
-            TestQuestionDto qdto = toQuestionDto(q);
+            ActivityQuestionResponse qdto = toQuestionDto(q);
             if (!includeCorrectAnswers) {
                 qdto.setCorrectOption(null);
                 qdto.setCorrectTextAnswer(null);
@@ -649,8 +654,8 @@ public class TestService {
 
 
     
-    public TestSummaryDto toSummaryDto(Test test) {
-        TestSummaryDto dto = new TestSummaryDto();
+    public ActivityResponse toSummaryDto(Test test) {
+        ActivityResponse dto = new ActivityResponse();
         dto.setId(test.getId());
 
         dto.setActivityType(test.getActivityType() != null ? test.getActivityType().name() : null);
@@ -683,11 +688,12 @@ public class TestService {
         dto.setQuestionCount(questionRepository.countByTest_Id(test.getId()));
         dto.setCreatedAt(test.getCreatedAt());
         dto.setUpdatedAt(test.getUpdatedAt());
+        
         return dto;
     }
 
-    private TestQuestionDto toQuestionDto(TestQuestion q) {
-        TestQuestionDto dto = new TestQuestionDto();
+    private ActivityQuestionResponse toQuestionDto(TestQuestion q) {
+        ActivityQuestionResponse dto = new ActivityQuestionResponse();
         dto.setId(q.getId());
         if (q.getTest() != null) {
             dto.setTestId(q.getTest().getId());

@@ -1,6 +1,11 @@
 package com.course.controller;
 
-import com.course.dto.*;
+import com.course.dto.activity.ActivityCreateRequest;
+import com.course.dto.activity.ActivityQuestionResponse;
+import com.course.dto.activity.ActivityQuestionUpsertRequest;
+import com.course.dto.activity.ActivityResponse;
+import com.course.dto.activity.ActivityUpsertRequest;
+import com.course.dto.activity.WeeklyActivityAssignRequest;
 import com.course.service.TestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,9 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-/**
- * "Activities" in REST layer map to existing Test/TestQuestion domain inside the codebase.
- */
+
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -21,41 +24,41 @@ public class ActivitiesController {
 
     private final TestService testService;
 
-    // --- Create/list activities ---
+    
 
     @PostMapping(value = "/lessons/{lessonId}/activities", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestDto> createLessonActivity(
+    public ResponseEntity<ActivityResponse> createLessonActivity(
             @PathVariable Integer lessonId,
-            @Valid @RequestBody TestUpsertDto dto
+            @Valid @RequestBody ActivityUpsertRequest dto
     ) {
-        TestDto created = testService.create(lessonId, dto);
+        ActivityResponse created = testService.create(lessonId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/lessons/{lessonId}/activities")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<List<TestSummaryDto>> listByLesson(@PathVariable Integer lessonId) {
+    public ResponseEntity<List<ActivityResponse>> listByLesson(@PathVariable Integer lessonId) {
         return ResponseEntity.ok(testService.listByLesson(lessonId));
     }
 
     @PostMapping(value = "/courses/{courseId}/activities", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestDto> createCourseActivity(
+    public ResponseEntity<ActivityResponse> createCourseActivity(
             @PathVariable Integer courseId,
-            @Valid @RequestBody CreateActivityDto dto
+            @Valid @RequestBody ActivityCreateRequest dto
     ) {
-        TestDto created = testService.createActivity(courseId, dto);
+        ActivityResponse created = testService.createActivity(courseId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/courses/{courseId}/activities/weekly")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
-    public ResponseEntity<List<TestSummaryDto>> listWeeklyActivities(@PathVariable Integer courseId) {
+    public ResponseEntity<List<ActivityResponse>> listWeeklyActivities(@PathVariable Integer courseId) {
         return ResponseEntity.ok(testService.listWeeklyActivitiesForCourse(courseId));
     }
 
-    // --- CRUD for a single activity ---
+    
 
     @GetMapping("/activities/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
@@ -65,7 +68,7 @@ public class ActivitiesController {
 
     @PutMapping(value = "/activities/{id}", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestDto> updateActivity(@PathVariable Integer id, @Valid @RequestBody TestUpsertDto dto) {
+    public ResponseEntity<ActivityResponse> updateActivity(@PathVariable Integer id, @Valid @RequestBody ActivityUpsertRequest dto) {
         return ResponseEntity.ok(testService.update(id, dto));
     }
 
@@ -78,36 +81,36 @@ public class ActivitiesController {
 
     @PostMapping("/activities/{id}/publish")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestDto> publish(@PathVariable Integer id) {
+    public ResponseEntity<ActivityResponse> publish(@PathVariable Integer id) {
         return ResponseEntity.ok(testService.markReady(id));
     }
 
-    // --- Weekly scheduling ---
+    
 
     @PostMapping(value = "/activities/{id}/schedule-week", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestDto> scheduleWeek(@PathVariable Integer id, @Valid @RequestBody AssignWeeklyActivityDto dto) {
+    public ResponseEntity<ActivityResponse> scheduleWeek(@PathVariable Integer id, @Valid @RequestBody WeeklyActivityAssignRequest dto) {
         return ResponseEntity.ok(testService.assignWeeklyActivity(id, dto));
     }
 
-    // --- Questions CRUD ---
+    
 
     @PostMapping(value = "/activities/{activityId}/questions", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestQuestionDto> createQuestion(
+    public ResponseEntity<ActivityQuestionResponse> createQuestion(
             @PathVariable Integer activityId,
-            @Valid @RequestBody TestQuestionUpsertDto dto
+            @Valid @RequestBody ActivityQuestionUpsertRequest dto
     ) {
-        TestQuestionDto created = testService.createQuestion(activityId, dto);
+        ActivityQuestionResponse created = testService.createQuestion(activityId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @PutMapping(value = "/activities/{activityId}/questions/{questionId}", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<TestQuestionDto> updateQuestion(
+    public ResponseEntity<ActivityQuestionResponse> updateQuestion(
             @PathVariable Integer activityId,
             @PathVariable Integer questionId,
-            @Valid @RequestBody TestQuestionUpsertDto dto
+            @Valid @RequestBody ActivityQuestionUpsertRequest dto
     ) {
         return ResponseEntity.ok(testService.updateQuestion(activityId, questionId, dto));
     }

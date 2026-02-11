@@ -1,7 +1,8 @@
 package com.course.controller;
 
-import com.course.dto.StudentAchievementDto;
-import com.course.dto.StudyClassDto;
+import com.course.dto.achievement.StudentAchievementResponse;
+import com.course.dto.classroom.StudyClassResponse;
+import com.course.dto.classroom.StudyClassUpsertRequest;
 import com.course.entity.Lesson;
 import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
@@ -34,29 +35,29 @@ public class ClassesController {
     private final ClassAchievementFeedService feedService;
     private final UserService userService;
 
-    // --- Classes (methodist CRUD) ---
+    
 
     @PostMapping("/classes")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<StudyClassDto> create(@Valid @RequestBody StudyClassDto dto) {
+    public ResponseEntity<StudyClassResponse> create(@Valid @RequestBody StudyClassUpsertRequest dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(classService.create(dto));
     }
 
     @GetMapping("/classes/{id}")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<StudyClassDto> getById(@PathVariable Integer id) {
+    public ResponseEntity<StudyClassResponse> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(classService.getById(id));
     }
 
     @GetMapping("/courses/{courseId}/classes")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<List<StudyClassDto>> getByCourse(@PathVariable Integer courseId) {
+    public ResponseEntity<List<StudyClassResponse>> getByCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(classService.getAllByCourse(courseId));
     }
 
     @PutMapping("/classes/{id}")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<StudyClassDto> update(@PathVariable Integer id, @Valid @RequestBody StudyClassDto dto) {
+    public ResponseEntity<StudyClassResponse> update(@PathVariable Integer id, @Valid @RequestBody StudyClassUpsertRequest dto) {
         return ResponseEntity.ok(classService.update(id, dto));
     }
 
@@ -67,21 +68,21 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- Teacher/Methodist: own classes ---
+    
 
     @GetMapping("/classes/my")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<List<StudyClassDto>> getMyClasses() {
+    public ResponseEntity<List<StudyClassResponse>> getMyClasses() {
         return ResponseEntity.ok(classService.getMyClasses());
     }
 
     @GetMapping("/classes/my/{id}")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<StudyClassDto> getMyClassById(@PathVariable Integer id) {
+    public ResponseEntity<StudyClassResponse> getMyClassById(@PathVariable Integer id) {
         return ResponseEntity.ok(classService.getMyClassById(id));
     }
 
-    // --- Teacher actions: open/close ---
+    
 
     @PostMapping("/classes/{classId}/lessons/{lessonId}/open")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
@@ -159,11 +160,11 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- Achievement feed ---
+    
 
     @GetMapping("/classes/{classId}/achievement-feed")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
-    public ResponseEntity<List<StudentAchievementDto>> getClassAchievementFeed(@PathVariable Integer classId) {
+    public ResponseEntity<List<StudentAchievementResponse>> getClassAchievementFeed(@PathVariable Integer classId) {
         User current = authService.getCurrentUserEntity();
         RoleName role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
         if (role == null) {

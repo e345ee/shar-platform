@@ -1,6 +1,6 @@
 package com.course.service;
 
-import com.course.dto.NotificationDto;
+import com.course.dto.notification.NotificationResponse;
 import com.course.entity.Notification;
 import com.course.entity.NotificationType;
 import com.course.entity.User;
@@ -21,7 +21,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final AuthService authService;
 
-    public NotificationDto create(User recipient, NotificationType type, String title, String message,
+    public NotificationResponse create(User recipient, NotificationType type, String title, String message,
                                   Integer courseId, Integer classId, Integer testId, Integer attemptId, Integer achievementId) {
         if (recipient == null || recipient.getId() == null) {
             throw new IllegalArgumentException("recipient is required");
@@ -44,7 +44,7 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotificationDto> listMyNotifications() {
+    public List<NotificationResponse> listMyNotifications() {
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getId() == null) {
             throw new ForbiddenOperationException("Unauthenticated");
@@ -62,7 +62,7 @@ public class NotificationService {
         return notificationRepository.countByUser_IdAndReadFalse(current.getId());
     }
 
-    public NotificationDto markRead(Integer notificationId) {
+    public NotificationResponse markRead(Integer notificationId) {
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getId() == null) {
             throw new ForbiddenOperationException("Unauthenticated");
@@ -92,8 +92,8 @@ public class NotificationService {
         return changed;
     }
 
-    public NotificationDto toDto(Notification n) {
-        NotificationDto dto = new NotificationDto();
+    public NotificationResponse toDto(Notification n) {
+        NotificationResponse dto = new NotificationResponse();
         dto.setId(n.getId());
         dto.setType(n.getType() != null ? n.getType().name() : null);
         dto.setTitle(n.getTitle());

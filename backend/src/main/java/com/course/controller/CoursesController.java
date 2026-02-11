@@ -1,6 +1,7 @@
 package com.course.controller;
 
-import com.course.dto.CourseDto;
+import com.course.dto.course.CourseResponse;
+import com.course.dto.course.CourseUpsertRequest;
 import com.course.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,25 +21,25 @@ public class CoursesController {
 
     @PostMapping
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<CourseDto> create(@Valid @RequestBody CourseDto dto) {
+    public ResponseEntity<CourseResponse> create(@Valid @RequestBody CourseUpsertRequest dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(courseService.create(dto));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<CourseDto> getById(@PathVariable Integer id) {
+    public ResponseEntity<CourseResponse> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(courseService.getById(id));
     }
 
     @GetMapping
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<List<CourseDto>> getAll() {
+    public ResponseEntity<List<CourseResponse>> getAll() {
         return ResponseEntity.ok(courseService.getAll());
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<CourseDto> update(@PathVariable Integer id, @Valid @RequestBody CourseDto dto) {
+    public ResponseEntity<CourseResponse> update(@PathVariable Integer id, @Valid @RequestBody CourseUpsertRequest dto) {
         return ResponseEntity.ok(courseService.update(id, dto));
     }
 

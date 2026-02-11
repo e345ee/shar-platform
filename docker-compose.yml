@@ -81,7 +81,7 @@ services:
       APP_S3_MAX_AVATAR_BYTES: 2097152
       APP_S3_MAX_ACHIEVEMENT_PHOTO_BYTES: 5242880
 
-      # Mail. Disabled by default; configure real SMTP via env to enable.
+
       APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
       APP_MAIL_FROM: ${APP_MAIL_FROM:-no-reply@course.local}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-localhost}

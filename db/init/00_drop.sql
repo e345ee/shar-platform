@@ -1,6 +1,6 @@
--- 00_drop.sql
--- Drops all objects for the course-management DB (PostgreSQL).
--- Run as a role that owns the objects (or with sufficient privileges).
+
+
+
 
 DROP TABLE IF EXISTS
   class_opened_tests,

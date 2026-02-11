@@ -1,6 +1,12 @@
 package com.course.service;
 
-import com.course.dto.*;
+import com.course.dto.activity.ActivityResponse;
+import com.course.dto.activity.ActivityWithAttemptResponse;
+import com.course.dto.attempt.AttemptStatusResponse;
+import com.course.dto.course.CourseResponse;
+import com.course.dto.course.StudentCoursePageResponse;
+import com.course.dto.lesson.LessonResponse;
+import com.course.dto.lesson.LessonWithActivitiesResponse;
 import com.course.entity.ActivityType;
 import com.course.entity.Course;
 import com.course.entity.Test;
@@ -39,7 +45,7 @@ public class StudentCoursePageService {
     private final StudentRemedialAssignmentRepository studentRemedialAssignmentRepository;
     private final TestService testService;
 
-    public StudentCoursePageDto getCoursePage(Integer courseId) {
+    public StudentCoursePageResponse getCoursePage(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
         classStudentService.assertStudentInCourse(current.getId(), courseId, "Student is not enrolled in this course");
@@ -47,9 +53,9 @@ public class StudentCoursePageService {
         Course course = courseService.getEntityById(courseId);
 
         
-        List<LessonDto> allLessons = lessonService.listByCourse(courseId);
+        List<LessonResponse> allLessons = lessonService.listByCourse(courseId);
         List<Integer> openedIds = classOpenedLessonService.findOpenedLessonIdsForStudentInCourse(current.getId(), courseId);
-        List<LessonDto> openedLessons = openedIds.isEmpty()
+        List<LessonResponse> openedLessons = openedIds.isEmpty()
                 ? List.of()
                 : allLessons.stream().filter(l -> l.getId() != null && openedIds.contains(l.getId())).toList();
 
@@ -57,7 +63,7 @@ public class StudentCoursePageService {
         List<Test> lessonActivities = openedLessons.isEmpty()
                 ? List.of()
                 : testRepository.findAllByLesson_IdInAndStatusAndActivityTypeIn(
-                        openedLessons.stream().map(LessonDto::getId).filter(Objects::nonNull).toList(),
+                        openedLessons.stream().map(LessonResponse::getId).filter(Objects::nonNull).toList(),
                         TestStatus.READY,
                         List.of(ActivityType.HOMEWORK_TEST, ActivityType.CONTROL_WORK)
                 );
@@ -98,7 +104,7 @@ public class StudentCoursePageService {
         weekly.forEach(t -> testIds.add(t.getId()));
         remedial.forEach(t -> testIds.add(t.getId()));
 
-        Map<Integer, AttemptStatusDto> latestByTest = new HashMap<>();
+        Map<Integer, AttemptStatusResponse> latestByTest = new HashMap<>();
         if (!testIds.isEmpty()) {
             
             var attempts = testAttemptRepository.findAllForLatestMap(current.getId(), new ArrayList<>(testIds));
@@ -110,7 +116,7 @@ public class StudentCoursePageService {
                 if (latestByTest.containsKey(tid)) {
                     continue; 
                 }
-                AttemptStatusDto a = new AttemptStatusDto();
+                AttemptStatusResponse a = new AttemptStatusResponse();
                 a.setTestId(tid);
                 a.setAttemptId(ta.getId());
                 a.setStatus(ta.getStatus() != null ? ta.getStatus().name() : null);
@@ -132,16 +138,16 @@ public class StudentCoursePageService {
             }
         }
 
-        List<LessonWithActivitiesDto> lessonBlocks = new ArrayList<>();
-        for (LessonDto lesson : openedLessons) {
-            LessonWithActivitiesDto block = new LessonWithActivitiesDto();
+        List<LessonWithActivitiesResponse> lessonBlocks = new ArrayList<>();
+        for (LessonResponse lesson : openedLessons) {
+            LessonWithActivitiesResponse block = new LessonWithActivitiesResponse();
             block.setLesson(lesson);
             List<Test> acts = activitiesByLessonId.getOrDefault(lesson.getId(), List.of());
             block.setActivities(acts.stream().map(t -> toActivityWithAttempt(t, latestByTest.get(t.getId()))).toList());
             lessonBlocks.add(block);
         }
 
-        StudentCoursePageDto dto = new StudentCoursePageDto();
+        StudentCoursePageResponse dto = new StudentCoursePageResponse();
         dto.setCourse(toCourseDto(course));
         dto.setCourseClosed(classStudentService.isCourseClosedForStudent(current.getId(), courseId));
         dto.setLessons(lessonBlocks);
@@ -150,17 +156,17 @@ public class StudentCoursePageService {
         return dto;
     }
 
-    private ActivityWithAttemptDto toActivityWithAttempt(Test t, AttemptStatusDto attempt) {
-        ActivityWithAttemptDto dto = new ActivityWithAttemptDto();
+    private ActivityWithAttemptResponse toActivityWithAttempt(Test t, AttemptStatusResponse attempt) {
+        ActivityWithAttemptResponse dto = new ActivityWithAttemptResponse();
         
-        TestSummaryDto summary = testService.toSummaryDto(t);
+        ActivityResponse summary = testService.toSummaryDto(t);
         dto.setActivity(summary);
         dto.setLatestAttempt(attempt);
         return dto;
     }
 
-    private CourseDto toCourseDto(Course c) {
-        CourseDto dto = new CourseDto();
+    private CourseResponse toCourseDto(Course c) {
+        CourseResponse dto = new CourseResponse();
         dto.setId(c.getId());
         dto.setName(c.getName());
         dto.setDescription(c.getDescription());

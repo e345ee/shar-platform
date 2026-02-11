@@ -23,28 +23,28 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class CertificatePdfService {
 
-    // Шапка и шрифт
+    
     private static final String ORG_NAME = "ШАРИК";
     private static final String FONT_PATH = "fonts/DejaVuSans.ttf";
 
-    // Входные данные
+    
     public byte[] generateCourseCertificate(Course course,
                                             String teacherName,
                                             User student,
                                             int earnedPoints,
                                             int maxPoints) {
-        // Название курса
+        
         String courseName = (course != null && course.getName() != null && !course.getName().isBlank())
                 ? course.getName()
                 : "Курс";
-        // Имя ученика
+        
         String studentName = (student != null && student.getName() != null && !student.getName().isBlank())
                 ? student.getName()
                 : "Ученик";
-        // Имя учителя
+        
         String teacher = (teacherName == null || teacherName.isBlank()) ? "—" : teacherName;
 
-        // создаем pdf
+        
         try (PDDocument doc = new PDDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream();
              InputStream fontStream = new ClassPathResource(FONT_PATH).getInputStream()) {
@@ -55,7 +55,7 @@ public class CertificatePdfService {
             float width = mediaBox.getWidth();
             float height = mediaBox.getHeight();
 
-            // контент в пдф документе
+            
             try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
                 float margin = 48f;
                 cs.setLineWidth(2.5f);
@@ -101,7 +101,7 @@ public class CertificatePdfService {
                 y = writeCenteredLine(cs, font, 16f, scoreLine, centerX, y);
                 y -= 8f;
 
-                // дата выдачи
+                
                 String date = LocalDate.now()
                         .format(DateTimeFormatter.ofPattern("d MMMM yyyy", new Locale("ru")));
                 y = writeCenteredLine(cs, font, 14f, "Дата выдачи: " + date, centerX, y);
@@ -120,7 +120,7 @@ public class CertificatePdfService {
         }
     }
 
-    // Центрирование текста
+    
 
     private float writeCentered(PDPageContentStream cs,
                                 PDType0Font font,
@@ -151,7 +151,7 @@ public class CertificatePdfService {
         return baselineY - leading;
     }
 
-    // размер шрифта
+    
     private float fitFontSize(PDType0Font font,
                               String text,
                               float maxWidth,

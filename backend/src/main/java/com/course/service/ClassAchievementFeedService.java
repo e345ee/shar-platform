@@ -1,6 +1,6 @@
 package com.course.service;
 
-import com.course.dto.StudentAchievementDto;
+import com.course.dto.achievement.StudentAchievementResponse;
 import com.course.entity.*;
 import com.course.repository.ClassAchievementFeedRepository;
 import lombok.RequiredArgsConstructor;
@@ -65,14 +65,14 @@ public class ClassAchievementFeedService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudentAchievementDto> getFeedForClass(Integer classId) {
+    public List<StudentAchievementResponse> getFeedForClass(Integer classId) {
         List<ClassAchievementFeed> feed = feedRepository.findFeedByClassId(classId);
         return feed.stream().map(this::toDto).filter(Objects::nonNull).toList();
     }
 
-    private StudentAchievementDto toDto(ClassAchievementFeed f) {
+    private StudentAchievementResponse toDto(ClassAchievementFeed f) {
         if (f == null) return null;
-        StudentAchievementDto dto = new StudentAchievementDto();
+        StudentAchievementResponse dto = new StudentAchievementResponse();
         
         dto.setId(f.getId());
         dto.setAwardedAt(f.getAwardedAt());

@@ -1,8 +1,8 @@
 package com.course.controller;
 
-import com.course.dto.ClassJoinRequestDto;
-import com.course.dto.CreateClassJoinRequestDto;
-import com.course.dto.UserDto;
+import com.course.dto.classroom.ClassJoinRequestCreateRequest;
+import com.course.dto.classroom.ClassJoinRequestResponse;
+import com.course.dto.user.UserResponse;
 import com.course.service.ClassJoinRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,24 +20,21 @@ public class JoinRequestsController {
 
     private final ClassJoinRequestService joinRequestService;
 
-    /**
-     * Can be called by Telegram bot or by student.
-     * SecurityConfig already allows POST /api/join-requests without JWT.
-     */
+    
     @PostMapping
-    public ResponseEntity<ClassJoinRequestDto> create(@Valid @RequestBody CreateClassJoinRequestDto dto) {
+    public ResponseEntity<ClassJoinRequestResponse> create(@Valid @RequestBody ClassJoinRequestCreateRequest dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(joinRequestService.createRequest(dto));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<List<ClassJoinRequestDto>> listForClass(@RequestParam Integer classId) {
+    public ResponseEntity<List<ClassJoinRequestResponse>> listForClass(@RequestParam Integer classId) {
         return ResponseEntity.ok(joinRequestService.listForClass(classId));
     }
 
     @PostMapping("/{requestId}/approve")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<UserDto> approve(@PathVariable Integer requestId, @RequestParam Integer classId) {
+    public ResponseEntity<UserResponse> approve(@PathVariable Integer requestId, @RequestParam Integer classId) {
         return ResponseEntity.ok(joinRequestService.approve(classId, requestId));
     }
 

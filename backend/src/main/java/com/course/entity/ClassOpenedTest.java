@@ -45,4 +45,39 @@ public class ClassOpenedTest {
             openedAt = LocalDateTime.now();
         }
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public StudyClass getStudyClass() {
+        return this.studyClass;
+    }
+
+    public void setStudyClass(StudyClass studyClass) {
+        this.studyClass = studyClass;
+    }
+
+    public Test getTest() {
+        return this.test;
+    }
+
+    public void setTest(Test test) {
+        this.test = test;
+    }
+
+    public LocalDateTime getOpenedAt() {
+        return this.openedAt;
+    }
+
+    public void setOpenedAt(LocalDateTime openedAt) {
+        this.openedAt = openedAt;
+    }
+
 }

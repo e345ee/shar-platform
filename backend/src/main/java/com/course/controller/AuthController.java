@@ -1,7 +1,7 @@
 package com.course.controller;
 
-import com.course.dto.AuthLoginRequestDto;
-import com.course.dto.AuthTokenResponseDto;
+import com.course.dto.auth.AuthLoginRequest;
+import com.course.dto.auth.AuthTokenResponse;
 import com.course.security.JwtService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,13 +23,13 @@ public class AuthController {
     private final JwtService jwtService;
 
     @PostMapping("/login")
-    public AuthTokenResponseDto login(@Valid @RequestBody AuthLoginRequestDto req) {
+    public AuthTokenResponse login(@Valid @RequestBody AuthLoginRequest req) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword())
         );
 
         UserDetails user = (UserDetails) auth.getPrincipal();
         String token = jwtService.generateAccessToken(user);
-        return new AuthTokenResponseDto("Bearer", token, jwtService.getAccessTokenTtlSeconds());
+        return new AuthTokenResponse("Bearer", token, jwtService.getAccessTokenTtlSeconds());
     }
 }

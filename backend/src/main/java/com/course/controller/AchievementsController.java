@@ -1,9 +1,9 @@
 package com.course.controller;
 
-import com.course.dto.AchievementDto;
-import com.course.dto.AchievementForm;
-import com.course.dto.StudentAchievementDto;
-import com.course.dto.UpdateAchievementDto;
+import com.course.dto.achievement.AchievementResponse;
+import com.course.dto.achievement.AchievementUpsertForm;
+import com.course.dto.achievement.AchievementUpdateRequest;
+import com.course.dto.achievement.StudentAchievementResponse;
 import com.course.entity.Achievement;
 import com.course.entity.RoleName;
 import com.course.entity.User;
@@ -33,51 +33,51 @@ public class AchievementsController {
     private final UserService userService;
     private final ClassStudentService classStudentService;
 
-    // --- CRUD achievements (methodist) ---
+    
 
     @PostMapping(value = "/courses/{courseId}/achievements", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<AchievementDto> create(
+    public ResponseEntity<AchievementResponse> create(
             @PathVariable Integer courseId,
-            @Valid @ModelAttribute AchievementForm form
+            @Valid @ModelAttribute AchievementUpsertForm form
     ) {
-        AchievementDto created = achievementService.create(courseId, form);
+        AchievementResponse created = achievementService.create(courseId, form);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/courses/{courseId}/achievements")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<List<AchievementDto>> listByCourse(@PathVariable Integer courseId) {
+    public ResponseEntity<List<AchievementResponse>> listByCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(achievementService.listByCourse(courseId));
     }
 
     @GetMapping("/achievements/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<AchievementDto> getById(@PathVariable Integer id) {
+    public ResponseEntity<AchievementResponse> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(achievementService.getById(id));
     }
 
     @PutMapping(value = "/achievements/{id}", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<AchievementDto> update(
+    public ResponseEntity<AchievementResponse> update(
             @PathVariable Integer id,
-            @Valid @RequestBody UpdateAchievementDto dto
+            @Valid @RequestBody AchievementUpdateRequest dto
     ) {
         return ResponseEntity.ok(achievementService.update(id, dto));
     }
 
     @PutMapping(value = "/achievements/{id}", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<AchievementDto> updateWithOptionalPhoto(
+    public ResponseEntity<AchievementResponse> updateWithOptionalPhoto(
             @PathVariable Integer id,
-            @Valid @ModelAttribute AchievementForm form
+            @Valid @ModelAttribute AchievementUpsertForm form
     ) {
         return ResponseEntity.ok(achievementService.updateWithOptionalPhoto(id, form));
     }
 
     @PutMapping(value = "/achievements/{id}/photo", consumes = {"multipart/form-data"})
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<AchievementDto> replacePhoto(
+    public ResponseEntity<AchievementResponse> replacePhoto(
             @PathVariable Integer id,
             @RequestPart("photo") MultipartFile photo
     ) {
@@ -91,11 +91,11 @@ public class AchievementsController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- Award / revoke ---
+    
 
     @PostMapping("/achievements/{achievementId}/award/{studentId}")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<StudentAchievementDto> award(
+    public ResponseEntity<StudentAchievementResponse> award(
             @PathVariable Integer achievementId,
             @PathVariable Integer studentId
     ) {
@@ -114,11 +114,11 @@ public class AchievementsController {
         return ResponseEntity.noContent().build();
     }
 
-    // --- View student achievements (teacher/methodist scoped) ---
+    
 
     @GetMapping("/students/{studentId}/achievements")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
-    public ResponseEntity<List<StudentAchievementDto>> getStudentAchievements(@PathVariable Integer studentId) {
+    public ResponseEntity<List<StudentAchievementResponse>> getStudentAchievements(@PathVariable Integer studentId) {
         User current = authService.getCurrentUserEntity();
         RoleName role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
         if (role == null) {

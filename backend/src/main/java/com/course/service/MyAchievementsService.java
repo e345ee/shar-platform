@@ -1,9 +1,9 @@
 package com.course.service;
 
-import com.course.dto.AchievementDto;
-import com.course.dto.CourseDto;
-import com.course.dto.MyAchievementsPageDto;
-import com.course.dto.StudentAchievementDto;
+import com.course.dto.achievement.AchievementResponse;
+import com.course.dto.achievement.MyAchievementsPageResponse;
+import com.course.dto.achievement.StudentAchievementResponse;
+import com.course.dto.course.CourseResponse;
 import com.course.entity.RoleName;
 import com.course.entity.User;
 import com.course.repository.StudentAchievementRepository;
@@ -31,36 +31,36 @@ public class MyAchievementsService {
     private final AchievementService achievementService;
     private final StudentAchievementService studentAchievementService;
 
-    public MyAchievementsPageDto getMyAchievementsPage() {
+    public MyAchievementsPageResponse getMyAchievementsPage() {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
         
-        List<StudentAchievementDto> earned = studentAchievementRepository
+        List<StudentAchievementResponse> earned = studentAchievementRepository
                 .findAllByStudent_IdOrderByAwardedAtDesc(current.getId())
                 .stream()
                 .map(studentAchievementService::toDto)
                 .toList();
 
         
-        List<CourseDto> courses = studentContentService.listMyCourses();
+        List<CourseResponse> courses = studentContentService.listMyCourses();
 
-        List<AchievementDto> allAvailable = new ArrayList<>();
-        for (CourseDto c : courses) {
+        List<AchievementResponse> allAvailable = new ArrayList<>();
+        for (CourseResponse c : courses) {
             if (c == null || c.getId() == null) continue;
             allAvailable.addAll(achievementService.listByCourse(c.getId()));
         }
 
         Set<Integer> earnedIds = new HashSet<>();
-        for (StudentAchievementDto e : earned) {
+        for (StudentAchievementResponse e : earned) {
             if (e.getAchievementId() != null) earnedIds.add(e.getAchievementId());
         }
 
-        List<AchievementDto> notEarned = allAvailable.stream()
+        List<AchievementResponse> notEarned = allAvailable.stream()
                 .filter(a -> a != null && a.getId() != null && !earnedIds.contains(a.getId()))
                 .toList();
 
-        MyAchievementsPageDto dto = new MyAchievementsPageDto();
+        MyAchievementsPageResponse dto = new MyAchievementsPageResponse();
         dto.setTotalAvailable(allAvailable.size());
         dto.setTotalEarned(earned.size());
         dto.setEarned(earned);

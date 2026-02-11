@@ -1,6 +1,13 @@
 package com.course.service;
 
-import com.course.dto.*;
+import com.course.dto.attempt.AttemptAnswerResponse;
+import com.course.dto.attempt.AttemptGradeRequest;
+import com.course.dto.attempt.AttemptGradeAnswerRequest;
+import com.course.dto.attempt.AttemptResponse;
+import com.course.dto.attempt.AttemptSubmitRequest;
+import com.course.dto.attempt.AttemptSubmitAnswerRequest;
+import com.course.dto.attempt.AttemptSummaryResponse;
+import com.course.dto.attempt.PendingAttemptResponse;
 import com.course.entity.*;
 import com.course.exception.*;
 import com.course.repository.TestAttemptAnswerRepository;
@@ -20,7 +27,7 @@ import java.util.*;
 public class TestAttemptService {
 
     
-    public record StartAttemptResult(TestAttemptDto attempt, boolean created) {}
+    public record StartAttemptResult(AttemptResponse attempt, boolean created) {}
 
     private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
     private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
@@ -43,7 +50,7 @@ public class TestAttemptService {
     private final NotificationService notificationService;
 
     
-    public TestAttemptDto gradeOpenAttempt(Integer attemptId, GradeTestAttemptDto dto) {
+    public AttemptResponse gradeOpenAttempt(Integer attemptId, AttemptGradeRequest dto) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -96,7 +103,7 @@ public class TestAttemptService {
 
         
         Set<Integer> seen = new HashSet<>();
-        for (GradeTestAttemptAnswerDto g : dto.getGrades()) {
+        for (AttemptGradeAnswerRequest g : dto.getGrades()) {
             if (g == null || g.getQuestionId() == null) {
                 throw new TestAttemptValidationException("Each grade must contain questionId");
             }
@@ -117,7 +124,7 @@ public class TestAttemptService {
         }
 
         
-        for (GradeTestAttemptAnswerDto g : dto.getGrades()) {
+        for (AttemptGradeAnswerRequest g : dto.getGrades()) {
             TestAttemptAnswer ans = openByQuestionId.get(g.getQuestionId());
             int max = (ans.getQuestion() != null && ans.getQuestion().getPoints() != null && ans.getQuestion().getPoints() > 0)
                     ? ans.getQuestion().getPoints()
@@ -183,7 +190,7 @@ public class TestAttemptService {
     }
 
     @Transactional(readOnly = true)
-    public List<PendingTestAttemptDto> listPendingAttemptsForTeacher(Integer courseId, Integer testId, Integer classId) {
+    public List<PendingAttemptResponse> listPendingAttemptsForTeacher(Integer courseId, Integer testId, Integer classId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
@@ -205,7 +212,7 @@ public class TestAttemptService {
         }
 
         return rows.stream().map(r -> {
-            PendingTestAttemptDto dto = new PendingTestAttemptDto();
+            PendingAttemptResponse dto = new PendingAttemptResponse();
             dto.setAttemptId(r.getAttemptId());
             dto.setTestId(r.getTestId());
             dto.setLessonId(r.getLessonId());
@@ -258,7 +265,7 @@ public class TestAttemptService {
 
     
     @Transactional(readOnly = true)
-    public List<TestAttemptSummaryDto> listMyAttempts(Integer testId) {
+    public List<AttemptSummaryResponse> listMyAttempts(Integer testId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -273,7 +280,7 @@ public class TestAttemptService {
 
 
 @Transactional(readOnly = true)
-public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
+public AttemptResponse getLatestCompletedAttemptForTest(Integer testId) {
     User current = authService.getCurrentUserEntity();
     userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -296,7 +303,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
     
     @Transactional(readOnly = true)
-    public List<TestAttemptSummaryDto> listAllAttempts(Integer testId) {
+    public List<AttemptSummaryResponse> listAllAttempts(Integer testId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -329,7 +336,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
     
     @Transactional(readOnly = true)
-    public List<CourseTestAttemptSummaryDto> listAttemptsForCourse(Integer courseId) {
+    public List<AttemptSummaryResponse> listAttemptsForCourse(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -348,7 +355,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
     
     @Transactional(readOnly = true)
-    public TestAttemptDto getAttempt(Integer attemptId) {
+    public AttemptResponse getAttempt(Integer attemptId) {
         TestAttempt attempt = getEntityById(attemptId);
         assertCanViewAttempt(attempt);
 
@@ -358,7 +365,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
     }
 
     
-    public TestAttemptDto submit(Integer attemptId, SubmitTestAttemptDto dto) {
+    public AttemptResponse submit(Integer attemptId, AttemptSubmitRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -398,7 +405,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
         
         Set<Integer> seen = new HashSet<>();
-        for (SubmitTestAttemptAnswerDto a : dto.getAnswers()) {
+        for (AttemptSubmitAnswerRequest a : dto.getAnswers()) {
             if (a == null || a.getQuestionId() == null) {
                 throw new TestAttemptValidationException("Each answer must contain questionId");
             }
@@ -434,7 +441,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         int awardedTotal = 0;
         int maxTotal = 0;
         boolean hasOpenQuestions = false;
-        for (SubmitTestAttemptAnswerDto a : dto.getAnswers()) {
+        for (AttemptSubmitAnswerRequest a : dto.getAnswers()) {
             TestQuestion q = byId.get(a.getQuestionId());
             TestQuestionType type = q.getQuestionType() == null ? TestQuestionType.SINGLE_CHOICE : q.getQuestionType();
             if (type == TestQuestionType.OPEN) {
@@ -570,8 +577,8 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
 
     
 
-    private TestAttemptDto toDto(TestAttempt attempt, boolean includeAnswers) {
-        TestAttemptDto dto = new TestAttemptDto();
+    private AttemptResponse toDto(TestAttempt attempt, boolean includeAnswers) {
+        AttemptResponse dto = new AttemptResponse();
         dto.setId(attempt.getId());
 
         if (attempt.getTest() != null) {
@@ -634,7 +641,7 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
             List<TestAttemptAnswer> answers = answerRepository.findAllByAttempt_IdOrderByIdAsc(attempt.getId());
             boolean hideCorrectness = attempt.getStatus() == TestAttemptStatus.IN_PROGRESS;
             dto.setAnswers(answers.stream().map(a -> {
-                TestAttemptAnswerDto adto = new TestAttemptAnswerDto();
+                AttemptAnswerResponse adto = new AttemptAnswerResponse();
                 adto.setId(a.getId());
                 adto.setAttemptId(attempt.getId());
                 if (a.getQuestion() != null) {
@@ -675,8 +682,8 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         return dto;
     }
 
-    private TestAttemptSummaryDto toSummaryDto(TestAttempt attempt) {
-        TestAttemptSummaryDto dto = new TestAttemptSummaryDto();
+    private AttemptSummaryResponse toSummaryDto(TestAttempt attempt) {
+        AttemptSummaryResponse dto = new AttemptSummaryResponse();
         dto.setId(attempt.getId());
         if (attempt.getTest() != null) {
             dto.setTestId(attempt.getTest().getId());
@@ -704,8 +711,9 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
         return dto;
     }
 
-    private CourseTestAttemptSummaryDto toCourseSummaryDto(TestAttempt attempt) {
-        CourseTestAttemptSummaryDto dto = new CourseTestAttemptSummaryDto();
+    private AttemptSummaryResponse toCourseSummaryDto(TestAttempt attempt) {
+        AttemptSummaryResponse dto = new AttemptSummaryResponse();
+        
         dto.setAttemptId(attempt.getId());
         if (attempt.getTest() != null) {
             dto.setTestId(attempt.getTest().getId());
@@ -713,11 +721,10 @@ public TestAttemptDto getLatestCompletedAttemptForTest(Integer testId) {
                 dto.setLessonId(attempt.getTest().getLesson().getId());
                 if (attempt.getTest().getLesson().getCourse() != null) {
                     dto.setCourseId(attempt.getTest().getLesson().getCourse().getId());
-                } else if (attempt.getTest().getCourse() != null) {
-                    dto.setCourseId(attempt.getTest().getCourse().getId());
-                } else if (attempt.getTest().getCourse() != null) {
-                    dto.setCourseId(attempt.getTest().getCourse().getId());
                 }
+            }
+            if (dto.getCourseId() == null && attempt.getTest().getCourse() != null) {
+                dto.setCourseId(attempt.getTest().getCourse().getId());
             }
         }
         if (attempt.getStudent() != null) {

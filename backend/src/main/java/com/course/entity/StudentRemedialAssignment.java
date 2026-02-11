@@ -63,4 +63,71 @@ public class StudentRemedialAssignment {
             assignedAt = LocalDateTime.now();
         }
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public User getStudent() {
+        return this.student;
+    }
+
+    public void setStudent(User student) {
+        this.student = student;
+    }
+
+    public Test getTest() {
+        return this.test;
+    }
+
+    public void setTest(Test test) {
+        this.test = test;
+    }
+
+    public Course getCourse() {
+        return this.course;
+    }
+
+    public void setCourse(Course course) {
+        this.course = course;
+    }
+
+    public String getTopic() {
+        return this.topic;
+    }
+
+    public void setTopic(String topic) {
+        this.topic = topic;
+    }
+
+    public LocalDate getAssignedWeekStart() {
+        return this.assignedWeekStart;
+    }
+
+    public void setAssignedWeekStart(LocalDate assignedWeekStart) {
+        this.assignedWeekStart = assignedWeekStart;
+    }
+
+    public LocalDateTime getAssignedAt() {
+        return this.assignedAt;
+    }
+
+    public void setAssignedAt(LocalDateTime assignedAt) {
+        this.assignedAt = assignedAt;
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return this.completedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
+    }
+
 }

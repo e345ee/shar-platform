@@ -1,6 +1,10 @@
 package com.course.service;
 
-import com.course.dto.*;
+import com.course.dto.course.StudentCourseProgressResponse;
+import com.course.dto.statistics.StudentStatisticsOverviewResponse;
+import com.course.dto.statistics.StudentTopicStatsResponse;
+import com.course.dto.statistics.TeacherStatsResponse;
+import com.course.dto.statistics.TopicStatsResponse;
 import com.course.entity.Course;
 import com.course.entity.RoleName;
 import com.course.entity.StudyClass;
@@ -30,7 +34,7 @@ public class StatisticsService {
 
     private final StatisticsRepository statisticsRepository;
 
-    public List<TeacherStatsDto> getTeacherStatsForCurrentMethodist(Integer methodistIdOverrideForAdmin) {
+    public List<TeacherStatsResponse> getTeacherStatsForCurrentMethodist(Integer methodistIdOverrideForAdmin) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -48,7 +52,7 @@ public class StatisticsService {
 
         return statisticsRepository.findTeacherStatsForMethodist(methodistId)
                 .stream().map(p -> {
-                    TeacherStatsDto dto = new TeacherStatsDto();
+                    TeacherStatsResponse dto = new TeacherStatsResponse();
                     dto.setTeacherId(p.getTeacherId());
                     dto.setTeacherName(p.getTeacherName());
                     dto.setTeacherEmail(p.getTeacherEmail());
@@ -63,12 +67,12 @@ public class StatisticsService {
 
     
     public String exportTeacherStatsCsv(Integer methodistIdOverrideForAdmin) {
-        List<TeacherStatsDto> rows = getTeacherStatsForCurrentMethodist(methodistIdOverrideForAdmin);
+        List<TeacherStatsResponse> rows = getTeacherStatsForCurrentMethodist(methodistIdOverrideForAdmin);
 
         StringBuilder sb = new StringBuilder();
         sb.append("teacherId,teacherName,teacherEmail,classesCount,studentsCount,submittedAttemptsCount,gradedAttemptsCount,avgGradePercent\n");
 
-        for (TeacherStatsDto r : rows) {
+        for (TeacherStatsResponse r : rows) {
             sb.append(csv(r.getTeacherId()));
             sb.append(',').append(csv(r.getTeacherName()));
             sb.append(',').append(csv(r.getTeacherEmail()));
@@ -82,7 +86,7 @@ public class StatisticsService {
         return sb.toString();
     }
 
-    public List<StudentTopicStatsDto> getMyTopicStats(Integer courseId) {
+    public List<StudentTopicStatsResponse> getMyTopicStats(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -93,7 +97,7 @@ public class StatisticsService {
         return statisticsRepository.findStudentTopicStats(current.getId(), courseId)
                 .stream()
                 .map(p -> {
-                    StudentTopicStatsDto dto = new StudentTopicStatsDto();
+                    StudentTopicStatsResponse dto = new StudentTopicStatsResponse();
                     dto.setCourseId(p.getCourseId());
                     dto.setCourseName(p.getCourseName());
                     dto.setTopic(p.getTopic());
@@ -107,12 +111,12 @@ public class StatisticsService {
                 .toList();
     }
 
-    public StudentStatisticsOverviewDto getMyOverview() {
+    public StudentStatisticsOverviewResponse getMyOverview() {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
         StudentOverviewStatsProjection p = statisticsRepository.getStudentOverviewStats(current.getId());
-        StudentStatisticsOverviewDto dto = new StudentStatisticsOverviewDto();
+        StudentStatisticsOverviewResponse dto = new StudentStatisticsOverviewResponse();
         dto.setAttemptsTotal(nullSafe(p.getAttemptsTotal()));
         dto.setAttemptsInProgress(nullSafe(p.getAttemptsInProgress()));
         dto.setAttemptsFinished(nullSafe(p.getAttemptsFinished()));
@@ -122,9 +126,9 @@ public class StatisticsService {
         dto.setCoursesStarted(nullSafe(p.getCoursesStarted()));
         dto.setCoursesCompleted(nullSafe(p.getCoursesCompleted()));
 
-        List<StudentCourseProgressDto> courses = statisticsRepository.findStudentCourseProgress(current.getId())
+        List<StudentCourseProgressResponse> courses = statisticsRepository.findStudentCourseProgress(current.getId())
                 .stream().map(cp -> {
-                    StudentCourseProgressDto c = new StudentCourseProgressDto();
+                    StudentCourseProgressResponse c = new StudentCourseProgressResponse();
                     c.setCourseId(cp.getCourseId());
                     c.setCourseName(cp.getCourseName());
                     c.setRequiredTests(nullSafe(cp.getRequiredTests()));
@@ -138,7 +142,7 @@ public class StatisticsService {
         return dto;
     }
 
-    public List<ClassTopicStatsDto> getClassTopicStatsForTeacher(Integer classId) {
+    public List<TopicStatsResponse> getClassTopicStatsForTeacher(Integer classId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
@@ -155,10 +159,11 @@ public class StatisticsService {
 
         return statisticsRepository.findClassTopicStats(classId)
                 .stream().map(p -> {
-                    ClassTopicStatsDto dto = new ClassTopicStatsDto();
-                    dto.setClassId(p.getClassId());
+                    TopicStatsResponse dto = new TopicStatsResponse();
+                    
+                    dto.setClassId(p.getClassId() == null ? null : String.valueOf(p.getClassId()));
                     dto.setClassName(p.getClassName());
-                    dto.setCourseId(p.getCourseId());
+                    dto.setCourseId(p.getCourseId() == null ? null : String.valueOf(p.getCourseId()));
                     dto.setTopic(p.getTopic());
                     dto.setStudentsTotal(nullSafe(p.getStudentsTotal()));
                     dto.setStudentsWithActivity(nullSafe(p.getStudentsWithActivity()));
@@ -168,7 +173,7 @@ public class StatisticsService {
                 }).toList();
     }
 
-    public List<StudentTopicStatsDto> getStudentTopicStatsForTeacher(Integer studentId, Integer courseId) {
+    public List<StudentTopicStatsResponse> getStudentTopicStatsForTeacher(Integer studentId, Integer courseId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
@@ -190,7 +195,7 @@ public class StatisticsService {
 
         return statisticsRepository.findStudentTopicStats(studentId, courseId)
                 .stream().map(p -> {
-                    StudentTopicStatsDto dto = new StudentTopicStatsDto();
+                    StudentTopicStatsResponse dto = new StudentTopicStatsResponse();
                     dto.setCourseId(p.getCourseId());
                     dto.setCourseName(p.getCourseName());
                     dto.setTopic(p.getTopic());
@@ -203,7 +208,7 @@ public class StatisticsService {
                 }).toList();
     }
 
-    public List<CourseTopicStatsDto> getCourseTopicStatsForMethodist(Integer courseId) {
+    public List<TopicStatsResponse> getCourseTopicStatsForMethodist(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -216,7 +221,8 @@ public class StatisticsService {
 
         return statisticsRepository.findCourseTopicStats(courseId)
                 .stream().map(p -> {
-                    CourseTopicStatsDto dto = new CourseTopicStatsDto();
+                    TopicStatsResponse dto = new TopicStatsResponse();
+                    
                     dto.setCourseId(p.getCourseId());
                     dto.setCourseName(p.getCourseName());
                     dto.setTopic(p.getTopic());
@@ -228,7 +234,7 @@ public class StatisticsService {
                 }).toList();
     }
 
-    public List<TeacherClassTopicStatsDto> getCourseTeacherTopicStatsForMethodist(Integer courseId) {
+    public List<TopicStatsResponse> getCourseTeacherTopicStatsForMethodist(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
 
@@ -241,11 +247,12 @@ public class StatisticsService {
 
         return statisticsRepository.findTeacherClassTopicStatsForCourse(courseId)
                 .stream().map(p -> {
-                    TeacherClassTopicStatsDto dto = new TeacherClassTopicStatsDto();
-                    dto.setCourseId(p.getCourseId());
-                    dto.setClassId(p.getClassId());
+                    TopicStatsResponse dto = new TopicStatsResponse();
+                    
+                    dto.setCourseId(p.getCourseId() == null ? null : String.valueOf(p.getCourseId()));
+                    dto.setClassId(p.getClassId() == null ? null : String.valueOf(p.getClassId()));
                     dto.setClassName(p.getClassName());
-                    dto.setTeacherId(p.getTeacherId());
+                    dto.setTeacherId(p.getTeacherId() == null ? null : String.valueOf(p.getTeacherId()));
                     dto.setTeacherName(p.getTeacherName());
                     dto.setTopic(p.getTopic());
                     dto.setStudentsTotal(nullSafe(p.getStudentsTotal()));

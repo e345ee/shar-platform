@@ -40,4 +40,47 @@ public class ClassStudent {
     public void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public StudyClass getStudyClass() {
+        return this.studyClass;
+    }
+
+    public void setStudyClass(StudyClass studyClass) {
+        this.studyClass = studyClass;
+    }
+
+    public User getStudent() {
+        return this.student;
+    }
+
+    public void setStudent(User student) {
+        this.student = student;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getCourseClosedAt() {
+        return this.courseClosedAt;
+    }
+
+    public void setCourseClosedAt(LocalDateTime courseClosedAt) {
+        this.courseClosedAt = courseClosedAt;
+    }
+
 }

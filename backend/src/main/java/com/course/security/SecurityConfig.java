@@ -33,21 +33,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
-                // Stateless JWT API: disable CSRF and server-side sessions
+                
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints used by health checks / swagger / e2e tests
+                        
                         .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/error").permitAll()
 
-                        // Auth/login must be reachable without JWT
+                        
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
 
-                        // Students can create join requests before they have an account/token
+                        
                         .requestMatchers(HttpMethod.POST, "/api/join-requests").permitAll()
 
                         .anyRequest().authenticated()

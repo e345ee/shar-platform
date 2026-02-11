@@ -1,6 +1,18 @@
 package com.course.controller;
 
-import com.course.dto.*;
+import com.course.dto.activity.ActivityResponse;
+import com.course.dto.achievement.MyAchievementsPageResponse;
+import com.course.dto.achievement.StudentAchievementResponse;
+import com.course.dto.attempt.AttemptResponse;
+import com.course.dto.auth.ChangePasswordRequest;
+import com.course.dto.course.CourseResponse;
+import com.course.dto.course.StudentCoursePageResponse;
+import com.course.dto.lesson.LessonResponse;
+import com.course.dto.notification.NotificationResponse;
+import com.course.dto.statistics.StudentStatisticsOverviewResponse;
+import com.course.dto.statistics.StudentTopicStatsResponse;
+import com.course.dto.user.ProfileUpdateRequest;
+import com.course.dto.user.UserResponse;
 import com.course.entity.User;
 import com.course.exception.ResourceNotFoundException;
 import com.course.service.*;
@@ -31,25 +43,25 @@ public class MeController {
     private final StudentAchievementService studentAchievementService;
     private final MyAchievementsService myAchievementsService;
 
-    // --- Profile ---
+    
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserDto> getMe() {
+    public ResponseEntity<UserResponse> getMe() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.getUserById(current.getId()));
     }
 
     @PatchMapping(value = "/profile", consumes = {"application/json"})
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserDto> updateProfile(@Valid @RequestBody UpdateProfileDto dto) {
+    public ResponseEntity<UserResponse> updateProfile(@Valid @RequestBody ProfileUpdateRequest dto) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.updateOwnProfile(current, dto));
     }
 
     @PutMapping(value = "/password", consumes = {"application/json"})
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordDto dto) {
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.changeOwnPassword(current, dto.getCurrentPassword(), dto.getNewPassword());
         return ResponseEntity.noContent().build();
@@ -57,23 +69,23 @@ public class MeController {
 
     @PostMapping(value = "/avatar", consumes = {"multipart/form-data"})
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserDto> uploadAvatar(@RequestPart("file") MultipartFile file) {
+    public ResponseEntity<UserResponse> uploadAvatar(@RequestPart("file") MultipartFile file) {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.uploadOwnAvatar(current, file));
     }
 
     @DeleteMapping("/avatar")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<UserDto> deleteAvatar() {
+    public ResponseEntity<UserResponse> deleteAvatar() {
         User current = authService.getCurrentUserEntity();
         return ResponseEntity.ok(userService.deleteOwnAvatar(current));
     }
 
-    // --- Notifications ---
+    
 
     @GetMapping("/notifications")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<NotificationDto>> listNotifications() {
+    public ResponseEntity<List<NotificationResponse>> listNotifications() {
         return ResponseEntity.ok(notificationService.listMyNotifications());
     }
 
@@ -85,7 +97,7 @@ public class MeController {
 
     @PatchMapping("/notifications/{id}/read")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<NotificationDto> markRead(@PathVariable Integer id) {
+    public ResponseEntity<NotificationResponse> markRead(@PathVariable Integer id) {
         return ResponseEntity.ok(notificationService.markRead(id));
     }
 
@@ -95,36 +107,36 @@ public class MeController {
         return ResponseEntity.ok(Map.of("marked", notificationService.markAllRead()));
     }
 
-    // --- Student content ---
+    
 
     @GetMapping("/courses")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<List<CourseDto>> listMyCourses() {
+    public ResponseEntity<List<CourseResponse>> listMyCourses() {
         return ResponseEntity.ok(studentContentService.listMyCourses());
     }
 
     @GetMapping("/courses/{courseId}/page")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<StudentCoursePageDto> getCoursePage(@PathVariable Integer courseId) {
+    public ResponseEntity<StudentCoursePageResponse> getCoursePage(@PathVariable Integer courseId) {
         return ResponseEntity.ok(studentCoursePageService.getCoursePage(courseId));
     }
 
     @GetMapping("/courses/{courseId}/lessons")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<List<LessonDto>> listMyLessonsInCourse(@PathVariable Integer courseId) {
+    public ResponseEntity<List<LessonResponse>> listMyLessonsInCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(studentContentService.listMyLessonsInCourse(courseId));
     }
 
     @GetMapping("/activities/{activityId}/attempts/latest")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<TestAttemptDto> getLatestCompletedAttempt(@PathVariable Integer activityId) {
+    public ResponseEntity<AttemptResponse> getLatestCompletedAttempt(@PathVariable Integer activityId) {
         return ResponseEntity.ok(testAttemptService.getLatestCompletedAttemptForTest(activityId));
     }
 
     @GetMapping("/lessons/{lessonId}/activity/attempts/latest")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<TestAttemptDto> getLatestCompletedAttemptByLesson(@PathVariable Integer lessonId) {
-        List<TestSummaryDto> tests = testService.listByLesson(lessonId);
+    public ResponseEntity<AttemptResponse> getLatestCompletedAttemptByLesson(@PathVariable Integer lessonId) {
+        List<ActivityResponse> tests = testService.listByLesson(lessonId);
         if (tests == null || tests.isEmpty()) {
             throw new ResourceNotFoundException("No activity for lesson " + lessonId);
         }
@@ -132,7 +144,7 @@ public class MeController {
         return ResponseEntity.ok(testAttemptService.getLatestCompletedAttemptForTest(testId));
     }
 
-    // --- Certificates (student only) ---
+    
 
     @PostMapping("/courses/{courseId}/completion-email")
     @PreAuthorize("hasRole('STUDENT')")
@@ -141,31 +153,31 @@ public class MeController {
         return ResponseEntity.ok().build();
     }
 
-    // --- Student achievements ---
+    
 
     @GetMapping("/achievements")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<List<StudentAchievementDto>> getMyAchievements() {
+    public ResponseEntity<List<StudentAchievementResponse>> getMyAchievements() {
         return ResponseEntity.ok(studentAchievementService.getMyAchievements());
     }
 
     @GetMapping("/achievements/page")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<MyAchievementsPageDto> getMyAchievementsPage() {
+    public ResponseEntity<MyAchievementsPageResponse> getMyAchievementsPage() {
         return ResponseEntity.ok(myAchievementsService.getMyAchievementsPage());
     }
 
-    // --- Student statistics ---
+    
 
     @GetMapping("/statistics/overview")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<StudentStatisticsOverviewDto> overview() {
+    public ResponseEntity<StudentStatisticsOverviewResponse> overview() {
         return ResponseEntity.ok(statisticsService.getMyOverview());
     }
 
     @GetMapping("/statistics/topics")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<List<StudentTopicStatsDto>> topics(@RequestParam(required = false) Integer courseId) {
+    public ResponseEntity<List<StudentTopicStatsResponse>> topics(@RequestParam(required = false) Integer courseId) {
         return ResponseEntity.ok(statisticsService.getMyTopicStats(courseId));
     }
 }

@@ -1,6 +1,6 @@
 package com.course.service;
 
-import com.course.dto.LessonPresentationInfoDto;
+import com.course.dto.lesson.LessonPresentationInfoResponse;
 import com.course.entity.Lesson;
 import com.course.exception.LessonPresentationNotFoundException;
 import com.course.exception.LessonPresentationValidationException;
@@ -35,15 +35,15 @@ public class LessonPresentationSlideService {
     private final LessonService lessonService;
     private final LessonPresentationStorageService storageService;
 
-    public LessonPresentationInfoDto getPresentationInfo(Integer lessonId) {
+    public LessonPresentationInfoResponse getPresentationInfo(Integer lessonId) {
         Lesson lesson = lessonService.getEntityByIdForCurrentUser(lessonId);
 
         if (!StringUtils.hasText(lesson.getPresentationUrl())) {
-            return new LessonPresentationInfoDto(false, 0);
+            return new LessonPresentationInfoResponse(false, 0);
         }
 
         int pages = getPageCount(lesson);
-        return new LessonPresentationInfoDto(true, pages);
+        return new LessonPresentationInfoResponse(true, pages);
     }
 
     public ResponseEntity<byte[]> renderPageAsPng(Integer lessonId, int pageNumber, Integer dpi) {

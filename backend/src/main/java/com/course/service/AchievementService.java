@@ -1,8 +1,8 @@
 package com.course.service;
 
-import com.course.dto.AchievementDto;
-import com.course.dto.AchievementForm;
-import com.course.dto.UpdateAchievementDto;
+import com.course.dto.achievement.AchievementResponse;
+import com.course.dto.achievement.AchievementUpsertForm;
+import com.course.dto.achievement.AchievementUpdateRequest;
 import com.course.entity.Achievement;
 import com.course.entity.Course;
 import com.course.entity.RoleName;
@@ -38,7 +38,7 @@ public class AchievementService {
     private final AchievementPhotoStorageService photoStorageService;
     private final StudentAchievementService studentAchievementService;
 
-    public AchievementDto create(Integer courseId, AchievementForm form) {
+    public AchievementResponse create(Integer courseId, AchievementUpsertForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -76,7 +76,7 @@ public class AchievementService {
     }
 
     @Transactional(readOnly = true)
-    public AchievementDto getById(Integer id) {
+    public AchievementResponse getById(Integer id) {
         Achievement a = getEntityById(id);
         assertCanViewAchievement(authService.getCurrentUserEntity(), a);
         return toDto(a);
@@ -89,7 +89,7 @@ public class AchievementService {
     }
 
     @Transactional(readOnly = true)
-    public List<AchievementDto> listByCourse(Integer courseId) {
+    public List<AchievementResponse> listByCourse(Integer courseId) {
         Course course = courseService.getEntityById(courseId);
         User current = authService.getCurrentUserEntity();
 
@@ -107,7 +107,7 @@ public class AchievementService {
                 .stream().map(this::toDto).toList();
     }
 
-    public AchievementDto update(Integer id, UpdateAchievementDto dto) {
+    public AchievementResponse update(Integer id, AchievementUpdateRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -139,7 +139,7 @@ public class AchievementService {
         return toDto(achievementRepository.save(a));
     }
 
-    public AchievementDto updateWithOptionalPhoto(Integer id, AchievementForm form) {
+    public AchievementResponse updateWithOptionalPhoto(Integer id, AchievementUpsertForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -187,7 +187,7 @@ public class AchievementService {
         return toDto(saved);
     }
 
-    public AchievementDto replacePhoto(Integer id, MultipartFile photo) {
+    public AchievementResponse replacePhoto(Integer id, MultipartFile photo) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -224,8 +224,8 @@ public class AchievementService {
         photoStorageService.deleteByPublicUrl(oldUrl);
     }
 
-    public AchievementDto toDto(Achievement a) {
-        AchievementDto dto = new AchievementDto();
+    public AchievementResponse toDto(Achievement a) {
+        AchievementResponse dto = new AchievementResponse();
         dto.setId(a.getId());
         dto.setTitle(a.getTitle());
         dto.setJokeDescription(a.getJokeDescription());

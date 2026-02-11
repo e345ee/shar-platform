@@ -1,8 +1,8 @@
 package com.course.service;
 
-import com.course.dto.LessonForm;
-import com.course.dto.LessonDto;
-import com.course.dto.UpdateLessonDto;
+import com.course.dto.lesson.LessonResponse;
+import com.course.dto.lesson.LessonUpdateRequest;
+import com.course.dto.lesson.LessonUpsertForm;
 import com.course.entity.Course;
 import com.course.entity.Lesson;
 import com.course.entity.RoleName;
@@ -15,12 +15,17 @@ import com.course.repository.LessonRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+
 @Service
+@Validated
 @RequiredArgsConstructor
 @Transactional
 public class LessonService {
@@ -38,7 +43,7 @@ public class LessonService {
     private final StudyClassService studyClassService;
     private final LessonPresentationStorageService presentationStorageService;
 
-    public LessonDto create(Integer courseId, LessonForm form) {
+    public LessonResponse create(@NotNull Integer courseId, @Valid @NotNull LessonUpsertForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -86,12 +91,12 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public LessonDto getById(Integer id) {
+    public LessonResponse getById(@NotNull Integer id) {
         return toDto(getEntityByIdForCurrentUser(id));
     }
 
     @Transactional(readOnly = true)
-    public Lesson getEntityByIdForCurrentUser(Integer id) {
+    public Lesson getEntityByIdForCurrentUser(@NotNull Integer id) {
         Lesson lesson = getEntityById(id);
         User current = authService.getCurrentUserEntity();
         assertCanViewLesson(current, lesson);
@@ -99,13 +104,13 @@ public class LessonService {
     }
 
     @Transactional(readOnly = true)
-    public Lesson getEntityById(Integer id) {
+    public Lesson getEntityById(@NotNull Integer id) {
         return lessonRepository.findById(id)
                 .orElseThrow(() -> new LessonNotFoundException("Lesson with id " + id + " not found"));
     }
 
     @Transactional(readOnly = true)
-    public List<LessonDto> listByCourse(Integer courseId) {
+    public List<LessonResponse> listByCourse(Integer courseId) {
         Course course = courseService.getEntityById(courseId);
 
         User current = authService.getCurrentUserEntity();
@@ -128,7 +133,7 @@ public class LessonService {
                 .stream().map(this::toDto).toList();
     }
 
-    public LessonDto update(Integer id, UpdateLessonDto dto) {
+    public LessonResponse update(@NotNull Integer id, @Valid @NotNull LessonUpdateRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -168,7 +173,7 @@ public class LessonService {
         return toDto(saved);
     }
 
-    public LessonDto updateWithOptionalPresentation(Integer id, LessonForm form) {
+    public LessonResponse updateWithOptionalPresentation(@NotNull Integer id, @Valid @NotNull LessonUpsertForm form) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -224,7 +229,7 @@ public class LessonService {
         return toDto(saved);
     }
 
-    public LessonDto replacePresentation(Integer id, MultipartFile presentation) {
+    public LessonResponse replacePresentation(@NotNull Integer id, @NotNull MultipartFile presentation) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -245,7 +250,7 @@ public class LessonService {
         return toDto(saved);
     }
 
-    public LessonDto deletePresentation(Integer id) {
+    public LessonResponse deletePresentation(@NotNull Integer id) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -276,8 +281,8 @@ public class LessonService {
         presentationStorageService.deleteByPublicUrl(oldUrl);
     }
 
-    private LessonDto toDto(Lesson l) {
-        LessonDto dto = new LessonDto();
+    private LessonResponse toDto(Lesson l) {
+        LessonResponse dto = new LessonResponse();
         dto.setId(l.getId());
         dto.setOrderIndex(l.getOrderIndex());
         dto.setTitle(l.getTitle());

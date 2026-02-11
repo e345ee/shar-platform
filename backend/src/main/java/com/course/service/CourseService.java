@@ -1,6 +1,7 @@
 package com.course.service;
 
-import com.course.dto.CourseDto;
+import com.course.dto.course.CourseResponse;
+import com.course.dto.course.CourseUpsertRequest;
 import com.course.entity.Course;
 import com.course.entity.RoleName;
 import com.course.entity.User;
@@ -8,12 +9,17 @@ import com.course.exception.ForbiddenOperationException;
 import com.course.exception.ResourceNotFoundException;
 import com.course.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 @Transactional
 public class CourseService {
@@ -24,7 +30,7 @@ public class CourseService {
     private final AuthService authService;
     private final UserService userService;
 
-    public CourseDto create(CourseDto dto) {
+    public CourseResponse create(@Valid @NotNull CourseUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -37,7 +43,7 @@ public class CourseService {
     }
 
     @Transactional(readOnly = true)
-    public CourseDto getById(Integer id) {
+    public CourseResponse getById(Integer id) {
         return toDto(getEntityById(id));
     }
 
@@ -48,11 +54,11 @@ public class CourseService {
     }
 
     @Transactional(readOnly = true)
-    public List<CourseDto> getAll() {
+    public List<CourseResponse> getAll() {
         return courseRepository.findAll().stream().map(this::toDto).toList();
     }
 
-    public CourseDto update(Integer id, CourseDto dto) {
+    public CourseResponse update(@NotNull Integer id, @Valid @NotNull CourseUpsertRequest dto) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -65,7 +71,7 @@ public class CourseService {
         return toDto(courseRepository.save(course));
     }
 
-    public void delete(Integer id) {
+    public void delete(@NotNull Integer id) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_METHODIST);
 
@@ -75,8 +81,8 @@ public class CourseService {
         courseRepository.delete(course);
     }
 
-    private CourseDto toDto(Course c) {
-        CourseDto dto = new CourseDto();
+    private CourseResponse toDto(Course c) {
+        CourseResponse dto = new CourseResponse();
         dto.setId(c.getId());
         dto.setName(c.getName());
         dto.setDescription(c.getDescription());

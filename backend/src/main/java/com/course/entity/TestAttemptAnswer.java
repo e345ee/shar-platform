@@ -84,4 +84,79 @@ public class TestAttemptAnswer {
     public void onUpdate() {
         updatedAt = LocalDateTime.now();
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public TestAttempt getAttempt() {
+        return this.attempt;
+    }
+
+    public void setAttempt(TestAttempt attempt) {
+        this.attempt = attempt;
+    }
+
+    public TestQuestion getQuestion() {
+        return this.question;
+    }
+
+    public void setQuestion(TestQuestion question) {
+        this.question = question;
+    }
+
+    public Integer getSelectedOption() {
+        return this.selectedOption;
+    }
+
+    public void setSelectedOption(Integer selectedOption) {
+        this.selectedOption = selectedOption;
+    }
+
+    public String getTextAnswer() {
+        return this.textAnswer;
+    }
+
+    public void setTextAnswer(String textAnswer) {
+        this.textAnswer = textAnswer;
+    }
+
+    public String getFeedback() {
+        return this.feedback;
+    }
+
+    public void setFeedback(String feedback) {
+        this.feedback = feedback;
+    }
+
+    public LocalDateTime getGradedAt() {
+        return this.gradedAt;
+    }
+
+    public void setGradedAt(LocalDateTime gradedAt) {
+        this.gradedAt = gradedAt;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return this.updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
 }

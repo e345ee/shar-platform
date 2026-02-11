@@ -37,4 +37,39 @@ public class MethodistTeacher {
     public void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public User getMethodist() {
+        return this.methodist;
+    }
+
+    public void setMethodist(User methodist) {
+        this.methodist = methodist;
+    }
+
+    public User getTeacher() {
+        return this.teacher;
+    }
+
+    public void setTeacher(User teacher) {
+        this.teacher = teacher;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
 }

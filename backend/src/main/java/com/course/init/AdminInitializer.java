@@ -36,8 +36,8 @@ public class AdminInitializer implements CommandLineRunner {
                     return roleRepository.save(r);
                 });
 
-        // If an admin user already exists (e.g. from seed scripts), ensure it has a valid bcrypt password.
-        // This prevents a common dev/test failure when someone seeds placeholder values like "admin_hash".
+        
+        
         userRepository.findByName("admin")
                 .or(() -> userRepository.findByEmail("admin@example.com"))
                 .ifPresentOrElse(existing -> {

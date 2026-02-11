@@ -1,7 +1,8 @@
 package com.course.controller;
 
-import com.course.dto.PageDto;
-import com.course.dto.RoleDto;
+import com.course.dto.common.PageResponse;
+import com.course.dto.role.RoleResponse;
+import com.course.dto.role.RoleUpsertRequest;
 import com.course.service.RoleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,37 +23,37 @@ public class RolesController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RoleDto> create(@Valid @RequestBody RoleDto dto) {
+    public ResponseEntity<RoleResponse> create(@Valid @RequestBody RoleUpsertRequest dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(roleService.createRole(dto));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<RoleDto> getById(@PathVariable Integer id) {
+    public ResponseEntity<RoleResponse> getById(@PathVariable Integer id) {
         return ResponseEntity.ok(roleService.getRoleById(id));
     }
 
     @GetMapping("/name/{rolename}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<RoleDto> getByName(@PathVariable String rolename) {
+    public ResponseEntity<RoleResponse> getByName(@PathVariable String rolename) {
         return ResponseEntity.ok(roleService.getRoleByName(rolename));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<List<RoleDto>> getAll() {
+    public ResponseEntity<List<RoleResponse>> getAll() {
         return ResponseEntity.ok(roleService.getAllRoles());
     }
 
     @GetMapping("/paginated")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
-    public ResponseEntity<PageDto<RoleDto>> getAllPaginated(Pageable pageable) {
+    public ResponseEntity<PageResponse<RoleResponse>> getAllPaginated(Pageable pageable) {
         return ResponseEntity.ok(roleService.getAllRolesPaginated(pageable));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<RoleDto> update(@PathVariable Integer id, @Valid @RequestBody RoleDto dto) {
+    public ResponseEntity<RoleResponse> update(@PathVariable Integer id, @Valid @RequestBody RoleUpsertRequest dto) {
         return ResponseEntity.ok(roleService.updateRole(id, dto));
     }
 

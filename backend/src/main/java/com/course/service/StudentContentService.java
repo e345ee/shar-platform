@@ -1,7 +1,7 @@
 package com.course.service;
 
-import com.course.dto.CourseDto;
-import com.course.dto.LessonDto;
+import com.course.dto.course.CourseResponse;
+import com.course.dto.lesson.LessonResponse;
 import com.course.entity.Course;
 import com.course.entity.RoleName;
 import com.course.entity.User;
@@ -26,7 +26,7 @@ public class StudentContentService {
     private final LessonService lessonService;
     private final ClassOpenedLessonService classOpenedLessonService;
 
-    public List<CourseDto> listMyCourses() {
+    public List<CourseResponse> listMyCourses() {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
@@ -34,13 +34,13 @@ public class StudentContentService {
         return courses.stream().map(this::toDto).toList();
     }
 
-    public List<LessonDto> listMyLessonsInCourse(Integer courseId) {
+    public List<LessonResponse> listMyLessonsInCourse(Integer courseId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
 
         
         
-        List<LessonDto> all = lessonService.listByCourse(courseId);
+        List<LessonResponse> all = lessonService.listByCourse(courseId);
         List<Integer> openedIds = classOpenedLessonService.findOpenedLessonIdsForStudentInCourse(current.getId(), courseId);
         if (openedIds.isEmpty()) {
             return List.of();
@@ -48,8 +48,8 @@ public class StudentContentService {
         return all.stream().filter(l -> l.getId() != null && openedIds.contains(l.getId())).toList();
     }
 
-    private CourseDto toDto(Course c) {
-        CourseDto dto = new CourseDto();
+    private CourseResponse toDto(Course c) {
+        CourseResponse dto = new CourseResponse();
         dto.setId(c.getId());
         dto.setName(c.getName());
         dto.setDescription(c.getDescription());

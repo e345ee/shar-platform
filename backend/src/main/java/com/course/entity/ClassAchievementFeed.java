@@ -47,4 +47,63 @@ public class ClassAchievementFeed {
         if (createdAt == null) createdAt = now;
         if (awardedAt == null) awardedAt = now;
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public StudyClass getStudyClass() {
+        return this.studyClass;
+    }
+
+    public void setStudyClass(StudyClass studyClass) {
+        this.studyClass = studyClass;
+    }
+
+    public User getStudent() {
+        return this.student;
+    }
+
+    public void setStudent(User student) {
+        this.student = student;
+    }
+
+    public Achievement getAchievement() {
+        return this.achievement;
+    }
+
+    public void setAchievement(Achievement achievement) {
+        this.achievement = achievement;
+    }
+
+    public User getAwardedBy() {
+        return this.awardedBy;
+    }
+
+    public void setAwardedBy(User awardedBy) {
+        this.awardedBy = awardedBy;
+    }
+
+    public LocalDateTime getAwardedAt() {
+        return this.awardedAt;
+    }
+
+    public void setAwardedAt(LocalDateTime awardedAt) {
+        this.awardedAt = awardedAt;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
 }

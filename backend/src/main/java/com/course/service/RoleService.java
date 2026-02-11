@@ -1,7 +1,8 @@
 package com.course.service;
 
-import com.course.dto.PageDto;
-import com.course.dto.RoleDto;
+import com.course.dto.common.PageResponse;
+import com.course.dto.role.RoleResponse;
+import com.course.dto.role.RoleUpsertRequest;
 import com.course.entity.Role;
 import com.course.entity.RoleName;
 import com.course.exception.DuplicateResourceException;
@@ -23,7 +24,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
 
-    public RoleDto createRole(RoleDto dto) {
+    public RoleResponse createRole(RoleUpsertRequest dto) {
         RoleName roleName = parseRoleName(dto.getRolename());
         if (roleRepository.existsByRolename(roleName)) {
             throw new DuplicateResourceException("Role with name '" + roleName.name() + "' already exists");
@@ -38,14 +39,14 @@ public class RoleService {
     }
 
     @Transactional(readOnly = true)
-    public RoleDto getRoleById(Integer id) {
+    public RoleResponse getRoleById(Integer id) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role with id " + id + " not found"));
         return convertToDto(role);
     }
 
     @Transactional(readOnly = true)
-    public RoleDto getRoleByName(String rolename) {
+    public RoleResponse getRoleByName(String rolename) {
         RoleName roleName = parseRoleName(rolename);
         Role role = roleRepository.findByRolename(roleName)
                 .orElseThrow(() -> new ResourceNotFoundException("Role with name '" + roleName.name() + "' not found"));
@@ -53,19 +54,19 @@ public class RoleService {
     }
 
     @Transactional(readOnly = true)
-    public List<RoleDto> getAllRoles() {
+    public List<RoleResponse> getAllRoles() {
         return roleRepository.findAll().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public PageDto<RoleDto> getAllRolesPaginated(Pageable pageable) {
+    public PageResponse<RoleResponse> getAllRolesPaginated(Pageable pageable) {
         Page<Role> page = roleRepository.findAll(pageable);
         return convertPageToPageDto(page);
     }
 
-    public RoleDto updateRole(Integer id, RoleDto dto) {
+    public RoleResponse updateRole(Integer id, RoleUpsertRequest dto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role with id " + id + " not found"));
 
@@ -88,8 +89,8 @@ public class RoleService {
         roleRepository.delete(role);
     }
 
-    private RoleDto convertToDto(Role role) {
-        return new RoleDto(role.getId(), role.getRolename() != null ? role.getRolename().name() : null, role.getDescription());
+    private RoleResponse convertToDto(Role role) {
+        return new RoleResponse(role.getId(), role.getRolename() != null ? role.getRolename().name() : null, role.getDescription());
     }
 
     private RoleName parseRoleName(String raw) {
@@ -103,8 +104,8 @@ public class RoleService {
         }
     }
 
-    private PageDto<RoleDto> convertPageToPageDto(Page<Role> page) {
-        return new PageDto<>(
+    private PageResponse<RoleResponse> convertPageToPageDto(Page<Role> page) {
+        return new PageResponse<>(
                 page.getContent().stream()
                         .map(this::convertToDto)
                         .collect(Collectors.toList()),

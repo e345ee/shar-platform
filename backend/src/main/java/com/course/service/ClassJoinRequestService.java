@@ -1,8 +1,8 @@
 package com.course.service;
 
-import com.course.dto.ClassJoinRequestDto;
-import com.course.dto.CreateClassJoinRequestDto;
-import com.course.dto.UserDto;
+import com.course.dto.classroom.ClassJoinRequestCreateRequest;
+import com.course.dto.classroom.ClassJoinRequestResponse;
+import com.course.dto.user.UserResponse;
 import com.course.entity.ClassJoinRequest;
 import com.course.entity.ClassStudent;
 import com.course.entity.RoleName;
@@ -34,7 +34,7 @@ public class ClassJoinRequestService {
     private final UserService userService;
     private final NotificationService notificationService;
 
-    public ClassJoinRequestDto createRequest(CreateClassJoinRequestDto dto) {
+    public ClassJoinRequestResponse createRequest(ClassJoinRequestCreateRequest dto) {
         String classCode = dto.getClassCode().trim().toUpperCase();
 
         StudyClass sc = classService.getEntityByJoinCode(classCode);
@@ -86,7 +86,7 @@ public class ClassJoinRequestService {
     }
 
     @Transactional(readOnly = true)
-    public List<ClassJoinRequestDto> listForClass(Integer classId) {
+    public List<ClassJoinRequestResponse> listForClass(Integer classId) {
         StudyClass sc = classService.getEntityById(classId);
         assertCanManageRequests(sc);
 
@@ -94,7 +94,7 @@ public class ClassJoinRequestService {
                 .stream().map(this::toDto).toList();
     }
 
-    public UserDto approve(Integer classId, Integer requestId) {
+    public UserResponse approve(Integer classId, Integer requestId) {
         StudyClass sc = classService.getEntityById(classId);
         assertCanManageRequests(sc);
 
@@ -154,8 +154,8 @@ public class ClassJoinRequestService {
         }
     }
 
-    private ClassJoinRequestDto toDto(ClassJoinRequest req) {
-        ClassJoinRequestDto dto = new ClassJoinRequestDto();
+    private ClassJoinRequestResponse toDto(ClassJoinRequest req) {
+        ClassJoinRequestResponse dto = new ClassJoinRequestResponse();
         dto.setId(req.getId());
         if (req.getStudyClass() != null) {
             dto.setClassId(req.getStudyClass().getId());

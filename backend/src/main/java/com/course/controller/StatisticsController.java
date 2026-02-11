@@ -1,6 +1,8 @@
 package com.course.controller;
 
-import com.course.dto.*;
+import com.course.dto.statistics.StudentTopicStatsResponse;
+import com.course.dto.statistics.TeacherStatsResponse;
+import com.course.dto.statistics.TopicStatsResponse;
 import com.course.service.StatisticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -19,42 +21,42 @@ public class StatisticsController {
 
     private final StatisticsService statisticsService;
 
-    // --- Teacher / Methodist (topics stats) ---
+    
 
     @GetMapping("/classes/{classId}/topics")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<List<ClassTopicStatsDto>> classTopics(@PathVariable Integer classId) {
+    public ResponseEntity<List<TopicStatsResponse>> classTopics(@PathVariable Integer classId) {
         return ResponseEntity.ok(statisticsService.getClassTopicStatsForTeacher(classId));
     }
 
     @GetMapping("/students/{studentId}/topics")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<List<StudentTopicStatsDto>> studentTopics(
+    public ResponseEntity<List<StudentTopicStatsResponse>> studentTopics(
             @PathVariable Integer studentId,
             @RequestParam Integer courseId
     ) {
         return ResponseEntity.ok(statisticsService.getStudentTopicStatsForTeacher(studentId, courseId));
     }
 
-    // --- Methodist / Admin (course-wide stats) ---
+    
 
     @GetMapping("/courses/{courseId}/topics")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
-    public ResponseEntity<List<CourseTopicStatsDto>> courseTopics(@PathVariable Integer courseId) {
+    public ResponseEntity<List<TopicStatsResponse>> courseTopics(@PathVariable Integer courseId) {
         return ResponseEntity.ok(statisticsService.getCourseTopicStatsForMethodist(courseId));
     }
 
     @GetMapping("/courses/{courseId}/classes/topics")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
-    public ResponseEntity<List<TeacherClassTopicStatsDto>> classTopicsForCourse(@PathVariable Integer courseId) {
+    public ResponseEntity<List<TopicStatsResponse>> classTopicsForCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(statisticsService.getCourseTeacherTopicStatsForMethodist(courseId));
     }
 
-    // --- Teachers performance (methodist/admin) ---
+    
 
     @GetMapping("/teachers")
     @PreAuthorize("hasAnyRole('METHODIST','ADMIN')")
-    public ResponseEntity<List<TeacherStatsDto>> getTeachersStats(
+    public ResponseEntity<List<TeacherStatsResponse>> getTeachersStats(
             @RequestParam(value = "methodistId", required = false) Integer methodistId
     ) {
         return ResponseEntity.ok(statisticsService.getTeacherStatsForCurrentMethodist(methodistId));

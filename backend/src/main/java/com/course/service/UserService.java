@@ -1,8 +1,9 @@
 package com.course.service;
 
-import com.course.dto.PageDto;
-import com.course.dto.UpdateProfileDto;
-import com.course.dto.UserDto;
+import com.course.dto.common.PageResponse;
+import com.course.dto.user.ProfileUpdateRequest;
+import com.course.dto.user.UserResponse;
+import com.course.dto.user.UserUpsertRequest;
 import com.course.entity.Role;
 import com.course.entity.RoleName;
 import com.course.entity.User;
@@ -19,12 +20,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 @Transactional
 public class UserService {
@@ -46,7 +52,7 @@ public class UserService {
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%".toCharArray();
 
     
-    public UserDto updateOwnProfile(User currentUser, UpdateProfileDto dto) {
+    public UserResponse updateOwnProfile(@NotNull User currentUser, @Valid @NotNull ProfileUpdateRequest dto) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
@@ -118,7 +124,7 @@ public class UserService {
     }
 
     
-    public UserDto uploadOwnAvatar(User currentUser, org.springframework.web.multipart.MultipartFile file) {
+    public UserResponse uploadOwnAvatar(User currentUser, org.springframework.web.multipart.MultipartFile file) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
@@ -144,7 +150,7 @@ public class UserService {
     }
 
     
-    public UserDto deleteOwnAvatar(User currentUser) {
+    public UserResponse deleteOwnAvatar(User currentUser) {
         if (currentUser == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
@@ -167,7 +173,7 @@ public class UserService {
     }
 
     
-    public UserDto createTeacherByMethodist(Integer metodistUserId, UserDto dto) {
+    public UserResponse createTeacherByMethodist(@NotNull Integer metodistUserId, @Valid @NotNull UserUpsertRequest dto) {
         assertUserHasRole(metodistUserId, ROLE_METHODIST);
 
         User methodist = userRepository.findById(metodistUserId)
@@ -239,7 +245,7 @@ public class UserService {
     }
 
     
-    public UserDto createMethodist(UserDto dto) {
+    public UserResponse createMethodist(@Valid @NotNull UserUpsertRequest dto) {
         validateUserCreateCommon(dto);
 
         Role methodistRole = roleRepository.findByRolename(ROLE_METHODIST)
@@ -304,12 +310,12 @@ public class UserService {
     }
 
     
-    public UserDto toDto(User user) {
+    public UserResponse toDto(User user) {
         return convertToDto(user);
     }
 
     
-    public UserDto createUser(UserDto dto) {
+    public UserResponse createUser(@Valid @NotNull UserUpsertRequest dto) {
         if (dto.getRoleId() == null) {
             throw new IllegalArgumentException("Role ID cannot be null");
         }
@@ -332,13 +338,8 @@ public class UserService {
         return convertToDto(savedUser);
     }
 
-    /**
-     * Create a STUDENT account.
-     *
-     * REST-layer enforces access (ADMIN/METHODIST). Here we also enforce role = STUDENT
-     * regardless of any roleId sent by client.
-     */
-    public UserDto createStudent(UserDto dto) {
+    
+    public UserResponse createStudent(@Valid @NotNull UserUpsertRequest dto) {
         validateUserCreateCommon(dto);
 
         Role studentRole = roleRepository.findByRolename(ROLE_STUDENT)
@@ -357,40 +358,40 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public UserDto getUserById(Integer id) {
+    public UserResponse getUserById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
         return convertToDto(user);
     }
 
     @Transactional(readOnly = true)
-    public UserDto getUserByEmail(String email) {
+    public UserResponse getUserByEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User with email '" + email + "' not found"));
         return convertToDto(user);
     }
 
     @Transactional(readOnly = true)
-    public UserDto getUserByName(String name) {
+    public UserResponse getUserByName(String name) {
         User user = userRepository.findByName(name)
                 .orElseThrow(() -> new ResourceNotFoundException("User with name '" + name + "' not found"));
         return convertToDto(user);
     }
 
     @Transactional(readOnly = true)
-    public List<UserDto> getAllUsers() {
+    public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
-    public PageDto<UserDto> getAllUsersPaginated(Pageable pageable) {
+    public PageResponse<UserResponse> getAllUsersPaginated(Pageable pageable) {
         Page<User> page = userRepository.findAll(pageable);
         return convertPageToPageDto(page);
     }
 
-    public UserDto updateUser(Integer id, UserDto dto) {
+    public UserResponse updateUser(@NotNull Integer id, @Valid @NotNull UserUpsertRequest dto) {
         if (dto.getRoleId() == null) {
             throw new IllegalArgumentException("Role ID cannot be null");
         }
@@ -524,7 +525,7 @@ public class UserService {
     }
 
 
-    private void validateUserCreateCommon(UserDto dto) {
+    private void validateUserCreateCommon(UserUpsertRequest dto) {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new DuplicateResourceException("User with email '" + dto.getEmail() + "' already exists");
         }
@@ -556,9 +557,9 @@ public class UserService {
         throw new DuplicateResourceException("Unable to generate unique user name");
     }
 
-    private UserDto convertToDto(User user) {
+    private UserResponse convertToDto(User user) {
         
-        return new UserDto(
+        return new UserResponse(
                 user.getId(),
                 user.getRole() != null ? user.getRole().getId() : null,
                 user.getName(),
@@ -570,8 +571,8 @@ public class UserService {
         );
     }
 
-    private PageDto<UserDto> convertPageToPageDto(Page<User> page) {
-        return new PageDto<>(
+    private PageResponse<UserResponse> convertPageToPageDto(Page<User> page) {
+        return new PageResponse<>(
                 page.getContent().stream()
                         .map(this::convertToDto)
                         .collect(Collectors.toList()),

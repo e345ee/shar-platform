@@ -1,41 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ------------------------------------------------------------
-# v7: add REMEDIAL_TASK activity + auto-assignment on low score (<50%) by topic
-# E2E smoke-test for:
-# - roles/users: ADMIN -> create METHODIST; METHODIST -> create TEACHER
-# - METHODIST: create COURSE + CLASS
-# - anonymous: create join request
-# - TEACHER: approve join request
-# - ADMIN: set known password for the approved STUDENT
-# - METHODIST: create lessons with numbering + upload PDF
-# - access: METHODIST/TEACHER/STUDENT can view lessons in their course;
-#           STUDENT cannot view lessons from another course
-# - PDF slide paging: /presentation/info and /presentation/pages/{n}
-# - ACTIVITIES (tests/homework) + QUESTIONS:
-#     * METHODIST: create draft test, update, add/update/delete questions
-#     * METHODIST: publish (ready)
-#     * STUDENT: start attempt, submit answers, auto-grading
-#     * TEACHER: can view student's results (attempts list + attempt detail)
-#
-# Prereqs:
-# - backend is running (default: http://localhost:8080)
-# - DB is migrated (table.sql applied)
-# - S3/MinIO configured and reachable (PDF upload works)
-# - curl available
-# - jq OR python3 available
-# ------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 
-# Email sending can be enabled by setting APP_MAIL_ENABLED=true and configuring
-# SPRING_MAIL_* env vars for a real SMTP provider.
+
+
 
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 
-# Test users passwords
+
 METHODIST_PASS="MethodistPass1!"
 TEACHER_PASS="TeacherPass1!"
 STUDENT_PASS="StudentPass1!"
@@ -53,7 +53,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# --- structured logging / failure artifacts ---
+
 RUN_ID="${RUN_ID:-$(date +%Y%m%d%H%M%S)-$RANDOM}"
 LOG_DIR="${E2E_LOG_DIR:-$WORKDIR/logs}"
 FAIL_DIR="$LOG_DIR/failures"
@@ -67,7 +67,7 @@ LAST_HTTP_BODY_FILE=""
 LAST_HTTP_HEADERS_FILE=""
 
 _slugify() {
-  # best-effort slug for directories
+
   echo "$*" | tr ' /' '__' | tr -cd 'A-Za-z0-9_.-'
 }
 
@@ -125,7 +125,7 @@ need_tool curl
 need_tool base64
 
 urlenc() {
-  # URL-encode a string (best-effort). Prefers python3.
+
   local s="$1"
   if command -v python3 >/dev/null 2>&1; then
     python3 - <<'PY' "$s"
@@ -133,7 +133,7 @@ import sys, urllib.parse
 print(urllib.parse.quote(sys.argv[1]))
 PY
   else
-    # Fallback: encode space only (enough for our test strings)
+
     echo "${s// /%20}"
   fi
 }
@@ -187,7 +187,7 @@ else:
 }
 
 json_len() {
-  # Usage: json_len "$json"
+
   local json="$1"
   if command -v jq >/dev/null 2>&1; then
     echo "$json" | jq 'length'
@@ -197,7 +197,7 @@ json_len() {
 }
 
 json_filter_first() {
-  # Usage: json_filter_first "$json" "field" "value"
+
   local json="$1"
   local field="$2"
   local value="$3"
@@ -217,7 +217,7 @@ print("null" if res is None else json.dumps(res))' "$field" "$value" <<<"$json"
 }
 
 json_filter_first2() {
-  # Usage: json_filter_first2 "$json" "field1" "value1" "field2" "value2"
+
   local json="$1"
   local f1="$2"; local v1="$3"
   local f2="$4"; local v2="$5"
@@ -237,7 +237,7 @@ print("null" if res is None else json.dumps(res))' "$f1" "$v1" "$f2" "$v2" <<<"$
 }
 
 float_ge() {
-  # Usage: float_ge "a" "b"  => returns 0 if ok, 1 if not
+
   python3 - "$1" "$2" <<'PY'
 import sys
 a=float(sys.argv[1]); b=float(sys.argv[2])
@@ -246,7 +246,7 @@ PY
 }
 
 float_between() {
-  # Usage: float_between "x" "lo" "hi"
+
   python3 - "$1" "$2" "$3" <<'PY'
 import sys
 x=float(sys.argv[1]); lo=float(sys.argv[2]); hi=float(sys.argv[3])
@@ -285,7 +285,7 @@ request_json() {
     echo "TIME_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   } > "$meta"
 
-  # Save curl args (best-effort). Redact JSON "password" fields unless LOG_SECRETS=1.
+
   if [[ "${LOG_SECRETS:-0}" == "1" ]]; then
     printf '%s\n' "$@" > "$args"
   else
@@ -309,7 +309,7 @@ request_json() {
   LAST_HTTP_BODY_FILE="$out"
   LAST_HTTP_HEADERS_FILE="$hdr"
 
-  # --- stdout trace (so you can see what each request does + JSON it returns) ---
+
   local show="${SHOW_HTTP:-1}"
   if [[ "$show" == "1" ]]; then
     echo
@@ -321,7 +321,7 @@ request_json() {
       echo ">>> Authorization: <none>"
     fi
 
-    # Print request JSON body if provided via -d
+
     local req_body=""
     local prev=""
     for a in "$@"; do
@@ -354,7 +354,7 @@ request_json() {
         python3 -m json.tool <<<"$HTTP_BODY" 2>/dev/null || echo "$HTTP_BODY"
       fi
     else
-      # Non-JSON (CSV/plain text)
+
       echo "$HTTP_BODY"
     fi
 
@@ -442,17 +442,17 @@ expect_code_one_of() {
   fail "$ctx (expected one of: $*, got $got)"
 }
 
-# ------------------------------------------------------------
-# 0) Health
-# ------------------------------------------------------------
+
+
+
 log "Health check"
 request_json GET "/actuator/health" "" -H "Accept: application/json"
 expect_code 200 "health check"
 pass "Backend is up"
 
-# ------------------------------------------------------------
-# 0.1) Swagger + JWT smoke checks
-# ------------------------------------------------------------
+
+
+
 log "Swagger/OpenAPI check"
 request_json GET "/v3/api-docs" "" -H "Accept: application/json"
 expect_code 200 "openapi docs"
@@ -469,9 +469,9 @@ expect_code 200 "jwt bearer access to /api/me"
 pass "Swagger + JWT are OK"
 
 
-# ------------------------------------------------------------
-# 0.2) UsersController: ADMIN creates STUDENT with tgId uniqueness
-# ------------------------------------------------------------
+
+
+
 log "ADMIN creates STUDENT via /api/users/students (tgId unique)"
 PRE_STUDENT_NAME="pre_student_$SUF"
 PRE_STUDENT_EMAIL="pre_student_$SUF@example.com"
@@ -500,9 +500,9 @@ HTTP_BODY=$(cat "$WORKDIR/basic_disabled.json")
 [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "403" ]] || fail "Expected Basic auth to be rejected (401/403), got $HTTP_CODE"
 pass "Basic auth is disabled"
 
-# ------------------------------------------------------------
-# 1) Create METHODIST (ADMIN)
-# ------------------------------------------------------------
+
+
+
 METHODIST_NAME="methodist_$SUF"
 METHODIST_EMAIL="methodist_$SUF@example.com"
 
@@ -524,12 +524,12 @@ METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$METHODIST_JWT" && "$METHODIST_JWT" != "null" ]] || fail "No accessToken for methodist"
 pass "Methodist JWT acquired"
 
-# Backward-compatible var name used across the script: now stores JWT (Bearer)
+
 METHODIST_AUTH="$METHODIST_JWT"
 
-# ------------------------------------------------------------
-# 2) Create TEACHER (METHODIST)
-# ------------------------------------------------------------
+
+
+
 TEACHER_NAME="teacher_$SUF"
 TEACHER_EMAIL="teacher_$SUF@example.com"
 
@@ -551,12 +551,12 @@ TEACHER_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$TEACHER_JWT" && "$TEACHER_JWT" != "null" ]] || fail "No accessToken for teacher"
 pass "Teacher JWT acquired"
 
-# Backward-compatible var name used across the script: now stores JWT (Bearer)
+
 TEACHER_AUTH="$TEACHER_JWT"
 
-# ------------------------------------------------------------
-# 3) Create COURSE (METHODIST)
-# ------------------------------------------------------------
+
+
+
 COURSE_NAME="Course_$SUF"
 log "Create COURSE as METHODIST"
 request_json POST "/api/courses" "$METHODIST_AUTH" \
@@ -566,9 +566,9 @@ expect_code 201 "create course"
 COURSE_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Course created: id=$COURSE_ID"
 
-# ------------------------------------------------------------
-# 4) Create CLASS (METHODIST) with assigned TEACHER
-# ------------------------------------------------------------
+
+
+
 CLASS_NAME="Class_$SUF"
 log "Create CLASS as METHODIST"
 request_json POST "/api/classes" "$METHODIST_AUTH" \
@@ -580,9 +580,9 @@ CLASS_CODE=$(json_get "$HTTP_BODY" '.joinCode')
 [[ ${#CLASS_CODE} -eq 8 ]] || fail "joinCode must be 8 chars, got '$CLASS_CODE'"
 pass "Class created: id=$CLASS_ID joinCode=$CLASS_CODE"
 
-# ------------------------------------------------------------
-# 4b) Methodist can be a TEACHER: create CLASS with teacherId = METHODIST_ID
-# ------------------------------------------------------------
+
+
+
 MTC_CLASS_NAME="Class_MethodistTeacher_$SUF"
 log "Create CLASS where teacherId is the same METHODIST (methodist can be a teacher)"
 request_json POST "/api/classes" "$METHODIST_AUTH" \
@@ -594,9 +594,9 @@ MTC_TEACHER_ID=$(json_get "$HTTP_BODY" '.teacherId')
 [[ "$MTC_TEACHER_ID" == "$METHODIST_ID" ]] || fail "Expected teacherId=$METHODIST_ID for methodist-teacher class, got $MTC_TEACHER_ID ($HTTP_BODY)"
 pass "Methodist-teacher class created: id=$MTC_CLASS_ID"
 
-# ------------------------------------------------------------
-# 5) Create JOIN REQUEST (anonymous)
-# ------------------------------------------------------------
+
+
+
 STUDENT_NAME="student_$SUF"
 STUDENT_EMAIL="student_$SUF@example.com"
 STUDENT_TG="tg_$SUF"
@@ -609,18 +609,18 @@ expect_code 201 "create join request"
 REQUEST_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Join request created: id=$REQUEST_ID"
 
-# ------------------------------------------------------------
-# 5a) Notifications: teacher should see join request notification
-# ------------------------------------------------------------
+
+
+
 log "Teacher NOTIFICATIONS should include CLASS_JOIN_REQUEST"
 request_json GET "/api/me/notifications" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "get teacher notifications"
 echo "$HTTP_BODY" | grep -q "CLASS_JOIN_REQUEST" || fail "Expected teacher notifications to contain CLASS_JOIN_REQUEST, got: $HTTP_BODY"
 pass "Teacher join-request notification present"
 
-# ------------------------------------------------------------
-# 6) Approve JOIN REQUEST (TEACHER)
-# ------------------------------------------------------------
+
+
+
 log "Approve JOIN REQUEST as TEACHER"
 request_json POST "/api/join-requests/$REQUEST_ID/approve?classId=$CLASS_ID" "$TEACHER_AUTH" \
   -H "Accept: application/json"
@@ -628,9 +628,9 @@ expect_code 200 "approve join request"
 STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Student approved: id=$STUDENT_ID"
 
-# ------------------------------------------------------------
-# 7) Set known STUDENT password (ADMIN) so we can login in this script
-# ------------------------------------------------------------
+
+
+
 log "Fetch STUDENT role id (ADMIN)"
 request_json GET "/api/roles/name/STUDENT" "$ADMIN_JWT" -H "Accept: application/json"
 expect_code 200 "get STUDENT role"
@@ -651,13 +651,13 @@ expect_code 200 "jwt login student"
 STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$STUDENT_JWT" && "$STUDENT_JWT" != "null" ]] || fail "No accessToken for student"
 
-# Backward-compatible var name used across the script: now stores JWT (Bearer)
+
 STUDENT_AUTH="$STUDENT_JWT"
 pass "Student JWT acquired"
 
-# ------------------------------------------------------------
-# 7c) ACHIEVEMENTS: create 2 achievements + verify "My achievements" page + award + class feed
-# ------------------------------------------------------------
+
+
+
 
 PNG_FILE="$WORKDIR/ach_photo.png"
 log "Create tiny PNG for achievement photo"
@@ -822,9 +822,9 @@ request_json GET "/api/classes/$OTHER_CLASS_ID/achievement-feed" "$STUDENT_AUTH"
 expect_code_one_of "student feed for чужой class forbidden" 403 404
 pass "Student cannot view чужой class feed"
 
-# ------------------------------------------------------------
-# 7b) Student COURSE PAGE aggregated endpoint (initially empty)
-# ------------------------------------------------------------
+
+
+
 log "Student COURSE PAGE (before lessons/tests): should return empty lessons and empty weekly"
 request_json GET "/api/me/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student course page"
@@ -832,9 +832,9 @@ echo "$HTTP_BODY" | grep -q '"course"' || fail "course page must contain course"
 echo "$HTTP_BODY" | grep -q '"lessons"' || fail "course page must contain lessons"
 pass "Course page endpoint works"
 
-# ------------------------------------------------------------
-# 8) Prepare a tiny 2-page PDF for upload
-# ------------------------------------------------------------
+
+
+
 PDF_FILE="$WORKDIR/test_presentation.pdf"
 log "Create 2-page test PDF"
 cat > "$PDF_FILE.b64" <<'B64'
@@ -878,9 +878,9 @@ base64 -d "$PDF_FILE.b64" > "$PDF_FILE"
 [[ -s "$PDF_FILE" ]] || fail "PDF was not created"
 pass "PDF created at $PDF_FILE"
 
-# ------------------------------------------------------------
-# 9) Create LESSON 1 (METHODIST) - appended, should become orderIndex=1
-# ------------------------------------------------------------
+
+
+
 log "Create LESSON #1 (append) with PDF"
 request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST_AUTH" \
   -H "Accept: application/json" \
@@ -893,9 +893,9 @@ LESSON_A_ORDER=$(json_get "$HTTP_BODY" '.orderIndex')
 [[ "$LESSON_A_ORDER" == "1" ]] || fail "Expected lesson A orderIndex=1, got $LESSON_A_ORDER"
 pass "Lesson A created: id=$LESSON_A_ID orderIndex=$LESSON_A_ORDER"
 
-# ------------------------------------------------------------
-# 10) Create LESSON 2 (METHODIST) - insert at position 1; should reorder
-# ------------------------------------------------------------
+
+
+
 log "Create LESSON #2 (insert at orderIndex=1)"
 request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST_AUTH" \
   -H "Accept: application/json" \
@@ -925,9 +925,9 @@ pass "Lesson ordering is correct"
 LESSON_ID="$LESSON_B_ID"
 LESSON2_ID="$LESSON_A_ID"
 
-# ------------------------------------------------------------
-# 11) Access tests + gating: STUDENT cannot view lesson until TEACHER opens it for the class
-# ------------------------------------------------------------
+
+
+
 log "Access: METHODIST can GET lesson"
 request_json GET "/api/lessons/$LESSON_ID" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "methodist get lesson"
@@ -953,16 +953,16 @@ request_json GET "/api/lessons/$LESSON_ID" "$STUDENT_AUTH" -H "Accept: applicati
 expect_code 200 "student get lesson after open"
 pass "Student can view opened lesson"
 
-# ------------------------------------------------------------
-# 12) TESTS: create draft test + questions (SINGLE_CHOICE + TEXT + OPEN) + publish + attempt submit + manual grade
-# ------------------------------------------------------------
+
+
+
 DEADLINE="$(date -u -d "+3 days" +"%Y-%m-%dT%H:%M:%S")"
-# (macOS users can export DEADLINE manually or adjust date command)
+
 
 log "Student list tests in lesson: should be empty initially"
 request_json GET "/api/lessons/$LESSON_ID/activities" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student list lesson tests (initial)"
-# should be [] (or empty array)
+
 if [[ "$(echo "$HTTP_BODY" | tr -d ' \n\r\t')" != "[]" ]]; then
   fail "Expected empty list for student before test is created/published, got: $HTTP_BODY"
 fi
@@ -1036,9 +1036,9 @@ READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 pass "Test published"
 
 
-# ------------------------------------------------------------
-# 12b) Create SECOND TEST on same lesson: more quiz coverage
-# ------------------------------------------------------------
+
+
+
 log "Create SECOND TEST (DRAFT) as METHODIST on second lesson"
 request_json POST "/api/lessons/$LESSON_ID/activities" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
@@ -1077,9 +1077,9 @@ TEST2_READY_STATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$TEST2_READY_STATUS" == "READY" ]] || fail "Expected READY for test2 after publish, got $TEST2_READY_STATUS"
 pass "Second test published"
 
-# ------------------------------------------------------------
-# CONTROL_WORK activity with per-attempt time limit
-# ------------------------------------------------------------
+
+
+
 log "Create CONTROL_WORK activity with timeLimitSeconds=1 (DRAFT) as METHODIST"
 request_json POST "/api/courses/$COURSE_ID/activities" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
@@ -1100,9 +1100,9 @@ request_json POST "/api/activities/$CONTROL_ID/publish" "$METHODIST_AUTH" -H "Ac
 expect_code 200 "publish control work ready"
 pass "Control work published"
 
-# ------------------------------------------------------------
-# WEEKLY_STAR activity: create -> add questions -> publish -> assign current week
-# ------------------------------------------------------------
+
+
+
 WEEK_START=$(date -d "$(date +%F) -$(( $(date +%u) - 1 )) days" +%F)
 log "Create WEEKLY_STAR activity (DRAFT) as METHODIST"
 request_json POST "/api/courses/$COURSE_ID/activities" "$METHODIST_AUTH" \
@@ -1150,10 +1150,10 @@ echo "$HTTP_BODY" | grep -q "\"weeklyThisWeek\"" || fail "course page missing we
 echo "$HTTP_BODY" | grep -q "\"id\":$WEEKLY_ID" || fail "course page does not include weekly id=$WEEKLY_ID"
 pass "Course page includes weekly activity"
 
-# ------------------------------------------------------------
-# REMEDIAL_TASK activity: create -> add questions -> publish -> assign current week
-# (Visibility: only after assignment to a specific student based on low score <50% on the same topic)
-# ------------------------------------------------------------
+
+
+
+
 WEAK_TOPIC="WeakTopic_$SUF"
 
 log "Create REMEDIAL_TASK activity (DRAFT) as METHODIST (topic=$WEAK_TOPIC)"
@@ -1284,13 +1284,13 @@ log "Attempt to EDIT published test as METHODIST should fail"
 request_json PUT "/api/activities/$TEST_ID" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"title\":\"ShouldFail_$SUF\",\"description\":\"x\",\"topic\":\"x\",\"deadline\":\"$DEADLINE\"}"
-# depending on your exception mapping it might be 400/409/403
+
 expect_code_one_of "edit published test" 400 403 409
 pass "Editing published test is blocked"
 
-# ------------------------------------------------------------
-# REMEDIAL auto-assignment: fail a topic test (<50%) -> remedial appears on course page
-# ------------------------------------------------------------
+
+
+
 log "Create WEAK TOPIC homework test (auto-graded) on lesson2 (topic=$WEAK_TOPIC)"
 request_json POST "/api/lessons/$LESSON2_ID/activities" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
@@ -1402,7 +1402,7 @@ raise SystemExit(1)' "$REMEDIAL_ID" "$REM_ATT_ID" <<<"$HTTP_BODY"
 pass "Course page includes remedial latestAttempt"
 
 
-# ---------------- CONTROL_WORK time limit ----------------
+
 log "Student START CONTROL_WORK attempt (timeLimitSeconds=1)"
 request_json POST "/api/activities/$CONTROL_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 201 "start control work attempt"
@@ -1419,7 +1419,7 @@ request_json POST "/api/attempts/$CATT_ID/submit" "$STUDENT_AUTH" \
 expect_code_one_of "submit control work after time limit" 400 422
 pass "Time limit enforcement works for CONTROL_WORK"
 
-# ---------------- Student attempt flow ----------------
+
 log "Student START attempt"
 request_json POST "/api/activities/$TEST_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 201 "start attempt"
@@ -1449,13 +1449,13 @@ pass "Teacher manual-grading notification present"
 log "Student GET attempt detail: should show isCorrect flags"
 request_json GET "/api/attempts/$ATTEMPT_ID" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student get attempt detail"
-# Ensure at least one isCorrect present
+
 if ! echo "$HTTP_BODY" | grep -q "\"isCorrect\""; then
   fail "Expected isCorrect fields in attempt detail: $HTTP_BODY"
 fi
 pass "Student can view graded attempt with correctness flags"
 
-# ---------------- Weekly attempt flow ----------------
+
 log "Student START WEEKLY attempt"
 request_json POST "/api/activities/$WEEKLY_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 201 "start weekly attempt"
@@ -1471,7 +1471,7 @@ WSTATUS=$(json_get "$HTTP_BODY" '.status')
 [[ "$WSTATUS" == "SUBMITTED" ]] || fail "Expected WEEKLY attempt SUBMITTED, got $WSTATUS ($HTTP_BODY)"
 pass "Weekly attempt submitted (pending manual grading)"
 
-# ---------------- Teacher can view results ----------------
+
 log "Teacher LIST attempts for test: should include student's attempt with score"
 request_json GET "/api/activities/$TEST_ID/attempts" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "teacher list attempts"
@@ -1484,11 +1484,11 @@ request_json GET "/api/attempts/$ATTEMPT_ID" "$TEACHER_AUTH" -H "Accept: applica
 expect_code 200 "teacher get attempt detail"
 pass "Teacher can view attempt detail"
 
-# ---------------- Teacher pending queue + partial manual grading ----------------
+
 log "Methodist PENDING attempts list (methodist can do teacher actions; should include our SUBMITTED attempt with 1 ungraded OPEN answer)"
 request_json GET "/api/attempts/pending?courseId=$COURSE_ID" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "methodist pending attempts"
-# must contain ATTEMPT_ID somewhere
+
 if ! echo "$HTTP_BODY" | grep -q "\"attemptId\":$ATTEMPT_ID"; then
   fail "Expected pending list to contain attemptId=$ATTEMPT_ID, got: $HTTP_BODY"
 fi
@@ -1612,9 +1612,9 @@ request_json POST "/api/attempts/$ATT3_ID/submit" "$STUDENT_AUTH"   -H "Content-
 expect_code_one_of "too-long student answer rejected" 400 409 422
 pass "Student answer length validation works"
 
-# ------------------------------------------------------------
-# 13) Negative access: STUDENT cannot view lesson from another course
-# ------------------------------------------------------------
+
+
+
 log "Create another course+lesson (METHODIST) to test forbidden access for student"
 request_json POST "/api/courses" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
@@ -1639,9 +1639,9 @@ request_json GET "/api/lessons/$OTHER_LESSON_ID" "$STUDENT_AUTH" -H "Accept: app
 }
 pass "Student is correctly forbidden from other course lesson"
 
-# ------------------------------------------------------------
-# 14) Optional: create + delete a DRAFT test on other lesson (delete endpoint check)
-# ------------------------------------------------------------
+
+
+
 log "Create DRAFT test on other lesson and DELETE it (METHODIST)"
 request_json POST "/api/lessons/$OTHER_LESSON_ID/activities" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
@@ -1653,9 +1653,9 @@ request_json DELETE "/api/activities/$TEMP_TEST_ID" "$METHODIST_AUTH" -H "Accept
 expect_code_one_of "delete temp test" 200 204
 pass "Draft test deleted successfully"
 
-# ------------------------------------------------------------
-# 15) PDF paging: info + pages 1..2 for METHODIST / TEACHER / STUDENT
-# ------------------------------------------------------------
+
+
+
 log "PDF: presentation info (METHODIST)"
 request_json GET "/api/lessons/$LESSON_ID/presentation/info" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "presentation info methodist"
@@ -1682,9 +1682,9 @@ fetch_pages_for "teacher" "$TEACHER_AUTH"
 fetch_pages_for "student" "$STUDENT_AUTH"
 
 
-# ------------------------------------------------------------
-# 16) Security regression: role isolation + negative access tests
-# ------------------------------------------------------------
+
+
+
 log "Negative: STUDENT cannot access teacher attempts list endpoint"
 request_json GET "/api/activities/$TEST_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code_one_of "student list attempts forbidden" 403 401
@@ -1719,7 +1719,7 @@ expect_code 201 "start attempt on test2"
 ATTEMPT2_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/activities/$TEST2_ID/attempts" "$STUDENT_AUTH" -H "Accept: application/json"
-# Implementation-dependent: 400/409 typical, sometimes 200 returns existing attempt
+
 expect_code_one_of "start attempt twice" 200 201 400 409
 if [[ "$HTTP_CODE" == "200" ]]; then
   EXISTING_ID=$(json_get "$HTTP_BODY" '.id')
@@ -1728,7 +1728,7 @@ elif [[ "$HTTP_CODE" == "201" ]]; then
   NEW_ID=$(json_get "$HTTP_BODY" '.id')
   NEW_NUM=$(json_get "$HTTP_BODY" '.attemptNumber')
   [[ "$NEW_ID" != "$ATTEMPT2_ID" ]] || fail "Expected new attempt id on second start (201), got same id=$NEW_ID"
-  # If platform allows multiple attempts, attemptNumber should increase (usually 2)
+
   if [[ "$NEW_NUM" != "null" && -n "$NEW_NUM" ]]; then
     [[ "$NEW_NUM" -ge 2 ]] || fail "Expected attemptNumber >= 2 on second start, got $NEW_NUM"
   fi
@@ -1761,7 +1761,7 @@ request_json POST "/api/join-requests/$REQUEST2_ID/approve?classId=$CLASS_ID" "$
 expect_code 200 "approve join request 2"
 STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
 
-# set password for student2
+
 request_json PUT "/api/users/$STUDENT2_ID" "$ADMIN_JWT" \
   -H "Content-Type: application/json" \
   -d "{\"id\":$STUDENT2_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
@@ -1781,12 +1781,12 @@ expect_code_one_of "student2 get чужой remedial forbidden" 401 403 404
 pass "Student2 cannot access remedial assigned to another student"
 
 
-# student2 starts attempt on test2 to create another attempt record
+
 request_json POST "/api/activities/$TEST2_ID/attempts" "$STUDENT2_AUTH" -H "Accept: application/json"
 expect_code 201 "student2 start attempt2"
 ATTEMPT2B_ID=$(json_get "$HTTP_BODY" '.id')
 
-# student1 tries to read student2 attempt -> should be forbidden (or 404)
+
 request_json GET "/api/attempts/$ATTEMPT2B_ID" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code_one_of "student cannot view others attempt" 403 404
 pass "Student cannot view other student's attempt"
@@ -1808,12 +1808,12 @@ METHODIST2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$METHODIST2_JWT" && "$METHODIST2_JWT" != "null" ]] || fail "No accessToken for methodist2"
 METHODIST2_AUTH="$METHODIST2_JWT"
 
-# methodist2 tries to delete test from methodist1 course (should be forbidden)
+
 request_json DELETE "/api/activities/$TEST_ID" "$METHODIST2_AUTH" -H "Accept: application/json"
 expect_code_one_of "methodist2 cannot delete чужой test" 403 404
 pass "Methodist isolation on tests OK"
 
-# methodist2 tries to create lesson under чужой course (should be forbidden)
+
 request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST2_AUTH" \
   -H "Accept: application/json" \
   -F "title=ShouldFail_$SUF" \
@@ -1822,9 +1822,9 @@ request_json POST "/api/courses/$COURSE_ID/lessons" "$METHODIST2_AUTH" \
 expect_code_one_of "methodist2 cannot add lesson to чужой course" 403 404
 pass "Methodist isolation on lessons OK"
 
-# ------------------------------------------------------------
-# 17) STATISTICS by topics + overview (STUDENT / TEACHER / METHODIST) + security checks
-# ------------------------------------------------------------
+
+
+
 
 log "Create TEACHER #2 + CLASS #2 + STUDENT #3 (for чужой access checks)"
 TEACHER2_NAME="teacher2_$SUF"
@@ -2000,7 +2000,7 @@ for j in 0 1; do
 done
 pass "Student2 created low-score data for shared topic"
 
-# ------------------- STUDENT STATISTICS -------------------
+
 log "STUDENT statistics overview (counts + course progress)"
 request_json GET "/api/me/statistics/overview" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student statistics overview"
@@ -2024,7 +2024,7 @@ REQ=$(json_get "$COURSE_OBJ" '.requiredTests')
 DONE=$(json_get "$COURSE_OBJ" '.completedTests')
 PCT=$(json_get "$COURSE_OBJ" '.percent')
 COMPL=$(json_get "$COURSE_OBJ" '.completed')
-# Script creates 3 baseline required tests (2 original + 1 weak-topic) + 6 shared-topic tests = 9.
+
 EXPECTED_REQUIRED_TESTS=9
 [[ "$REQ" == "$EXPECTED_REQUIRED_TESTS" ]] || fail "Expected requiredTests=$EXPECTED_REQUIRED_TESTS (2 original + 1 weak-topic + 6 shared), got $REQ ($COURSE_OBJ)"
 [[ "$DONE" == "$EXPECTED_REQUIRED_TESTS" ]] || fail "Expected completedTests=$EXPECTED_REQUIRED_TESTS, got $DONE ($COURSE_OBJ)"
@@ -2050,7 +2050,7 @@ request_json GET "/api/me/statistics/topics?courseId=$OTHER_COURSE_ID" "$STUDENT
 expect_code_one_of "student topic stats for чужой course forbidden" 401 403 404
 pass "Student cannot request stats for чужой course"
 
-# ------------------- TEACHER STATISTICS -------------------
+
 log "TEACHER class topic stats: shared topic should aggregate across students"
 request_json GET "/api/statistics/classes/$CLASS_ID/topics" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "teacher class topic stats"
@@ -2085,7 +2085,7 @@ request_json GET "/api/statistics/courses/$COURSE_ID/topics" "$TEACHER_AUTH" -H 
 expect_code_one_of "teacher cannot access methodist stats" 401 403
 pass "Teacher blocked from methodist stats"
 
-# ------------------- METHODIST STATISTICS -------------------
+
 log "METHODIST course topic stats: shared topic should show 3 students total (incl. student3), activity for 2"
 request_json GET "/api/statistics/courses/$COURSE_ID/topics" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "methodist course topic stats"
@@ -2133,7 +2133,7 @@ expect_code_one_of "methodist1 cannot view methodist2 course stats" 401 403 404
 pass "Methodist1 cannot view чужой course stats"
 
 
-# ------------------- METHODIST TEACHER STATISTICS -------------------
+
 log "SRS 3.1.3: METHODIST teacher statistics (JSON)"
 request_json GET "/api/statistics/teachers" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 200 "methodist teacher stats"
@@ -2150,9 +2150,9 @@ echo "$HTTP_BODY" | grep -q "$TEACHER2_EMAIL" || fail "CSV does not contain teac
 pass "Methodist teacher stats CSV OK"
 
 
-# ------------------------------------------------------------
-# 20) SRS 3.2.1: TEACHER removes STUDENT from class
-# ------------------------------------------------------------
+
+
+
 log "SRS 3.2.1: TEACHER removes STUDENT from class"
 request_json DELETE "/api/classes/$CLASS_ID/students/$STUDENT_ID" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 204 "teacher removes student from class"
@@ -2173,9 +2173,9 @@ request_json DELETE "/api/classes/$CLASS_ID/students/$STUDENT_ID" "$TEACHER_AUTH
 expect_code 404 "delete student again -> 404"
 pass "Second delete returns 404 as expected"
 
-# ------------------------------------------------------------
-# 20z) Course closing + student completion email (requires real SMTP config)
-# ------------------------------------------------------------
+
+
+
 log "Access control: ADMIN cannot send completion email (student-only)"
 request_json POST "/api/me/courses/$COURSE_ID/completion-email" "$ADMIN_JWT" -H "Accept: application/json"
 expect_code_one_of "admin forbidden" 401 403
@@ -2210,9 +2210,9 @@ else
 fi
 
 
-# ------------------------------------------------------------
-# 21) SRS 3.1.2: Deleting teacher - alternative flow (teacher has active classes)
-# ------------------------------------------------------------
+
+
+
 
 log "SRS 3.1.2 alt: METHODIST tries to delete TEACHER #1 who is still assigned to class1 -> should return 409"
 request_json DELETE "/api/users/teachers/$TEACHER_ID" "$METHODIST_AUTH" -H "Accept: application/json"
@@ -2227,9 +2227,9 @@ request_json PUT "/api/classes/$CLASS_ID" "$METHODIST_AUTH" \
 expect_code 200 "reassign class1 teacher"
 pass "Class1 reassigned"
 
-# We also created OTHER_CLASS_ID earlier for negative чужой access checks. It is
-# assigned to TEACHER #1 too, so reassign it as well; otherwise deleteTeacher
-# will still correctly return 409.
+
+
+
 if [[ -n "${OTHER_CLASS_ID:-}" ]]; then
   log "Reassign OtherClass to TEACHER #2 (cleanup for teacher deletion)"
   request_json PUT "/api/classes/$OTHER_CLASS_ID" "$METHODIST_AUTH" \

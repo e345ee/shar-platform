@@ -1,6 +1,6 @@
 package com.course.service;
 
-import com.course.dto.StudentAchievementDto;
+import com.course.dto.achievement.StudentAchievementResponse;
 import com.course.entity.Achievement;
 import com.course.entity.NotificationType;
 import com.course.entity.RoleName;
@@ -35,7 +35,7 @@ public class StudentAchievementService {
 
     private final ClassAchievementFeedService classAchievementFeedService;
 
-    public StudentAchievementDto awardToStudent(Achievement achievement, Integer studentId) {
+    public StudentAchievementResponse awardToStudent(Achievement achievement, Integer studentId) {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasAnyRole(current, ROLE_TEACHER, ROLE_METHODIST);
 
@@ -126,7 +126,7 @@ public class StudentAchievementService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudentAchievementDto> getMyAchievements() {
+    public List<StudentAchievementResponse> getMyAchievements() {
         User current = authService.getCurrentUserEntity();
         userService.assertUserEntityHasRole(current, ROLE_STUDENT);
         return studentAchievementRepository.findAllByStudent_IdOrderByAwardedAtDesc(current.getId())
@@ -134,7 +134,7 @@ public class StudentAchievementService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudentAchievementDto> listByStudent(Integer studentId) {
+    public List<StudentAchievementResponse> listByStudent(Integer studentId) {
         
         
         return studentAchievementRepository.findAllByStudent_IdOrderByAwardedAtDesc(studentId)
@@ -149,8 +149,8 @@ public class StudentAchievementService {
         studentAchievementRepository.deleteAllByAchievement_Id(achievementId);
     }
 
-    public StudentAchievementDto toDto(StudentAchievement sa) {
-        StudentAchievementDto dto = new StudentAchievementDto();
+    public StudentAchievementResponse toDto(StudentAchievement sa) {
+        StudentAchievementResponse dto = new StudentAchievementResponse();
         dto.setId(sa.getId());
         dto.setAwardedAt(sa.getAwardedAt());
 

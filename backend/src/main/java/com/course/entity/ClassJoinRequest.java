@@ -52,4 +52,55 @@ public class ClassJoinRequest {
     public void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    
+
+    public Integer getId() {
+        return this.id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    public StudyClass getStudyClass() {
+        return this.studyClass;
+    }
+
+    public void setStudyClass(StudyClass studyClass) {
+        this.studyClass = studyClass;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getEmail() {
+        return this.email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTgId() {
+        return this.tgId;
+    }
+
+    public void setTgId(String tgId) {
+        this.tgId = tgId;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return this.createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
 }
