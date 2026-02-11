@@ -2,20 +2,6 @@
 set -euo pipefail
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
