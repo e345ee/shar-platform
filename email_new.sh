@@ -6,7 +6,7 @@ PY="python3"
 command -v python3 >/dev/null 2>&1 || PY="python"
 command -v "$PY" >/dev/null 2>&1 || { echo "[ERROR] Need python (python3 or python)" >&2; exit 1; }
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${BASE_URL:-http://localhost:9090}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 

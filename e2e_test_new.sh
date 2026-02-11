@@ -2,7 +2,7 @@
 set -euo pipefail
 
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${BASE_URL:-http://localhost:9090}"
 
 
 
