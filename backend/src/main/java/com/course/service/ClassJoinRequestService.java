@@ -1,6 +1,6 @@
 package com.course.service;
 
-import com.course.dto.classroom.ClassJoinRequestCreateRequest;
+import com.course.dto.classroom.ClassJoinRequestByCodeRequest;
 import com.course.dto.classroom.ClassJoinRequestResponse;
 import com.course.dto.user.UserResponse;
 import com.course.entity.ClassJoinRequest;
@@ -34,30 +34,37 @@ public class ClassJoinRequestService {
     private final UserService userService;
     private final NotificationService notificationService;
 
-    public ClassJoinRequestResponse createRequest(ClassJoinRequestCreateRequest dto) {
-        String classCode = dto.getClassCode().trim().toUpperCase();
+    
 
+
+    public ClassJoinRequestResponse createRequest(ClassJoinRequestByCodeRequest dto) {
+        User current = authService.getCurrentUserEntity();
+        if (current == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+        userService.assertUserEntityHasRole(current, RoleName.STUDENT);
+
+        String classCode = dto.getClassCode().trim().toUpperCase();
         StudyClass sc = classService.getEntityByJoinCode(classCode);
 
-        if (userService.existsByEmail(dto.getEmail())) {
-            throw new DuplicateResourceException("User with email '" + dto.getEmail() + "' already exists");
+        if (classStudentRepository.existsByStudyClassIdAndStudentId(sc.getId(), current.getId())) {
+            throw new DuplicateResourceException("Student is already enrolled in this class");
         }
 
-        if (joinRequestRepository.existsByStudyClassIdAndEmailIgnoreCase(sc.getId(), dto.getEmail())) {
-            throw new DuplicateResourceException("Join request for this class and email already exists");
+        if (joinRequestRepository.existsByStudyClassIdAndEmailIgnoreCase(sc.getId(), current.getEmail())) {
+            throw new DuplicateResourceException("Join request for this class and student already exists");
         }
 
         ClassJoinRequest req = new ClassJoinRequest();
         req.setStudyClass(sc);
-        req.setName(dto.getName());
-        req.setEmail(dto.getEmail());
-        req.setTgId(dto.getTgId());
+        req.setName(current.getName());
+        req.setEmail(current.getEmail());
+        req.setTgId(current.getTgId());
 
         ClassJoinRequest saved = joinRequestRepository.save(req);
 
-        
         String title = "Новая заявка на вступление";
-        String msg = "Поступила заявка в класс '" + sc.getName() + "' от " + dto.getName();
+        String msg = "Поступила заявка в класс '" + sc.getName() + "' от " + current.getName();
         if (sc.getTeacher() != null && sc.getTeacher().getId() != null) {
             notificationService.create(sc.getTeacher(),
                     com.course.entity.NotificationType.CLASS_JOIN_REQUEST,
@@ -101,20 +108,20 @@ public class ClassJoinRequestService {
         ClassJoinRequest req = joinRequestRepository.findByIdAndStudyClassId(requestId, classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Join request with id " + requestId + " not found"));
 
-        if (userService.existsByEmail(req.getEmail())) {
-            throw new DuplicateResourceException("User with email '" + req.getEmail() + "' already exists");
+        
+        User student = userService.getUserEntityByUsernameOrEmail(req.getEmail());
+        userService.assertUserEntityHasRole(student, RoleName.STUDENT);
+
+        if (!classStudentRepository.existsByStudyClassIdAndStudentId(sc.getId(), student.getId())) {
+            ClassStudent cs = new ClassStudent();
+            cs.setStudyClass(sc);
+            cs.setStudent(student);
+            classStudentRepository.save(cs);
         }
-
-        User savedStudent = userService.createStudentFromJoinRequest(req.getName(), req.getEmail(), req.getTgId());
-
-        ClassStudent cs = new ClassStudent();
-        cs.setStudyClass(sc);
-        cs.setStudent(savedStudent);
-        classStudentRepository.save(cs);
 
         joinRequestRepository.delete(req);
 
-        return userService.toDto(savedStudent);
+        return userService.toDto(student);
     }
 
     public void delete(Integer classId, Integer requestId) {

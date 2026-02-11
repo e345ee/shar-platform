@@ -1,6 +1,8 @@
 package com.course.controller;
 
 import com.course.dto.achievement.StudentAchievementResponse;
+import com.course.dto.common.PageResponse;
+import com.course.dto.user.UserResponse;
 import com.course.dto.classroom.StudyClassResponse;
 import com.course.dto.classroom.StudyClassUpsertRequest;
 import com.course.entity.Lesson;
@@ -17,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -160,11 +163,17 @@ public class ClassesController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/classes/{classId}/students")
+    @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
+    public ResponseEntity<PageResponse<UserResponse>> listClassStudents(@PathVariable Integer classId, Pageable pageable) {
+        return ResponseEntity.ok(classStudentService.listStudentsInClass(classId, pageable));
+    }
+
     
 
     @GetMapping("/classes/{classId}/achievement-feed")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER','STUDENT')")
-    public ResponseEntity<List<StudentAchievementResponse>> getClassAchievementFeed(@PathVariable Integer classId) {
+    public ResponseEntity<PageResponse<StudentAchievementResponse>> getClassAchievementFeed(@PathVariable Integer classId, Pageable pageable) {
         User current = authService.getCurrentUserEntity();
         RoleName role = current != null && current.getRole() != null ? current.getRole().getRolename() : null;
         if (role == null) {
@@ -178,6 +187,6 @@ public class ClassesController {
             classService.getMyClassById(classId);
         }
 
-        return ResponseEntity.ok(feedService.getFeedForClass(classId));
+        return ResponseEntity.ok(feedService.getFeedForClass(classId, pageable));
     }
 }

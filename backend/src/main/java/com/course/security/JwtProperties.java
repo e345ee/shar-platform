@@ -20,4 +20,7 @@ public class JwtProperties {
     
     @Positive
     private long accessTokenTtlMinutes = 120;
+
+    @Positive
+    private long refreshTokenTtlMinutes = 10080;
 }

@@ -4,8 +4,12 @@ import com.course.entity.ClassStudent;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
+import java.util.List;
 
 import java.util.Optional;
+
+import com.course.entity.User;
 
 public interface ClassStudentRepository extends JpaRepository<ClassStudent, Integer> {
     boolean existsByStudyClassIdAndStudentId(Integer classId, Integer studentId);
@@ -43,6 +47,12 @@ java.util.List<com.course.entity.Course> findDistinctCoursesByStudentId(@Param("
     @Query("select distinct cs.studyClass.teacher.id from ClassStudent cs where cs.student.id = :studentId and cs.studyClass.course.id = :courseId and cs.studyClass.teacher.id is not null")
     java.util.List<Integer> findDistinctTeacherIdsByStudentInCourse(@Param("studentId") Integer studentId,
                                                                     @Param("courseId") Integer courseId);
+
+    @Query("select cs.student from ClassStudent cs where cs.studyClass.id = :classId order by cs.student.name asc")
+    List<User> findStudentsByClassId(@Param("classId") Integer classId, Pageable pageable);
+
+    @Query("select count(cs) from ClassStudent cs where cs.studyClass.id = :classId")
+    long countStudentsByClassId(@Param("classId") Integer classId);
 
 }
 

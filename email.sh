@@ -134,7 +134,7 @@ docker compose up -d --build postgres minio minio_init app
 wait_health
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
 expect 200 "admin login"
 ADMIN_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -144,7 +144,7 @@ expect 201 "create methodist"
 METHODIST_ID=$(json_get "$HTTP_BODY" '.id')
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
 expect 200 "methodist login"
 METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -154,7 +154,7 @@ expect 201 "create teacher"
 TEACHER_ID=$(json_get "$HTTP_BODY" '.id')
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
 expect 200 "teacher login"
 TEACHER_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -170,7 +170,13 @@ CLASS_ID=$(json_get "$HTTP_BODY" '.id')
 CLASS_CODE=$(json_get "$HTTP_BODY" '.joinCode')
 
 
-request POST "/api/join-requests" "" "{\"name\":\"$STUDENT_NAME\",\"email\":\"$TARGET_STUDENT_EMAIL\",\"tgId\":\"$STUDENT_TG\",\"classCode\":\"$CLASS_CODE\"}"
+
+request POST "/api/auth/register" "" "{\"name\":\"$STUDENT_NAME\",\"email\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
+expect 200 "student register"
+STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+
+
+request POST "/api/join-requests" "$STUDENT_JWT" "{\"classCode\":\"$CLASS_CODE\"}"
 expect 201 "create join request"
 REQUEST_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -180,18 +186,9 @@ expect 200 "approve join request"
 STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 
 
-request GET "/api/roles/name/STUDENT" "$ADMIN_JWT"
-expect 200 "get student role"
-ROLE_STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
-
-request PUT "/api/users/$STUDENT_ID" "$ADMIN_JWT" "{\"id\":$STUDENT_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT_NAME\",\"email\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
-expect 200 "set student password"
-
-
 request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
 expect 200 "student login"
 STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
-
 
 DEADLINE="$(date -u -d "+3 days" +"%Y-%m-%dT%H:%M:%S")"
 request POST "/api/courses/$COURSE_ID/activities" "$METHODIST_JWT" "{\"activityType\":\"CONTROL_WORK\",\"title\":\"Control_$SUF\",\"description\":\"Simple control\",\"topic\":\"Topic_$SUF\",\"deadline\":\"$DEADLINE\",\"weightMultiplier\":1,\"timeLimitSeconds\":120}"

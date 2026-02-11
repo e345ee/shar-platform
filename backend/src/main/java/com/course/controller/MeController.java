@@ -9,6 +9,7 @@ import com.course.dto.course.CourseResponse;
 import com.course.dto.course.StudentCoursePageResponse;
 import com.course.dto.lesson.LessonResponse;
 import com.course.dto.notification.NotificationResponse;
+import com.course.dto.common.PageResponse;
 import com.course.dto.statistics.StudentStatisticsOverviewResponse;
 import com.course.dto.statistics.StudentTopicStatsResponse;
 import com.course.dto.user.ProfileUpdateRequest;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Map;
@@ -85,8 +87,8 @@ public class MeController {
 
     @GetMapping("/notifications")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<NotificationResponse>> listNotifications() {
-        return ResponseEntity.ok(notificationService.listMyNotifications());
+    public ResponseEntity<PageResponse<NotificationResponse>> listNotifications(Pageable pageable) {
+        return ResponseEntity.ok(notificationService.listMyNotifications(pageable));
     }
 
     @GetMapping("/notifications/unread-count")

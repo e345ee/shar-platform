@@ -1,11 +1,13 @@
 package com.course.service;
 
 import com.course.dto.achievement.StudentAchievementResponse;
+import com.course.dto.common.PageResponse;
 import com.course.entity.*;
 import com.course.repository.ClassAchievementFeedRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +70,24 @@ public class ClassAchievementFeedService {
     public List<StudentAchievementResponse> getFeedForClass(Integer classId) {
         List<ClassAchievementFeed> feed = feedRepository.findFeedByClassId(classId);
         return feed.stream().map(this::toDto).filter(Objects::nonNull).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudentAchievementResponse> getFeedForClass(Integer classId, Pageable pageable) {
+        List<StudentAchievementResponse> all = getFeedForClass(classId);
+        int pageNumber = pageable != null ? pageable.getPageNumber() : 0;
+        int pageSize = pageable != null ? pageable.getPageSize() : all.size();
+        if (pageSize <= 0) {
+            pageSize = all.size() == 0 ? 1 : all.size();
+        }
+        int from = Math.min(pageNumber * pageSize, all.size());
+        int to = Math.min(from + pageSize, all.size());
+        List<StudentAchievementResponse> content = all.subList(from, to);
+        int totalPages = (int) Math.ceil(all.size() / (double) pageSize);
+        boolean first = pageNumber <= 0;
+        boolean last = pageNumber >= Math.max(0, totalPages - 1);
+
+        return new PageResponse<>(content, pageNumber, pageSize, all.size(), totalPages, last, first);
     }
 
     private StudentAchievementResponse toDto(ClassAchievementFeed f) {

@@ -18,6 +18,7 @@ STUDENT_PASS="StudentPass1!"
 SUF="$(date +%Y%m%d%H%M%S)-$RANDOM"
 
 WORKDIR="$(mktemp -d)"
+COOKIE_JAR_FILE="$WORKDIR/cookies.jar"
 KEEP_ARTIFACTS="${KEEP_ARTIFACTS:-1}"
 cleanup() {
   if [[ "${KEEP_ARTIFACTS}" == "1" ]]; then
@@ -271,11 +272,16 @@ request_json() {
   local curl_verbose=()
   [[ "${CURL_VERBOSE:-0}" == "1" ]] && curl_verbose=(-v)
 
+  local cookie_args=()
+  if [[ -n "${COOKIE_JAR_FILE:-}" ]]; then
+    cookie_args=(-b "$COOKIE_JAR_FILE" -c "$COOKIE_JAR_FILE")
+  fi
+
   if [[ -n "$token" ]]; then
-    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" "${cookie_args[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
       -H "Authorization: Bearer $token" -X "$method" "$BASE_URL$url" "$@" 2> "$curl_stderr")
   else
-    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
+    HTTP_CODE=$(curl -sS "${curl_verbose[@]}" "${cookie_args[@]}" -D "$hdr" -o "$out" -w "%{http_code}" \
       -X "$method" "$BASE_URL$url" "$@" 2> "$curl_stderr")
   fi
 
@@ -499,6 +505,22 @@ METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$METHODIST_JWT" && "$METHODIST_JWT" != "null" ]] || fail "No accessToken for methodist"
 pass "Methodist JWT acquired"
 
+log "Auth refresh via cookie for METHODIST"
+request_json POST "/api/auth/refresh" "" -H "Content-Type: application/json" -d "{}"
+expect_code 200 "refresh"
+METHODIST_REFRESHED_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$METHODIST_REFRESHED_JWT" && "$METHODIST_REFRESHED_JWT" != "null" ]] || fail "No accessToken after refresh"
+request_json GET "/api/me" "$METHODIST_REFRESHED_JWT" -H "Accept: application/json"
+expect_code 200 "access after refresh"
+pass "Refresh works"
+
+log "Auth logout clears refresh cookie"
+request_json POST "/api/auth/logout" "" -H "Accept: application/json"
+expect_code 204 "logout"
+request_json POST "/api/auth/refresh" "" -H "Content-Type: application/json" -d "{}"
+expect_code_one_of "refresh after logout" 401 403
+pass "Logout works"
+
 
 METHODIST_AUTH="$METHODIST_JWT"
 
@@ -516,6 +538,12 @@ expect_code 201 "create teacher"
 TEACHER_ID=$(json_get "$HTTP_BODY" '.id')
 [[ -n "$TEACHER_ID" && "$TEACHER_ID" != "null" ]] || fail "No teacher id in response"
 pass "Teacher created: id=$TEACHER_ID"
+
+log "METHODIST lists own teachers (paginated)"
+request_json GET "/api/users/teachers?page=0&size=20" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "list teachers"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$TEACHER_ID" || fail "Teacher missing in list: $HTTP_BODY"
+pass "Teacher list contains teacher1"
 
 log "JWT login (teacher)"
 request_json POST "/api/auth/login" "" \
@@ -576,19 +604,69 @@ STUDENT_NAME="student_$SUF"
 STUDENT_EMAIL="student_$SUF@example.com"
 STUDENT_TG="tg_$SUF"
 
-log "Create JOIN REQUEST (no auth)"
+log "Student REGISTRATION via /api/auth/register (public)"
+request_json POST "/api/auth/register" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$STUDENT_NAME\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
+expect_code 200 "student register"
+STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT_JWT" && "$STUDENT_JWT" != "null" ]] || fail "No accessToken in student register response"
+pass "Student registered and JWT acquired"
+
+log "Negative: duplicate student registration email rejected"
+request_json POST "/api/auth/register" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"${STUDENT_NAME}_dup\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect_code_one_of "duplicate student registration" 400 409 422
+pass "Duplicate registration rejected"
+
+log "Negative: JOIN REQUEST requires auth (public disabled)"
 request_json POST "/api/join-requests" "" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"$STUDENT_NAME\",\"email\":\"$STUDENT_EMAIL\",\"tgId\":\"$STUDENT_TG\",\"classCode\":\"$CLASS_CODE\"}"
-expect_code 201 "create join request"
+  -d "{\"classCode\":\"$CLASS_CODE\"}"
+expect_code_one_of "join request without auth" 401 403
+pass "Public join-request is disabled"
+
+log "Negative: JOIN REQUEST requires STUDENT role"
+request_json POST "/api/join-requests" "$TEACHER_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"classCode\":\"$CLASS_CODE\"}"
+expect_code_one_of "join request as teacher" 403
+pass "Only STUDENT can create join request"
+
+log "Create JOIN REQUEST as STUDENT by class code"
+request_json POST "/api/join-requests" "$STUDENT_JWT" \
+  -H "Content-Type: application/json" \
+  -d "{\"classCode\":\"$CLASS_CODE\"}"
+expect_code 201 "create join request (student)"
 REQUEST_ID=$(json_get "$HTTP_BODY" '.id')
+[[ -n "$REQUEST_ID" && "$REQUEST_ID" != "null" ]] || fail "No join request id in response"
 pass "Join request created: id=$REQUEST_ID"
 
+log "Negative: duplicate JOIN REQUEST for same class rejected"
+request_json POST "/api/join-requests" "$STUDENT_JWT" \
+  -H "Content-Type: application/json" \
+  -d "{\"classCode\":\"$CLASS_CODE\"}"
+expect_code_one_of "duplicate join request" 400 409 422
+pass "Duplicate join request rejected"
+
+log "Negative: invalid class code rejected"
+request_json POST "/api/join-requests" "$STUDENT_JWT" \
+  -H "Content-Type: application/json" \
+  -d "{\"classCode\":\"BAD\"}"
+expect_code_one_of "invalid class code" 400 422
+pass "Invalid class code rejected"
+
+log "Teacher lists JOIN REQUESTS for class"
+request_json GET "/api/join-requests?classId=$CLASS_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "list join requests (teacher)"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$REQUEST_ID" || fail "Join request missing in list: $HTTP_BODY"
+pass "Teacher sees the join request"
 
 
 
 log "Teacher NOTIFICATIONS should include CLASS_JOIN_REQUEST"
-request_json GET "/api/me/notifications" "$TEACHER_AUTH" -H "Accept: application/json"
+request_json GET "/api/me/notifications?page=0&size=50" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "get teacher notifications"
 echo "$HTTP_BODY" | grep -q "CLASS_JOIN_REQUEST" || fail "Expected teacher notifications to contain CLASS_JOIN_REQUEST, got: $HTTP_BODY"
 pass "Teacher join-request notification present"
@@ -603,20 +681,27 @@ expect_code 200 "approve join request"
 STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 pass "Student approved: id=$STUDENT_ID"
 
+log "Join request is removed after approval"
+request_json GET "/api/join-requests?classId=$CLASS_ID" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "list join requests (after approve)"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$REQUEST_ID" && fail "Expected join request to be removed after approval, but it is still present: $HTTP_BODY"
+pass "Join request removed"
+
+log "TEACHER lists students of class (paginated)"
+request_json GET "/api/classes/$CLASS_ID/students?page=0&size=20" "$TEACHER_AUTH" -H "Accept: application/json"
+expect_code 200 "list class students"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$STUDENT_ID" || fail "Student missing in class students list: $HTTP_BODY"
+pass "Class students list contains student"
 
 
 
-log "Fetch STUDENT role id (ADMIN)"
-request_json GET "/api/roles/name/STUDENT" "$ADMIN_JWT" -H "Accept: application/json"
-expect_code 200 "get STUDENT role"
-ROLE_STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 
-log "Set known password for the approved STUDENT (ADMIN)"
-request_json PUT "/api/users/$STUDENT_ID" "$ADMIN_JWT" \
-  -H "Content-Type: application/json" \
-  -d "{\"id\":$STUDENT_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT_NAME\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
-expect_code 200 "set student password"
-pass "Student password set"
+log "Student can access /api/me after approval"
+request_json GET "/api/me" "$STUDENT_JWT" -H "Accept: application/json"
+expect_code 200 "student /api/me"
+ME_ID=$(json_get "$HTTP_BODY" '.id')
+[[ "$ME_ID" == "$STUDENT_ID" ]] || fail "Expected /api/me id=$STUDENT_ID, got $ME_ID ($HTTP_BODY)"
+pass "Student /api/me OK"
 
 log "JWT login (student)"
 request_json POST "/api/auth/login" "" \
@@ -704,12 +789,12 @@ echo "$HTTP_BODY" | grep -q "achievementDescription" || fail "Expected earned it
 pass "My achievements page (after award) OK"
 
 log "Student CLASS ACHIEVEMENT FEED: should include awarded record"
-request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed?page=0&size=50" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student get class achievement feed"
-FEED_CNT=$(json_get "$HTTP_BODY" 'length')
+FEED_CNT=$(json_get "$HTTP_BODY" '.content | length')
 [[ "$FEED_CNT" == "1" ]] || fail "Expected feed length=1, got $FEED_CNT ($HTTP_BODY)"
-F_STUDENT=$(json_get "$HTTP_BODY" '.[0].studentId')
-F_ACH=$(json_get "$HTTP_BODY" '.[0].achievementId')
+F_STUDENT=$(json_get "$HTTP_BODY" '.content[0].studentId')
+F_ACH=$(json_get "$HTTP_BODY" '.content[0].achievementId')
 [[ "$F_STUDENT" == "$STUDENT_ID" ]] || fail "Expected feed studentId=$STUDENT_ID, got $F_STUDENT"
 [[ "$F_ACH" == "$ACH1_ID" ]] || fail "Expected feed achievementId=$ACH1_ID, got $F_ACH"
 pass "Class feed OK"
@@ -776,11 +861,11 @@ ACH_CNT=$(json_len "$HTTP_BODY")
 pass "Course achievements list updated after delete"
 
 log "Student CLASS ACHIEVEMENT FEED still includes awarded record after delete"
-request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed?page=0&size=50" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student get class achievement feed after achievement delete"
-FEED_CNT=$(json_get "$HTTP_BODY" 'length')
+FEED_CNT=$(json_get "$HTTP_BODY" '.content | length')
 [[ "$FEED_CNT" == "1" ]] || fail "Expected feed length=1, got $FEED_CNT ($HTTP_BODY)"
-F_ACH=$(json_get "$HTTP_BODY" '.[0].achievementId')
+F_ACH=$(json_get "$HTTP_BODY" '.content[0].achievementId')
 [[ "$F_ACH" == "$ACH1_ID" ]] || fail "Expected feed achievementId=$ACH1_ID, got $F_ACH"
 pass "Class feed stays correct after achievement delete"
 
@@ -793,7 +878,7 @@ request_json POST "/api/classes" "$METHODIST_AUTH" \
 expect_code 201 "create other class"
 OTHER_CLASS_ID=$(json_get "$HTTP_BODY" '.id')
 
-request_json GET "/api/classes/$OTHER_CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+request_json GET "/api/classes/$OTHER_CLASS_ID/achievement-feed?page=0&size=50" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code_one_of "student feed for чужой class forbidden" 403 404
 pass "Student cannot view чужой class feed"
 
@@ -1122,7 +1207,7 @@ log "Student COURSE PAGE should now include weeklyThisWeek with WEEKLY_ID"
 request_json GET "/api/me/courses/$COURSE_ID/page" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code 200 "student course page with weekly"
 echo "$HTTP_BODY" | grep -q "\"weeklyThisWeek\"" || fail "course page missing weeklyThisWeek"
-echo "$HTTP_BODY" | grep -q "\"id\":$WEEKLY_ID" || fail "course page does not include weekly id=$WEEKLY_ID"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$WEEKLY_ID" || fail "course page does not include weekly id=$WEEKLY_ID"
 pass "Course page includes weekly activity"
 
 
@@ -1721,14 +1806,21 @@ M2=$(json_get "$HTTP_BODY" '.maxScore')
 [[ "$M2" == "3" ]] || fail "Expected maxScore=3, got $M2 ($HTTP_BODY)"
 pass "Attempt2 graded 3/3"
 
-log "Negative: STUDENT cannot view other student's attempt (create another student in same class)"
+log "Negative: STUDENT cannot view other student's attempt (register student2 + join same class)"
 STUDENT2_NAME="student2_$SUF"
 STUDENT2_EMAIL="student2_$SUF@example.com"
 STUDENT2_TG="tg2_$SUF"
 
-request_json POST "/api/join-requests" "" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"tgId\":\"$STUDENT2_TG\",\"classCode\":\"$CLASS_CODE\"}"
+log "Register STUDENT2"
+request_json POST "/api/auth/register" ""   -H "Content-Type: application/json"   -d "{\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
+expect_code 200 "register student2"
+STUDENT2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT2_JWT" && "$STUDENT2_JWT" != "null" ]] || fail "No accessToken for student2 after register"
+STUDENT2_AUTH="$STUDENT2_JWT"
+pass "Student2 registered and JWT acquired"
+
+log "Create JOIN REQUEST for STUDENT2 by class code"
+request_json POST "/api/join-requests" "$STUDENT2_AUTH"   -H "Content-Type: application/json"   -d "{\"classCode\":\"$CLASS_CODE\"}"
 expect_code 201 "create join request 2"
 REQUEST2_ID=$(json_get "$HTTP_BODY" '.id')
 
@@ -1736,19 +1828,6 @@ request_json POST "/api/join-requests/$REQUEST2_ID/approve?classId=$CLASS_ID" "$
 expect_code 200 "approve join request 2"
 STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
 
-
-request_json PUT "/api/users/$STUDENT2_ID" "$ADMIN_JWT" \
-  -H "Content-Type: application/json" \
-  -d "{\"id\":$STUDENT2_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
-expect_code 200 "set student2 password"
-log "JWT login (student2)"
-request_json POST "/api/auth/login" "" \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
-expect_code 200 "jwt login student2"
-STUDENT2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
-[[ -n "$STUDENT2_JWT" && "$STUDENT2_JWT" != "null" ]] || fail "No accessToken for student2"
-STUDENT2_AUTH="$STUDENT2_JWT"
 
 log "Negative: STUDENT2 cannot access remedial activity assigned to STUDENT1"
 request_json GET "/api/activities/$REMEDIAL_ID" "$STUDENT2_AUTH" -H "Accept: application/json"
@@ -1836,28 +1915,26 @@ STUDENT3_EMAIL="student3_$SUF@example.com"
 STUDENT3_TG="tg3_$SUF"
 STUDENT3_PASS="StudentPass3!"
 
-request_json POST "/api/join-requests" "" \
+log "Register STUDENT3 via /api/auth/register (public)"
+request_json POST "/api/auth/register" "" \
   -H "Content-Type: application/json" \
-  -d "{\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"tgId\":\"$STUDENT3_TG\",\"classCode\":\"$CLASS2_CODE\"}"
+  -d "{\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\",\"tgId\":\"$STUDENT3_TG\"}"
+expect_code 200 "student3 register"
+STUDENT3_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT3_JWT" && "$STUDENT3_JWT" != "null" ]] || fail "No accessToken for student3"
+STUDENT3_AUTH="$STUDENT3_JWT"
+pass "Student3 registered and JWT acquired"
+
+log "Create JOIN REQUEST for STUDENT3 by class code"
+request_json POST "/api/join-requests" "$STUDENT3_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"classCode\":\"$CLASS2_CODE\"}"
 expect_code 201 "create join request 3"
 REQUEST3_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/join-requests/$REQUEST3_ID/approve?classId=$CLASS2_ID" "$TEACHER2_AUTH" -H "Accept: application/json"
 expect_code 200 "approve join request 3"
 STUDENT3_ID=$(json_get "$HTTP_BODY" '.id')
-
-request_json PUT "/api/users/$STUDENT3_ID" "$ADMIN_JWT" \
-  -H "Content-Type: application/json" \
-  -d "{\"id\":$STUDENT3_ID,\"roleId\":$ROLE_STUDENT_ID,\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\",\"tgId\":\"$STUDENT3_TG\"}"
-expect_code 200 "set student3 password"
-log "JWT login (student3)"
-request_json POST "/api/auth/login" "" \
-  -H "Content-Type: application/json" \
-  -d "{\"username\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\"}"
-expect_code 200 "jwt login student3"
-STUDENT3_JWT=$(json_get "$HTTP_BODY" '.accessToken')
-[[ -n "$STUDENT3_JWT" && "$STUDENT3_JWT" != "null" ]] || fail "No accessToken for student3"
-STUDENT3_AUTH="$STUDENT3_JWT"
 pass "Student3 created: id=$STUDENT3_ID"
 
 log "Negative: TEACHER #1 cannot view statistics for чужой class (class2)"
@@ -2139,7 +2216,7 @@ expect_code_one_of "student blocked from course after removal" 403 404
 pass "Student is blocked from course page after removal"
 
 log "After removal: STUDENT cannot access class achievement feed anymore"
-request_json GET "/api/classes/$CLASS_ID/achievement-feed" "$STUDENT_AUTH" -H "Accept: application/json"
+request_json GET "/api/classes/$CLASS_ID/achievement-feed?page=0&size=50" "$STUDENT_AUTH" -H "Accept: application/json"
 expect_code_one_of "student blocked from class feed after removal" 403 404
 pass "Student is blocked from class feed after removal"
 
@@ -2218,6 +2295,41 @@ log "Now delete TEACHER #1 should succeed"
 request_json DELETE "/api/users/teachers/$TEACHER_ID" "$METHODIST_AUTH" -H "Accept: application/json"
 expect_code 204 "delete teacher1 after reassignment"
 pass "Teacher1 deleted after reassignment"
+
+log "Deleted TEACHER #1 should disappear from METHODIST teachers list"
+request_json GET "/api/users/teachers?page=0&size=50" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "list teachers after deletion"
+echo "$HTTP_BODY" | grep -q '"content"' || fail "teachers list missing content field"
+
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$TEACHER_ID" && fail "deleted teacher still present in teachers list"
+pass "Deleted teacher not present in list"
+
+log "Deleted TEACHER #1 should not be able to login"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
+if [[ "$HTTP_CODE" == "200" ]]; then
+  fail "deleted teacher login unexpectedly succeeded"
+fi
+pass "Deleted teacher login blocked"
+
+log "Restore TEACHER #1 should succeed"
+request_json POST "/api/users/teachers/$TEACHER_ID/restore" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 204 "restore teacher1"
+pass "Teacher1 restored"
+
+log "Restored TEACHER #1 should reappear in METHODIST teachers list"
+request_json GET "/api/users/teachers?page=0&size=50" "$METHODIST_AUTH" -H "Accept: application/json"
+expect_code 200 "list teachers after restore"
+echo "$HTTP_BODY" | grep -Eq "\"id\"[[:space:]]*:[[:space:]]*$TEACHER_ID" || fail "restored teacher not present in teachers list"
+pass "Restored teacher present in list"
+
+log "Restored TEACHER #1 should be able to login again"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
+expect_code 200 "teacher1 login after restore"
+pass "Teacher1 login works after restore"
 
 log "All tests passed ✅"
 echo "Users created:"

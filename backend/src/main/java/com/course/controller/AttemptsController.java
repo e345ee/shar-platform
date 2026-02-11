@@ -5,12 +5,14 @@ import com.course.dto.attempt.AttemptResponse;
 import com.course.dto.attempt.AttemptSubmitRequest;
 import com.course.dto.attempt.AttemptSummaryResponse;
 import com.course.dto.attempt.PendingAttemptResponse;
+import com.course.dto.common.PageResponse;
 import com.course.service.TestAttemptService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -66,13 +68,12 @@ public class AttemptsController {
 
     @GetMapping("/attempts/pending")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
-    public ResponseEntity<List<PendingAttemptResponse>> listPendingAttempts(
+    public ResponseEntity<PageResponse<PendingAttemptResponse>> listPendingAttempts(
             @RequestParam(required = false) Integer courseId,
             @RequestParam(required = false) Integer activityId,
             @RequestParam(required = false) Integer classId
-    ) {
-        
-        return ResponseEntity.ok(attemptService.listPendingAttemptsForTeacher(courseId, activityId, classId));
+    , Pageable pageable) {
+        return ResponseEntity.ok(attemptService.listPendingAttemptsForTeacher(courseId, activityId, classId, pageable));
     }
 
     

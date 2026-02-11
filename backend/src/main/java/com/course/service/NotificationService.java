@@ -1,6 +1,7 @@
 package com.course.service;
 
 import com.course.dto.notification.NotificationResponse;
+import com.course.dto.common.PageResponse;
 import com.course.entity.Notification;
 import com.course.entity.NotificationType;
 import com.course.entity.User;
@@ -10,6 +11,9 @@ import com.course.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -44,13 +48,22 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotificationResponse> listMyNotifications() {
+    public PageResponse<NotificationResponse> listMyNotifications(Pageable pageable) {
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getId() == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
-        return notificationRepository.findAllByUser_IdOrderByCreatedAtDesc(current.getId())
-                .stream().map(this::toDto).toList();
+
+        Page<Notification> page = notificationRepository.findAllByUser_IdOrderByCreatedAtDesc(current.getId(), pageable);
+        return new PageResponse<>(
+                page.getContent().stream().map(this::toDto).toList(),
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast(),
+                page.isFirst()
+        );
     }
 
     @Transactional(readOnly = true)

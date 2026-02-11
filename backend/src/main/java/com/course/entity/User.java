@@ -59,6 +59,9 @@ public class User {
     @Size(max = 127, message = "Telegram ID must be at most 127 characters")
     private String tgId;
 
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
+
     
 
     public void setName(String name) {
@@ -167,6 +170,14 @@ public class User {
 
     public String getTgId() {
         return this.tgId;
+    }
+
+    public boolean isDeleted() {
+        return this.deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 
 }

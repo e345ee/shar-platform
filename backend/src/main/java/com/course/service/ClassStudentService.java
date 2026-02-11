@@ -12,6 +12,9 @@ import com.course.repository.ClassStudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
+import com.course.dto.common.PageResponse;
+import com.course.dto.user.UserResponse;
 
 @Service
 @RequiredArgsConstructor
@@ -121,7 +124,60 @@ public class ClassStudentService {
         }
     }
 
-    
+    public PageResponse<UserResponse> listStudentsInClass(Integer classId, Pageable pageable) {
+        if (classId == null) {
+            throw new IllegalArgumentException("classId is required");
+        }
+
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        RoleName role = current.getRole().getRolename();
+        boolean isTeacher = role == ROLE_TEACHER;
+        boolean isMethodist = role == ROLE_METHODIST;
+        boolean isStudent = role == ROLE_STUDENT;
+
+        StudyClass sc = classService.getEntityById(classId);
+
+        if (isTeacher) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || current.getId() == null
+                    || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class teacher can view students");
+            }
+        } else if (isMethodist) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || current.getId() == null
+                    || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class creator can view students");
+            }
+        } else if (isStudent) {
+            assertStudentInClass(current.getId(), classId, "Student can view students only for own classes");
+        } else {
+            throw new ClassStudentAccessDeniedException("Only TEACHER, METHODIST or STUDENT can view students");
+        }
+
+        java.util.List<User> users = classStudentRepository.findStudentsByClassId(classId, pageable);
+        long total = classStudentRepository.countStudentsByClassId(classId);
+
+        int pageNumber = pageable != null ? pageable.getPageNumber() : 0;
+        int pageSize = pageable != null ? pageable.getPageSize() : users.size();
+        int totalPages = pageSize == 0 ? 0 : (int) Math.ceil((double) total / (double) pageSize);
+        boolean first = pageNumber <= 0;
+        boolean last = totalPages == 0 || pageNumber >= (totalPages - 1);
+
+        return new PageResponse<>(
+                users.stream().map(u -> userService.getUserById(u.getId())).toList(),
+                pageNumber,
+                pageSize,
+                total,
+                totalPages,
+                last,
+                first
+        );
+    }
+
+
     @Transactional
     public void removeStudentFromClass(Integer classId, Integer studentId) {
         if (classId == null || studentId == null) {

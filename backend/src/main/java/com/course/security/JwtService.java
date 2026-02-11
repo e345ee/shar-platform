@@ -37,6 +37,20 @@ public class JwtService {
         return Jwts.builder()
                 .setSubject(user.getUsername())
                 .claim("roles", roles)
+                .claim("typ", "access")
+                .setIssuedAt(Date.from(now))
+                .setExpiration(Date.from(exp))
+                .signWith(signingKey, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String generateRefreshToken(UserDetails user) {
+        Instant now = Instant.now();
+        Instant exp = now.plusSeconds(getRefreshTokenTtlSeconds());
+
+        return Jwts.builder()
+                .setSubject(user.getUsername())
+                .claim("typ", "refresh")
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(exp))
                 .signWith(signingKey, SignatureAlgorithm.HS256)
@@ -66,8 +80,25 @@ public class JwtService {
                 && exp.after(new Date());
     }
 
+    public boolean isRefreshTokenValid(String token, UserDetails user) {
+        Claims claims = parseClaims(token);
+        String sub = claims.getSubject();
+        Date exp = claims.getExpiration();
+        Object typ = claims.get("typ");
+        return sub != null
+                && sub.equals(user.getUsername())
+                && exp != null
+                && exp.after(new Date())
+                && typ != null
+                && "refresh".equals(String.valueOf(typ));
+    }
+
     public long getAccessTokenTtlSeconds() {
         return props.getAccessTokenTtlMinutes() * 60L;
+    }
+
+    public long getRefreshTokenTtlSeconds() {
+        return props.getRefreshTokenTtlMinutes() * 60L;
     }
 
     private Claims parseClaims(String token) {

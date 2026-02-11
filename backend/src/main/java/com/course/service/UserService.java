@@ -14,6 +14,7 @@ import com.course.exception.TeacherDeletionConflictException;
 import com.course.repository.RoleRepository;
 import com.course.repository.StudyClassRepository;
 import com.course.repository.UserRepository;
+import com.course.repository.MethodistTeacherRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +41,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AvatarStorageService avatarStorageService;
     private final MethodistTeacherService methodistTeacherService;
+    private final MethodistTeacherRepository methodistTeacherRepository;
     private final StudyClassRepository studyClassRepository;
 
     private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
@@ -240,8 +242,40 @@ public class UserService {
             );
         }
 
-        methodistTeacherService.unlinkTeacher(metodistUserId, teacherUserId);
-        userRepository.delete(teacher);
+        teacher.setDeleted(true);
+        userRepository.save(teacher);
+    }
+
+    public void restoreTeacherByMethodist(Integer metodistUserId, Integer teacherUserId) {
+        assertUserHasRole(metodistUserId, ROLE_METHODIST);
+
+        methodistTeacherService.assertMethodistOwnsTeacher(
+                metodistUserId,
+                teacherUserId,
+                "Methodist can manage only own teachers"
+        );
+
+        User teacher = userRepository.findById(teacherUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User with id " + teacherUserId + " not found"));
+
+        if (teacher.getRole() == null || teacher.getRole().getRolename() == null
+                || teacher.getRole().getRolename() != ROLE_TEACHER) {
+            throw new ForbiddenOperationException("Methodist can restore only TEACHER users");
+        }
+
+        if (!teacher.isDeleted()) {
+            return;
+        }
+
+        teacher.setDeleted(false);
+        userRepository.save(teacher);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<UserResponse> listTeachersByMethodist(Integer methodistUserId, Pageable pageable) {
+        assertUserHasRole(methodistUserId, ROLE_METHODIST);
+        Page<User> page = methodistTeacherRepository.findTeachersByMethodistId(methodistUserId, pageable);
+        return convertPageToPageDto(page);
     }
 
     
@@ -274,7 +308,8 @@ public class UserService {
             throw new ForbiddenOperationException("Admin can delete only METHODIST users via this endpoint");
         }
 
-        userRepository.delete(methodist);
+        methodist.setDeleted(true);
+        userRepository.save(methodist);
     }
 
     
@@ -302,6 +337,10 @@ public class UserService {
     private void assertUserHasRole(Integer userId, RoleName requiredRole) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + userId + " not found"));
+
+        if (user.isDeleted()) {
+            throw new ResourceNotFoundException("User with id " + userId + " not found");
+        }
 
         if (user.getRole() == null || user.getRole().getRolename() == null
                 || requiredRole != user.getRole().getRolename()) {
@@ -430,7 +469,8 @@ public class UserService {
     public void deleteUser(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
-        userRepository.delete(user);
+        user.setDeleted(true);
+        userRepository.save(user);
     }
 
     
@@ -439,15 +479,23 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public User getUserEntityById(Integer id) {
-        return userRepository.findById(id)
+        User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User with id " + id + " not found"));
+        if (user.isDeleted()) {
+            throw new ResourceNotFoundException("User with id " + id + " not found");
+        }
+        return user;
     }
 
     @Transactional(readOnly = true)
     public User getUserEntityByUsernameOrEmail(String usernameOrEmail) {
-        return userRepository.findByEmail(usernameOrEmail)
+        User user = userRepository.findByEmail(usernameOrEmail)
                 .or(() -> userRepository.findByName(usernameOrEmail))
                 .orElseThrow(() -> new ResourceNotFoundException("User '" + usernameOrEmail + "' not found"));
+        if (user.isDeleted()) {
+            throw new ResourceNotFoundException("User '" + usernameOrEmail + "' not found");
+        }
+        return user;
     }
 
     public void assertUserEntityHasRole(User user, RoleName requiredRole) {

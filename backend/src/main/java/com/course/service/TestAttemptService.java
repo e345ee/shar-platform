@@ -8,6 +8,7 @@ import com.course.dto.attempt.AttemptSubmitRequest;
 import com.course.dto.attempt.AttemptSubmitAnswerRequest;
 import com.course.dto.attempt.AttemptSummaryResponse;
 import com.course.dto.attempt.PendingAttemptResponse;
+import com.course.dto.common.PageResponse;
 import com.course.entity.*;
 import com.course.exception.*;
 import com.course.repository.TestAttemptAnswerRepository;
@@ -17,6 +18,7 @@ import com.course.repository.TestQuestionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -225,6 +227,32 @@ public class TestAttemptService {
             dto.setSubmittedAt(r.getSubmittedAt());
             return dto;
         }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<PendingAttemptResponse> listPendingAttemptsForTeacher(Integer courseId, Integer testId, Integer classId, Pageable pageable) {
+        List<PendingAttemptResponse> all = listPendingAttemptsForTeacher(courseId, testId, classId);
+        int pageNumber = pageable != null ? pageable.getPageNumber() : 0;
+        int pageSize = pageable != null ? pageable.getPageSize() : all.size();
+        if (pageSize <= 0) {
+            pageSize = all.size() == 0 ? 1 : all.size();
+        }
+        int from = Math.min(pageNumber * pageSize, all.size());
+        int to = Math.min(from + pageSize, all.size());
+        List<PendingAttemptResponse> content = all.subList(from, to);
+        int totalPages = (int) Math.ceil(all.size() / (double) pageSize);
+        boolean first = pageNumber <= 0;
+        boolean last = pageNumber >= Math.max(0, totalPages - 1);
+
+        return new PageResponse<>(
+                content,
+                pageNumber,
+                pageSize,
+                all.size(),
+                totalPages,
+                last,
+                first
+        );
     }
 
     

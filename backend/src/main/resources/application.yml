@@ -58,6 +58,8 @@ app:
 
     access-token-ttl-minutes: 120
 
+    refresh-token-ttl-minutes: 10080
+
   s3:
     endpoint: http://localhost:9000
     region: us-east-1

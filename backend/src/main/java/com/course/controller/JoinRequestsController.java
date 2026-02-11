@@ -1,6 +1,6 @@
 package com.course.controller;
 
-import com.course.dto.classroom.ClassJoinRequestCreateRequest;
+import com.course.dto.classroom.ClassJoinRequestByCodeRequest;
 import com.course.dto.classroom.ClassJoinRequestResponse;
 import com.course.dto.user.UserResponse;
 import com.course.service.ClassJoinRequestService;
@@ -22,7 +22,8 @@ public class JoinRequestsController {
 
     
     @PostMapping
-    public ResponseEntity<ClassJoinRequestResponse> create(@Valid @RequestBody ClassJoinRequestCreateRequest dto) {
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ClassJoinRequestResponse> create(@Valid @RequestBody ClassJoinRequestByCodeRequest dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(joinRequestService.createRequest(dto));
     }
 

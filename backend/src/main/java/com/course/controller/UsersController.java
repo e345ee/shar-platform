@@ -77,6 +77,27 @@ public class UsersController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/teachers/{teacherId}/restore")
+    @PreAuthorize("hasRole('METHODIST')")
+    public ResponseEntity<Void> restoreTeacher(@PathVariable Integer teacherId) {
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getId() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+        userService.restoreTeacherByMethodist(current.getId(), teacherId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/teachers")
+    @PreAuthorize("hasRole('METHODIST')")
+    public ResponseEntity<PageResponse<UserResponse>> listMyTeachers(Pageable pageable) {
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getId() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+        return ResponseEntity.ok(userService.listTeachersByMethodist(current.getId(), pageable));
+    }
+
     
 
     @PostMapping("/students")
