@@ -125,11 +125,11 @@ STUDENT_TG="tg_$SUF"
 COURSE_NAME="Course_$SUF"
 CLASS_NAME="Class_$SUF"
 
-echo "[INFO] Resetting docker environment (down -v)"
-docker compose down -v >/dev/null 2>&1 || true
+//echo "[INFO] Resetting docker environment (down -v)"
+//docker compose down -v >/dev/null 2>&1 || true
 
-echo "[INFO] Starting services (postgres, minio, app)"
-docker compose up -d --build postgres minio minio_init app
+//echo "[INFO] Starting services (postgres, minio, app)"
+//docker compose up -d --build postgres minio minio_init app
 
 wait_health
 
