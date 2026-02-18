@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./Achivments.css";
 import {
     AchievementsIcon,
@@ -8,42 +8,111 @@ import {
     HomeIcon,
 } from "../../../svgs/MethodistSvg";
 import AddAchievementModal from "./AddAchievementModal";
+import {
+    createAchievement,
+    deleteAchievement,
+    listAchievementsByCourse,
+    listMyCourses,
+    updateAchievement,
+} from "../../api/methodistApi";
 
 function Achievements({ onBackToMain }) {
     const [showModal, setShowModal] = useState(false);
-    const [achievements, setAchievements] = useState([
-        {
-            id: 1,
-            title: "Первый курс",
-            description: "Создайте свой первый курс в системе",
-            imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=400&fit=crop",
-        },
-        {
-            id: 2,
-            title: "Мастер обучения",
-            description: "Обучите более 100 студентов",
-            imageUrl: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=400&fit=crop",
-        },
-        {
-            id: 3,
-            title: "Отличная оценка",
-            description: "Получите средний балл 4.8+ по всем курсам",
-            imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&h=400&fit=crop",
-        },
-    ]);
+    const [achievements, setAchievements] = useState([]);
+    const [courses, setCourses] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [modalMode, setModalMode] = useState("create");
+    const [editingAchievement, setEditingAchievement] = useState(null);
+
+    const loadAll = async () => {
+        setIsLoading(true);
+        setErrorMessage("");
+        try {
+            const coursesData = await listMyCourses();
+            const byCourse = await Promise.all(
+                coursesData.map(async (course) => ({
+                    course,
+                    achievements: await listAchievementsByCourse(course.id),
+                }))
+            );
+            const flat = byCourse.flatMap(({ course, achievements: items }) =>
+                items.map((item) => ({
+                    ...item,
+                    courseName: course.name,
+                }))
+            );
+            setCourses(coursesData);
+            setAchievements(flat);
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось загрузить достижения");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadAll();
+    }, []);
 
     const totalAchievements = achievements.length;
 
-    const handleAddAchievement = (newAchievementData) => {
-        const newAchievement = {
-            id: achievements.length + 1,
-            ...newAchievementData,
-        };
-        setAchievements([...achievements, newAchievement]);
+    const handleSubmitAchievement = async (payload) => {
+        setIsSubmitting(true);
+        setErrorMessage("");
+        try {
+            if (modalMode === "edit" && payload.id) {
+                const updated = await updateAchievement(payload.id, payload);
+                const currentCourseName = achievements.find((item) => item.id === payload.id)?.courseName || "-";
+                setAchievements((prev) =>
+                    prev.map((item) =>
+                        item.id === payload.id
+                            ? {
+                                ...item,
+                                ...updated,
+                                courseName: currentCourseName,
+                            }
+                            : item
+                    )
+                );
+            } else {
+                const created = await createAchievement(payload.courseId, payload);
+                const courseName = courses.find((course) => course.id === payload.courseId)?.name || "-";
+                setAchievements((prev) => [{ ...created, courseName }, ...prev]);
+            }
+        } catch (error) {
+            setErrorMessage(
+                error?.message || (modalMode === "edit" ? "Не удалось обновить достижение" : "Не удалось создать достижение")
+            );
+            throw error;
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
-    const handleDeleteAchievement = (id) => {
-        setAchievements(achievements.filter((achievement) => achievement.id !== id));
+    const handleDeleteAchievement = async (id) => {
+        setErrorMessage("");
+        try {
+            await deleteAchievement(id);
+            setAchievements((prev) => prev.filter((achievement) => achievement.id !== id));
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось удалить достижение");
+        }
+    };
+
+    const handleOpenCreateModal = () => {
+        setErrorMessage("");
+        setModalMode("create");
+        setEditingAchievement(null);
+        setShowModal(true);
+    };
+
+    const handleOpenEditModal = (achievement) => {
+        setErrorMessage("");
+        setModalMode("edit");
+        setEditingAchievement(achievement);
+        setShowModal(true);
     };
 
     return (
@@ -60,7 +129,7 @@ function Achievements({ onBackToMain }) {
                         </div>
                     </div>
                     <div className="achievements-header-actions">
-                        <button className="btn-add-achievement" onClick={() => setShowModal(true)} type="button">
+                        <button className="btn-add-achievement" onClick={handleOpenCreateModal} type="button">
                             <PlusIcon />
                             Добавить достижение
                         </button>
@@ -88,18 +157,30 @@ function Achievements({ onBackToMain }) {
                         <h2 className="achievements-list-title">Список достижений</h2>
                         <p className="achievements-list-subtitle">Все достижения в системе</p>
                     </div>
+                    {errorMessage && <div className="achievements-error">{errorMessage}</div>}
                     <div className="achievements-list">
+                        {isLoading && <div className="achievements-empty">Загрузка...</div>}
+                        {!isLoading && achievements.length === 0 && (
+                            <div className="achievements-empty">Достижений пока нет</div>
+                        )}
                         {achievements.map((achievement) => (
                             <div key={achievement.id} className="achievement-card">
                                 <div className="achievement-image">
-                                    <img src={achievement.imageUrl} alt={achievement.title} />
+                                    <img src={achievement.photoUrl} alt={achievement.title} />
                                 </div>
                                 <div className="achievement-info">
                                     <h3 className="achievement-title">{achievement.title}</h3>
+                                    <p className="achievement-description">Курс: {achievement.courseName || "-"}</p>
+                                    <p className="achievement-description">{achievement.jokeDescription}</p>
                                     <p className="achievement-description">{achievement.description}</p>
                                 </div>
                                 <div className="achievement-actions">
-                                    <button className="achievement-action-btn" type="button" aria-label="Edit">
+                                    <button
+                                        className="achievement-action-btn"
+                                        type="button"
+                                        aria-label="Edit"
+                                        onClick={() => handleOpenEditModal(achievement)}
+                                    >
                                         <EditIcon />
                                     </button>
                                     <button
@@ -119,8 +200,17 @@ function Achievements({ onBackToMain }) {
 
             <AddAchievementModal
                 isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                onAddAchievement={handleAddAchievement}
+                onClose={() => {
+                    setShowModal(false);
+                    setEditingAchievement(null);
+                    setModalMode("create");
+                }}
+                onSubmitAchievement={handleSubmitAchievement}
+                courses={courses}
+                mode={modalMode}
+                initialData={editingAchievement}
+                isSubmitting={isSubmitting}
+                errorMessage={errorMessage}
             />
         </div>
     );

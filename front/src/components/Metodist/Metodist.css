@@ -125,11 +125,11 @@
 }
 
 .dashboard-content {
-  padding: 40px 60px 60px;
+  padding: 16px 32px 20px;
   display: grid;
-  gap: 24px;
+  gap: 12px;
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
@@ -154,7 +154,7 @@
 
 .welcome-section {
   text-align: center;
-  padding: 40px 0 16px;
+  padding: 8px 0 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -171,19 +171,19 @@
   width: 200px;
   height: 200px;
   background: radial-gradient(
-    circle,
-    rgba(30, 64, 175, 0.1) 0%,
-    transparent 70%
+          circle,
+          rgba(30, 64, 175, 0.1) 0%,
+          transparent 70%
   );
   border-radius: 50%;
   pointer-events: none;
 }
 
 .welcome-title {
-  font-size: 48px;
+  font-size: 32px;
   font-weight: 800;
   color: white;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   letter-spacing: -0.03em;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   position: relative;
@@ -192,7 +192,7 @@
 }
 
 .welcome-subtitle {
-  font-size: 20px;
+  font-size: 14px;
   color: white;
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -226,7 +226,7 @@
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 28px;
+  gap: 12px;
   justify-items: stretch;
 }
 
@@ -248,15 +248,15 @@
   background: var(--card);
   border-radius: 16px;
   border: 1px solid var(--border);
-  padding: 28px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: left;
   position: relative;
-  min-height: 220px;
+  min-height: 150px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -295,8 +295,8 @@
 }
 
 .menu-icon {
-  width: 64px;
-  height: 64px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -330,8 +330,8 @@
 }
 
 .menu-icon svg {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
 }
 
 .menu-content {
@@ -341,7 +341,7 @@
 }
 
 .menu-title {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
@@ -350,14 +350,14 @@
 }
 
 .menu-description {
-  font-size: 15px;
+  font-size: 12px;
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.35;
   margin: 0;
 }
 
 .menu-link {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   margin-top: auto;
   padding-top: 8px;
@@ -420,18 +420,18 @@
 }
 
 .stats-section {
-  margin-top: 32px;
-  padding: 20px;
-  height: 300px;
+  margin-top: 4px;
+  padding: 12px;
+  height: auto;
   background: var(--bg-teal);
-  border-radius: 100px;
+  border-radius: 20px;
 }
 
 .stats-title {
-  font-size: 32px;
+  font-size: 20px;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   letter-spacing: -0.02em;
   text-align: center;
 }
@@ -439,17 +439,17 @@
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  gap: 10px;
 }
 
 .stat-item {
   text-align: center;
-  padding: 20px;
+  padding: 10px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
-  min-height: 140px;
+  min-height: 86px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -461,15 +461,15 @@
 }
 
 .stat-item .stat-value {
-  font-size: 42px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   color: peru;
 }
 
 .stat-item .stat-label {
-  font-size: 16px;
+  font-size: 12px;
   color: peru;
   font-weight: 500;
 }

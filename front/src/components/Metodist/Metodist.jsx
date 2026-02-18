@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./Metodist.css";
 import "./Profile/Profile"
 import Teachers from "./Teacher/Teacher";
 import StudyMaterial from "./StudyMaterial/StudyMaterial";
 
 import {
+  LogoutIcon,
   ProfileIcon,
   SettingsIcon,
   ActivitiesIcon,
@@ -15,9 +16,17 @@ import {
 } from "../../svgs/MethodistSvg"
 
 import Profile from "./Profile/Profile";
-import Class from "./Class/Class";
+import Class from "./ClassAndCourses/Class";
 import Achievements from "./Achivment/Achivments";
 import StudyActivity from "./StudyActivity/StudyActivity"
+import {
+  listActivitiesByLesson,
+  listLessonsByCourse,
+  listMyClasses,
+  listMyCourses,
+  listTeachers,
+  listWeeklyActivitiesByCourse,
+} from "../api/methodistApi";
 
 const menuCards = [
   {
@@ -40,7 +49,7 @@ const menuCards = [
     id: "teachers",
     title: "Преподаватели",
     description:
-        "Добавление и управление преподавателями: имя, email, предмет преподавания",
+        "Добавление и управление преподавателями: имя, email, пароль, telegram id",
     icon: TeachersIcon,
     tone: "green",
   },
@@ -54,55 +63,114 @@ const menuCards = [
   },
   {
     id: "classes",
-    title: "Учебные классы",
+    title: "Курсы и классы",
     description:
-        "Управление классами: назначение преподавателя, расписание занятий, количество студентов",
+        "Управление курсами и классами: создание курсов, классов и назначение преподавателей",
     icon: ClassesIcon,
     tone: "purple",
   },
 ];
 
-const stats = [
-  {
-    id: "activities",
-    label: "Активностей",
-    value: 1,
-    tone: "blue",
-  },
-  {
-    id: "materials",
-    label: "Материалов",
-    value: 0,
-    tone: "blue",
-  },
-  {
-    id: "teachers",
-    label: "Преподавателей",
-    value: 0,
-    tone: "green",
-  },
-  {
-    id: "classes",
-    label: "Классов",
-    value: 0,
-    tone: "purple",
-  },
-];
-
-function Methodist() {
+function Methodist({ onLogout }) {
   const [activeSection, setActiveSection] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [statsData, setStatsData] = useState({
+    activities: 0,
+    materials: 0,
+    teachers: 0,
+    classes: 0,
+  });
 
-  const handleLogout = () => {
-    // Здесь можно добавить логику выхода
-    console.log("Выход из системы");
-  };
+  useEffect(() => {
+    if (activeSection || showProfile) {
+      return undefined;
+    }
+    let isCancelled = false;
+
+    const loadStats = async () => {
+      try {
+        const [teachers, classes, courses] = await Promise.all([
+          listTeachers(0, 500),
+          listMyClasses(),
+          listMyCourses(),
+        ]);
+
+        let lessonsCount = 0;
+        const activityIds = new Set();
+
+        for (const course of courses) {
+          const lessons = await listLessonsByCourse(course.id);
+          lessonsCount += lessons.length;
+
+          const perLesson = await Promise.all(
+              lessons.map((lesson) => listActivitiesByLesson(lesson.id))
+          );
+          perLesson.flat().forEach((activity) => activityIds.add(activity.id));
+
+          const weekly = await listWeeklyActivitiesByCourse(course.id);
+          weekly.forEach((activity) => activityIds.add(activity.id));
+        }
+
+        if (!isCancelled) {
+          setStatsData({
+            activities: activityIds.size,
+            materials: lessonsCount,
+            teachers: teachers.length,
+            classes: classes.length,
+          });
+        }
+      } catch (e) {
+        if (!isCancelled) {
+          setStatsData({
+            activities: 0,
+            materials: 0,
+            teachers: 0,
+            classes: 0,
+          });
+        }
+      }
+    };
+
+    loadStats();
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeSection, showProfile]);
+
+  const stats = useMemo(
+      () => [
+        {
+          id: "activities",
+          label: "Активностей",
+          value: statsData.activities,
+          tone: "blue",
+        },
+        {
+          id: "materials",
+          label: "Материалов",
+          value: statsData.materials,
+          tone: "blue",
+        },
+        {
+          id: "teachers",
+          label: "Преподавателей",
+          value: statsData.teachers,
+          tone: "green",
+        },
+        {
+          id: "classes",
+          label: "Классов",
+          value: statsData.classes,
+          tone: "purple",
+        },
+      ],
+      [statsData]
+  );
 
   if (showProfile) {
     return (
         <Profile
             onBackToMain={() => setShowProfile(false)}
-            onLogout={handleLogout}
         />
     );
   }
@@ -156,6 +224,14 @@ function Methodist() {
               <div className="brand-title">Панель методиста</div>
             </div>
             <div className="topbar-actions">
+              <button
+                  className="topbar-icon-btn"
+                  type="button"
+                  aria-label="Logout"
+                  onClick={onLogout}
+              >
+                <LogoutIcon />
+              </button>
               <button
                   className="topbar-icon-btn"
                   type="button"

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./StudyActivity.css";
 import {
     ActivitiesIcon,
@@ -11,74 +11,138 @@ import {CalendarIcon, BookIcon, LocationIcon, DocumentIcon, TestIcon, QuestionsL
 import AddStudyActivityModal from "./AddStudyActivityModal";
 import TextModal from "./TextModal";
 import TestModal from "./TestModal";
+import {
+    createActivityQuestion,
+    createCourseActivity,
+    deleteActivityQuestion,
+    getActivityById,
+    listActivitiesByLesson,
+    listMyCourses,
+    listLessonsByCourse,
+    listWeeklyActivitiesByCourse,
+    updateActivityQuestion,
+    updateCourseActivity,
+} from "../../api/methodistApi";
+
+const ACTIVITY_TYPE_UI = {
+    HOMEWORK_TEST: { format: "Домашнее задание", color: "blue", type: "Тест" },
+    CONTROL_WORK: { format: "Контрольная работа", color: "red", type: "Тест" },
+    WEEKLY_STAR: { format: "Еженедельное задание", color: "green", type: "Тест" },
+    REMEDIAL_TASK: { format: "Для отстающих", color: "orange", type: "Тест" },
+};
+
+function formatDate(deadline) {
+    if (!deadline) return "";
+    const parsed = new Date(deadline);
+    if (Number.isNaN(parsed.getTime())) return "";
+    return parsed.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
+}
+
+function mapActivityToCard(activity, courses) {
+    const uiMeta = ACTIVITY_TYPE_UI[activity.activityType] || {
+        format: activity.activityType || "Активность",
+        color: "blue",
+        type: "Тест",
+    };
+    const courseName = courses.find((course) => course.id === activity.courseId)?.name || "";
+    return {
+        id: activity.id,
+        title: activity.title,
+        topic: activity.topic,
+        format: uiMeta.format,
+        type: uiMeta.type,
+        class: courseName,
+        date: formatDate(activity.deadline),
+        description: activity.description || "",
+        questionsCount: activity.questionCount || 0,
+        color: uiMeta.color,
+        activityType: activity.activityType,
+        deadline: activity.deadline,
+        tasks: [],
+        questions: [],
+    };
+}
 
 function StudyActivity({ onBackToMain }) {
     const [showModal, setShowModal] = useState(false);
     const [showTextTasksModal, setShowTextTasksModal] = useState(false);
     const [showTestQuestionsModal, setShowTestQuestionsModal] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState(null);
-    const [activities, setActivities] = useState([
-        {
-            id: 1,
-            title: "Контрольная работа по алгебре",
-            topic: "Квадратные уравнения",
-            format: "Контрольная работа",
-            type: "Тест",
-            class: "9А",
-            date: "15.01.2024",
-            description: "Решить 10 задач на тему квадратных уравнений. Время выполнения: 45 минут.",
-            questionsCount: 2,
-            color: "red",
-            questions: [
-                {
-                    id: 1,
-                    text: "Какое уравнение является квадратным?",
-                    options: [
-                        { id: 1, text: "x + 2 = 0" },
-                        { id: 2, text: "x² + 3x + 2 = 0" },
-                        { id: 3, text: "2x + 3 = 0" },
-                    ],
-                    correctAnswer: 2,
-                },
-                {
-                    id: 2,
-                    text: "Как найти дискриминант квадратного уравнения аx² + bx + c = 0?",
-                    options: [
-                        { id: 1, text: "b² - 4ac" },
-                        { id: 2, text: "a² + b² + c²" },
-                        { id: 3, text: "2ab + 3c" },
-                    ],
-                    correctAnswer: 1,
-                },
-            ],
-        },
-        {
-            id: 2,
-            title: "Домашнее задание: Литература",
-            topic: "Творчество А.С. Пушкина",
-            format: "Домашнее задание",
-            type: "Текст",
-            class: "10Б",
-            date: "18.01.2024",
-            description: "Прочитать главы 1-3 романа \"Евгений Онегин\". Выписать основные темы и мотивы.",
-            questionsCount: 0,
-            color: "blue",
-            tasks: [],
-        },
-        {
-            id: 3,
-            title: "Еженедельный проект",
-            topic: "Экология",
-            format: "Еженедельное задание",
-            type: "Текст",
-            class: "11А",
-            date: "20.01.2024",
-            description: "Подготовить презентацию на тему \"Глобальное потепление\". Срок сдачи: до конца недели.",
-            questionsCount: 0,
-            color: "green",
-            tasks: [],
-        },
-    ]);
+    const [activities, setActivities] = useState([]);
+    const [courses, setCourses] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [modalMode, setModalMode] = useState("create");
+    const [editingActivity, setEditingActivity] = useState(null);
+
+    useEffect(() => {
+        let isCancelled = false;
+        setErrorMessage("");
+        listMyCourses()
+            .then((data) => {
+                if (isCancelled) return;
+                setCourses(data);
+            })
+            .catch((error) => {
+                if (isCancelled) return;
+                setErrorMessage(error?.message || "Не удалось загрузить курсы");
+            });
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!courses.length) {
+            setActivities([]);
+            return;
+        }
+
+        let isCancelled = false;
+        setErrorMessage("");
+        (async () => {
+            try {
+                const collected = [];
+                for (const course of courses) {
+                    const lessons = await listLessonsByCourse(course.id);
+                    const perLesson = await Promise.all(
+                        lessons.map((lesson) => listActivitiesByLesson(lesson.id))
+                    );
+                    perLesson.flat().forEach((activity) => collected.push(activity));
+
+                    const weekly = await listWeeklyActivitiesByCourse(course.id);
+                    weekly.forEach((activity) => collected.push(activity));
+                }
+
+                const dedup = new Map();
+                for (const activity of collected) {
+                    if (!dedup.has(activity.id)) {
+                        dedup.set(activity.id, activity);
+                    }
+                }
+
+                const cards = Array.from(dedup.values())
+                    .map((activity) => mapActivityToCard(activity, courses))
+                    .sort((a, b) => (b.id || 0) - (a.id || 0));
+
+                if (!isCancelled) {
+                    setActivities(cards);
+                }
+            } catch (error) {
+                if (!isCancelled) {
+                    setErrorMessage(error?.message || "Не удалось загрузить активности");
+                }
+            }
+        })();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [courses]);
 
     const stats = {
         tests: activities.filter(a => a.type === "Тест").length,
@@ -89,19 +153,49 @@ function StudyActivity({ onBackToMain }) {
 
     const totalActivities = activities.length;
 
-    const handleAddActivity = (newActivityData) => {
-        const colors = ["red", "blue", "green", "orange"];
-        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const handleSubmitActivity = async ({ id, courseId, payload }) => {
+        setIsSubmitting(true);
+        setErrorMessage("");
+        try {
+            if (modalMode === "edit" && id) {
+                const updated = await updateCourseActivity(id, payload);
+                const updatedCard = mapActivityToCard(updated, courses);
+                setActivities((prev) =>
+                    prev.map((activity) => (activity.id === id ? { ...activity, ...updatedCard } : activity))
+                );
+            } else {
+                const created = await createCourseActivity(courseId, payload);
+                const newActivity = mapActivityToCard(created, courses);
+                setActivities((prev) => [newActivity, ...prev]);
+            }
+        } catch (error) {
+            setErrorMessage(
+                error?.message || (modalMode === "edit" ? "Не удалось обновить активность" : "Не удалось создать активность")
+            );
+            throw error;
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
-        const newActivity = {
-            id: activities.length + 1,
-            ...newActivityData,
-            questionsCount: newActivityData.type === "Тест" ? 0 : 0,
-            color: randomColor,
-            tasks: newActivityData.type === "Текст" ? [] : undefined,
-            questions: newActivityData.type === "Тест" ? [] : undefined,
-        };
-        setActivities([...activities, newActivity]);
+    const handleOpenCreateModal = () => {
+        setErrorMessage("");
+        setModalMode("create");
+        setEditingActivity(null);
+        setShowModal(true);
+    };
+
+    const handleOpenEditActivity = (activity) => {
+        setErrorMessage("");
+        getActivityById(activity.id)
+            .then((details) => {
+                setModalMode("edit");
+                setEditingActivity(details);
+                setShowModal(true);
+            })
+            .catch((error) => {
+                setErrorMessage(error?.message || "Не удалось загрузить активность для редактирования");
+            });
     };
 
     const handleOpenTextTasks = (activity) => {
@@ -118,16 +212,168 @@ function StudyActivity({ onBackToMain }) {
     };
 
     const handleOpenTestQuestions = (activity) => {
-        setSelectedActivity(activity);
-        setShowTestQuestionsModal(true);
+        setErrorMessage("");
+        getActivityById(activity.id)
+            .then((details) => {
+                const questions = (details.questions || []).map((q) => ({
+                    id: q.id,
+                    text: q.questionText || "",
+                    questionType: q.questionType || "SINGLE_CHOICE",
+                    points: q.points || 1,
+                    options: [
+                        { id: 1, text: q.option1 || "" },
+                        { id: 2, text: q.option2 || "" },
+                        { id: 3, text: q.option3 || "" },
+                        { id: 4, text: q.option4 || "" },
+                    ],
+                    correctAnswer: q.correctOption || null,
+                    correctTextAnswer: q.correctTextAnswer || "",
+                }));
+                setSelectedActivity({ ...activity, questions });
+                setShowTestQuestionsModal(true);
+            })
+            .catch((error) => {
+                setErrorMessage(error?.message || "Не удалось загрузить вопросы");
+            });
     };
 
-    const handleSaveQuestions = (activityId, questions) => {
-        setActivities(activities.map(activity =>
-            activity.id === activityId
-                ? { ...activity, questions, questionsCount: questions.length }
-                : activity
-        ));
+    const buildQuestionPayload = (question, index, activityType) => {
+        const questionType = question.questionType || "SINGLE_CHOICE";
+        const points = Number(question.points || 1);
+        if (!Number.isFinite(points) || points < 1) {
+            throw new Error(`Некорректные баллы в вопросе ${index + 1}`);
+        }
+
+        const text = (question.text || "").trim();
+        if (!text) {
+            throw new Error(`Заполните текст вопроса ${index + 1}`);
+        }
+
+        if (questionType === "OPEN") {
+            if (activityType === "REMEDIAL_TASK") {
+                throw new Error("Для REMEDIAL_TASK вопросы типа OPEN недоступны");
+            }
+            return {
+                orderIndex: index + 1,
+                questionText: text,
+                questionType: "OPEN",
+                points,
+                option1: null,
+                option2: null,
+                option3: null,
+                option4: null,
+                correctOption: null,
+                correctTextAnswer: null,
+            };
+        }
+
+        if (questionType === "TEXT") {
+            const correctTextAnswer = (question.correctTextAnswer || "").trim();
+            if (!correctTextAnswer) {
+                throw new Error(`Заполните правильный текстовый ответ в вопросе ${index + 1}`);
+            }
+            return {
+                orderIndex: index + 1,
+                questionText: text,
+                questionType: "TEXT",
+                points,
+                option1: null,
+                option2: null,
+                option3: null,
+                option4: null,
+                correctOption: null,
+                correctTextAnswer,
+            };
+        }
+
+        const options = Array.isArray(question.options) ? question.options.slice(0, 4) : [];
+        if (options.length < 4) {
+            throw new Error(`В вопросе ${index + 1} должно быть 4 варианта ответа`);
+        }
+        const optionValues = options.map((option) => (option?.text || "").trim());
+        if (optionValues.some((value) => !value)) {
+            throw new Error(`Заполните все варианты в вопросе ${index + 1}`);
+        }
+        if (!question.correctAnswer) {
+            throw new Error(`Выберите правильный ответ в вопросе ${index + 1}`);
+        }
+
+        const correctIndex = options.findIndex((option) => option.id === question.correctAnswer);
+        if (correctIndex < 0 || correctIndex > 3) {
+            throw new Error(`Некорректный правильный ответ в вопросе ${index + 1}`);
+        }
+
+        return {
+            orderIndex: index + 1,
+            questionText: text,
+            questionType: "SINGLE_CHOICE",
+            points,
+            option1: optionValues[0],
+            option2: optionValues[1],
+            option3: optionValues[2],
+            option4: optionValues[3],
+            correctOption: correctIndex + 1,
+            correctTextAnswer: null,
+        };
+    };
+
+    const handleSaveQuestions = async (activityId, questions) => {
+        setErrorMessage("");
+        const details = await getActivityById(activityId);
+        const activityType = details?.activityType || "";
+        const existingQuestions = Array.isArray(details.questions) ? details.questions : [];
+        const existingIds = new Set(existingQuestions.map((q) => q.id));
+
+        const prepared = questions.map((question, idx) => ({
+            id: question.id,
+            payload: buildQuestionPayload(question, idx, activityType),
+        }));
+
+        const keptExistingIds = new Set(
+            prepared.filter((item) => existingIds.has(item.id)).map((item) => item.id)
+        );
+
+        const toDelete = existingQuestions.filter((q) => !keptExistingIds.has(q.id));
+        for (const q of toDelete) {
+            await deleteActivityQuestion(activityId, q.id);
+        }
+
+        for (const item of prepared) {
+            if (existingIds.has(item.id)) {
+                await updateActivityQuestion(activityId, item.id, item.payload);
+            } else {
+                await createActivityQuestion(activityId, item.payload);
+            }
+        }
+
+        const refreshed = await getActivityById(activityId);
+        const refreshedQuestions = (refreshed.questions || []).map((q) => ({
+            id: q.id,
+            text: q.questionText || "",
+            questionType: q.questionType || "SINGLE_CHOICE",
+            points: q.points || 1,
+            options: [
+                { id: 1, text: q.option1 || "" },
+                { id: 2, text: q.option2 || "" },
+                { id: 3, text: q.option3 || "" },
+                { id: 4, text: q.option4 || "" },
+            ],
+            correctAnswer: q.correctOption || null,
+            correctTextAnswer: q.correctTextAnswer || "",
+        }));
+
+        setActivities((prev) =>
+            prev.map((activity) =>
+                activity.id === activityId
+                    ? { ...activity, questions: refreshedQuestions, questionsCount: refreshed.questionCount || 0 }
+                    : activity
+            )
+        );
+        setSelectedActivity((prev) =>
+            prev && prev.id === activityId
+                ? { ...prev, questions: refreshedQuestions, questionsCount: refreshed.questionCount || 0 }
+                : prev
+        );
     };
 
     const handleDeleteActivity = (id) => {
@@ -165,7 +411,7 @@ function StudyActivity({ onBackToMain }) {
                         </div>
                     </div>
                     <div className="activities-header-actions">
-                        <button className="btn-add-activity" onClick={() => setShowModal(true)} type="button">
+                        <button className="btn-add-activity" onClick={handleOpenCreateModal} type="button">
                             <PlusIcon />
                             Создать активность
                         </button>
@@ -220,7 +466,11 @@ function StudyActivity({ onBackToMain }) {
                         <h2 className="activities-list-title">Список активностей</h2>
                         <p className="activities-list-subtitle">Всего активностей: {totalActivities}</p>
                     </div>
+                    {errorMessage && <div className="activity-error">{errorMessage}</div>}
                     <div className="activities-list">
+                        {activities.length === 0 && (
+                            <div className="activity-empty">Активностей пока нет</div>
+                        )}
                         {activities.map((activity) => {
                             const tags = getActivityTypeTag(activity.format, activity.type);
                             return (
@@ -281,7 +531,12 @@ function StudyActivity({ onBackToMain }) {
                                         )}
                                     </div>
                                     <div className="activity-actions">
-                                        <button className="activity-action-btn" type="button" aria-label="Edit">
+                                        <button
+                                            className="activity-action-btn"
+                                            type="button"
+                                            aria-label="Edit"
+                                            onClick={() => handleOpenEditActivity(activity)}
+                                        >
                                             <EditIcon />
                                         </button>
                                         <button
@@ -302,8 +557,17 @@ function StudyActivity({ onBackToMain }) {
 
             <AddStudyActivityModal
                 isOpen={showModal}
-                onClose={() => setShowModal(false)}
-                onAddActivity={handleAddActivity}
+                onClose={() => {
+                    setShowModal(false);
+                    setModalMode("create");
+                    setEditingActivity(null);
+                }}
+                onSubmitActivity={handleSubmitActivity}
+                courses={courses}
+                errorMessage={errorMessage}
+                isSubmitting={isSubmitting}
+                mode={modalMode}
+                initialActivity={editingActivity}
             />
             <TextModal
                 isOpen={showTextTasksModal}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./Profile.css";
 import {
     HomeIcon,
@@ -8,17 +8,47 @@ import {
     MessageIcon,
     TelegramIcon,
 } from "../../../svgs/ProfileSvg";
+import { deleteMyAvatar, getMyProfile, updateMyProfile, uploadMyAvatar } from "../../api/methodistApi";
 
-function Profile({ onBackToMain, onLogout }) {
+function Profile({ onBackToMain }) {
     const [isEditing, setIsEditing] = useState(false);
     const [profile, setProfile] = useState({
-        name: "Иван Петров",
-        email: "ivan.petrov@example.com",
-        password: "********",
-        about: "Методист с 10-летним стажем работы в образовательной сфере. Специализируюсь на разработке учебных программ и методических материалов.",
-        telegramId: "@ivan_methodist",
-        photoUrl: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop",
+        name: "",
+        email: "",
+        password: "",
+        bio: "",
+        tgId: "",
+        photo: "",
     });
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const [successMessage, setSuccessMessage] = useState("");
+
+    const loadProfile = async () => {
+        setIsLoading(true);
+        setErrorMessage("");
+        try {
+            const me = await getMyProfile();
+            setProfile({
+                name: me?.name || "",
+                email: me?.email || "",
+                password: "",
+                bio: me?.bio || "",
+                tgId: me?.tgId || "",
+                photo: me?.photo || "",
+            });
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось загрузить профиль");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadProfile();
+    }, []);
 
     const handleInputChange = (field, value) => {
         setProfile((prev) => ({
@@ -27,9 +57,65 @@ function Profile({ onBackToMain, onLogout }) {
         }));
     };
 
-    const handleSave = () => {
-        setIsEditing(false);
-        // Здесь можно добавить логику сохранения
+    const handleSave = async () => {
+        setIsSaving(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        try {
+            const dto = {
+                name: profile.name.trim(),
+                email: profile.email.trim(),
+                bio: profile.bio,
+                tgId: profile.tgId.trim(),
+            };
+            if (profile.password.trim()) {
+                dto.password = profile.password;
+            }
+            await updateMyProfile(dto);
+            await loadProfile();
+            setProfile((prev) => ({ ...prev, password: "" }));
+            setIsEditing(false);
+            setSuccessMessage("Профиль сохранен");
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось сохранить профиль");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleChoosePhoto = async (e) => {
+        const file = e.target.files?.[0] || null;
+        if (!file) {
+            return;
+        }
+        setIsPhotoUploading(true);
+        setErrorMessage("");
+        setSuccessMessage("");
+        try {
+            const updated = await uploadMyAvatar(file);
+            setProfile((prev) => ({ ...prev, photo: updated?.photo || prev.photo }));
+            setSuccessMessage("Фото профиля обновлено");
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось загрузить фото");
+        } finally {
+            setIsPhotoUploading(false);
+            e.target.value = "";
+        }
+    };
+
+    const handleDeletePhoto = async () => {
+        setErrorMessage("");
+        setSuccessMessage("");
+        setIsPhotoUploading(true);
+        try {
+            const updated = await deleteMyAvatar();
+            setProfile((prev) => ({ ...prev, photo: updated?.photo || "" }));
+            setSuccessMessage("Фото профиля удалено");
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось удалить фото");
+        } finally {
+            setIsPhotoUploading(false);
+        }
     };
 
     return (
@@ -49,25 +135,44 @@ function Profile({ onBackToMain, onLogout }) {
                     </header>
 
                     <main className="profile-main">
+                        {errorMessage && <div className="profile-error">{errorMessage}</div>}
+                        {successMessage && <div className="profile-success">{successMessage}</div>}
+                        {isLoading && <div className="profile-success">Загрузка профиля...</div>}
+
                         <div className="profile-photo-section">
-                            <div className="profile-photo-wrapper">
-                                <img
-                                    src={profile.photoUrl}
-                                    alt="Профиль"
-                                    className="profile-photo"
-                                />
-                            </div>
-                            <div className="profile-photo-info">
-                                <label className="profile-label">Фото профиля</label>
-                                {isEditing ? (
-                                    <input
-                                        type="text"
-                                        className="profile-input"
-                                        value={profile.photoUrl}
-                                        onChange={(e) => handleInputChange("photoUrl", e.target.value)}
+                            <label className="profile-photo-upload profile-photo-wrapper" htmlFor="profile-photo-input">
+                                {profile.photo ? (
+                                    <img
+                                        src={profile.photo}
+                                        alt="Профиль"
+                                        className="profile-photo"
                                     />
                                 ) : (
-                                    <div className="profile-url">{profile.photoUrl}</div>
+                                    <div className="profile-photo profile-photo-empty" aria-label="Фото не загружено">
+                                        <UserIcon />
+                                    </div>
+                                )}
+                                <span className="profile-photo-hint">
+                                    {isPhotoUploading ? "Загрузка..." : "Нажмите, чтобы загрузить фото"}
+                                </span>
+                            </label>
+                            <input
+                                id="profile-photo-input"
+                                className="profile-photo-input"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleChoosePhoto}
+                                disabled={isPhotoUploading}
+                            />
+                            <div className="profile-photo-info">
+                                <label className="profile-label">Фото профиля </label>
+                                <div className="profile-url">{profile.photo ? "Фото загружено" : "Фото не загружено"}</div>
+                                {isEditing && (
+                                    <div className="profile-photo-actions">
+                                        <button className="btn-secondary" type="button" onClick={handleDeletePhoto}>
+                                            Удалить фото
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -121,11 +226,12 @@ function Profile({ onBackToMain, onLogout }) {
                                         <input
                                             type="password"
                                             className="profile-input"
+                                            placeholder="Оставьте пустым, если не нужно менять"
                                             value={profile.password}
                                             onChange={(e) => handleInputChange("password", e.target.value)}
                                         />
                                     ) : (
-                                        <div className="profile-value">{profile.password}</div>
+                                        <div className="profile-value">********</div>
                                     )}
                                 </div>
                             </div>
@@ -139,12 +245,12 @@ function Profile({ onBackToMain, onLogout }) {
                                     {isEditing ? (
                                         <textarea
                                             className="profile-textarea"
-                                            value={profile.about}
-                                            onChange={(e) => handleInputChange("about", e.target.value)}
+                                            value={profile.bio}
+                                            onChange={(e) => handleInputChange("bio", e.target.value)}
                                             rows="4"
                                         />
                                     ) : (
-                                        <div className="profile-value">{profile.about}</div>
+                                        <div className="profile-value">{profile.bio || "нет информации"}</div>
                                     )}
                                 </div>
                             </div>
@@ -159,11 +265,11 @@ function Profile({ onBackToMain, onLogout }) {
                                         <input
                                             type="text"
                                             className="profile-input"
-                                            value={profile.telegramId}
-                                            onChange={(e) => handleInputChange("telegramId", e.target.value)}
+                                            value={profile.tgId}
+                                            onChange={(e) => handleInputChange("tgId", e.target.value)}
                                         />
                                     ) : (
-                                        <div className="profile-value">{profile.telegramId}</div>
+                                        <div className="profile-value">{profile.tgId || "Не указан"}</div>
                                     )}
                                 </div>
                             </div>
@@ -171,7 +277,7 @@ function Profile({ onBackToMain, onLogout }) {
 
                         <div className="profile-actions">
                             {isEditing ? (
-                                <button className="btn-primary" onClick={handleSave} type="button">
+                                <button className="btn-primary" onClick={handleSave} type="button" disabled={isSaving}>
                                     Сохранить изменения
                                 </button>
                             ) : (
