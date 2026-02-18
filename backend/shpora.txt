@@ -1,0 +1,93 @@
+загрузка докера
+docker compose down -v
+docker compose up --build -d
+docker compose up --build -d course_app
+перезапуск докера если крашнулся (моя проблема)
+osascript -e 'quit app "Docker"'
+pkill -9 -f Docker
+pkill -9 -f com.docker
+open -a Docker
+
+
+
+
+
+/*пока не использую*/
+-- CREATE OR REPLACE FUNCTION grade_submission_auto(
+--     p_submission_id INT
+-- ) RETURNS VOID AS $$
+-- DECLARE
+-- v_score     INT;
+--     v_max_score INT;
+-- BEGIN
+--     IF NOT EXISTS (SELECT 1 FROM test_attempts WHERE id = p_submission_id) THEN
+--         RAISE EXCEPTION 'Попытка % не найдена', p_submission_id;
+-- END IF;
+--
+-- SELECT COALESCE(SUM(CASE WHEN taa.is_correct THEN COALESCE(tq.points, 1) ELSE 0 END), 0),
+--        COALESCE(SUM(COALESCE(tq.points, 1)), 0)
+-- INTO v_score, v_max_score
+-- FROM test_attempt_answers taa
+--          JOIN test_questions tq ON tq.id = taa.question_id
+-- WHERE taa.attempt_id = p_submission_id;
+--
+-- UPDATE test_attempts
+-- SET score       = v_score,
+--     max_score   = v_max_score,
+--     status      = 'GRADED',
+--     submitted_at = COALESCE(submitted_at, CURRENT_TIMESTAMP),
+--     updated_at  = CURRENT_TIMESTAMP
+-- WHERE id = p_submission_id;
+-- END;
+-- $$ LANGUAGE plpgsql;
+
+
+-- тригеры
+-- CREATE OR REPLACE FUNCTION recalc_attempt_score()
+-- RETURNS TRIGGER AS $$
+-- DECLARE
+-- v_attempt_id INT;
+-- BEGIN
+--     v_attempt_id := COALESCE(NEW.attempt_id, OLD.attempt_id);
+--
+-- UPDATE test_attempts ta
+-- SET score = (
+--     SELECT COALESCE(SUM(COALESCE(taa.points_awarded, 0)), 0)
+--     FROM test_attempt_answers taa
+--     WHERE taa.attempt_id = v_attempt_id
+-- ),
+--     max_score = (
+--         SELECT COALESCE(SUM(COALESCE(tq.points, 1)), 0)
+--         FROM test_attempt_answers taa
+--                  JOIN test_questions tq ON tq.id = taa.question_id
+--         WHERE taa.attempt_id = v_attempt_id
+--     ),
+--     updated_at = CURRENT_TIMESTAMP
+-- WHERE ta.id = v_attempt_id;
+--
+-- RETURN COALESCE(NEW, OLD);
+-- END;
+-- $$ LANGUAGE plpgsql;
+--
+-- DROP TRIGGER IF EXISTS trg_test_attempt_recalc_score ON test_attempt_answers;
+-- CREATE TRIGGER trg_test_attempt_recalc_score
+--     AFTER INSERT OR UPDATE OR DELETE ON test_attempt_answers
+--     FOR EACH ROW
+--     EXECUTE FUNCTION recalc_attempt_score();
+--
+--
+-- CREATE OR REPLACE FUNCTION set_submitted_at_on_status()
+-- RETURNS TRIGGER AS $$
+-- BEGIN
+--     IF NEW.status = 'SUBMITTED' AND NEW.submitted_at IS NULL THEN
+--         NEW.submitted_at := CURRENT_TIMESTAMP;
+-- END IF;
+-- RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
+--
+-- DROP TRIGGER IF EXISTS trg_test_attempt_set_submitted_at ON test_attempts;
+-- CREATE TRIGGER trg_test_attempt_set_submitted_at
+--     BEFORE INSERT OR UPDATE ON test_attempts
+--                          FOR EACH ROW
+--                          EXECUTE FUNCTION set_submitted_at_on_status();

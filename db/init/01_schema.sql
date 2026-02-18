@@ -262,3 +262,84 @@ CREATE INDEX IF NOT EXISTS idx_sra_student ON student_remedial_assignments(stude
 CREATE INDEX IF NOT EXISTS idx_sra_course ON student_remedial_assignments(course_id);
 CREATE INDEX IF NOT EXISTS idx_sra_topic ON student_remedial_assignments(topic);
 CREATE INDEX IF NOT EXISTS idx_sra_student_course_week ON student_remedial_assignments(student_id, course_id, assigned_week_start);
+
+
+CREATE OR REPLACE FUNCTION register_user(
+    p_name      VARCHAR(63),
+    p_email     VARCHAR(127),
+    p_password  VARCHAR(127),
+    p_role_name role_name DEFAULT 'STUDENT',
+    p_tg_id     VARCHAR(127) DEFAULT NULL
+) RETURNS INTEGER AS $$
+DECLARE
+v_user_id  INTEGER;
+    v_role_id  INTEGER;
+BEGIN
+    -- Получаем ID роли по имени
+SELECT id INTO v_role_id
+FROM role
+WHERE rolename = p_role_name;
+
+IF v_role_id IS NULL THEN
+        RAISE EXCEPTION 'Роль % не найдена', p_role_name;
+END IF;
+INSERT INTO users(role_id, name, email, password, tg_id)
+VALUES (v_role_id, p_name, p_email, p_password, p_tg_id)
+    RETURNING id INTO v_user_id;
+
+RETURN v_user_id;
+EXCEPTION
+    WHEN unique_violation THEN
+        RAISE EXCEPTION 'Пользователь с таким email или именем уже существует';
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION enroll_user_to_class(
+    p_user_id  INT,
+    p_class_id INT
+) RETURNS VOID AS $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM users WHERE id = p_user_id) THEN
+        RAISE EXCEPTION 'Пользователь % не найден', p_user_id;
+END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM classes WHERE id = p_class_id) THEN
+        RAISE EXCEPTION 'Класс % не найден', p_class_id;
+END IF;
+
+INSERT INTO class_students(student_id, class_id)
+VALUES (p_user_id, p_class_id)
+    ON CONFLICT (class_id, student_id) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION create_submission(
+    p_user_id     INT,
+    p_activity_id INT
+) RETURNS INT AS $$
+DECLARE
+v_id             INT;
+    v_attempt_number INT;
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM users WHERE id = p_user_id) THEN
+        RAISE EXCEPTION 'Пользователь % не найден', p_user_id;
+END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM tests WHERE id = p_activity_id) THEN
+        RAISE EXCEPTION 'Активность % не найдена', p_activity_id;
+END IF;
+
+SELECT COALESCE(MAX(attempt_number), 0) + 1
+INTO v_attempt_number
+FROM test_attempts
+WHERE test_id = p_activity_id
+  AND student_id = p_user_id;
+
+INSERT INTO test_attempts(test_id, student_id, attempt_number, status)
+VALUES (p_activity_id, p_user_id, v_attempt_number, 'IN_PROGRESS')
+    RETURNING id INTO v_id;
+
+RETURN v_id;
+END;
+$$ LANGUAGE plpgsql;

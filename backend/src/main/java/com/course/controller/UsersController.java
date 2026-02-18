@@ -1,6 +1,6 @@
 package com.course.controller;
-
 import com.course.dto.auth.ChangeAdminPasswordRequest;
+import com.course.dto.auth.UserRegisterRequest;
 import com.course.dto.common.PageResponse;
 import com.course.dto.user.UserResponse;
 import com.course.dto.user.UserUpsertRequest;
@@ -8,6 +8,8 @@ import com.course.entity.User;
 import com.course.exception.ForbiddenOperationException;
 import com.course.service.AuthService;
 import com.course.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -23,17 +25,21 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Tag(name = "Управление пользователями", description = "API для управления пользователями системы")
 public class UsersController {
 
     private final UserService userService;
     private final AuthService authService;
 
-    
-
+    //****************************************** Админ ****************************************//
+    @Operation(
+            summary = "Регистрация методиста",
+            description = "Регистрация нового методиста. Создает пользователя с обязательными полями: имя, email, пароль и опциональным полем tgId."
+    )
     @PostMapping("/methodists")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponse> createMethodist(@Valid @RequestBody UserUpsertRequest dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createMethodist(dto));
+    public ResponseEntity<UserResponse> createMethodist(@Valid @RequestBody UserRegisterRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createMethodist(req));
     }
 
     @DeleteMapping("/methodists/{methodistId}")
@@ -43,7 +49,6 @@ public class UsersController {
         return ResponseEntity.noContent().build();
     }
 
-    
     @PutMapping("/admin/password")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> changeAdminPassword(@Valid @RequestBody ChangeAdminPasswordRequest dto) {
@@ -53,17 +58,26 @@ public class UsersController {
         return ResponseEntity.noContent().build();
     }
 
-    
+    @GetMapping("/methodists")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<UserResponse>> listMethodists() {
+        return ResponseEntity.ok(userService.getAllMethodists());
+    }
 
+    //****************************************** Методист ****************************************//
+    @Operation(
+            summary = "Регистрация преподавателя",
+            description = "Регистрация нового преподавателя методистом. Создает пользователя с обязательными полями: имя, email, пароль и опциональным полем tgId."
+    )
     @PostMapping("/teachers")
     @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<UserResponse> createTeacher(@Valid @RequestBody UserUpsertRequest dto) {
+    public ResponseEntity<UserResponse> createTeacher(@Valid @RequestBody UserRegisterRequest req) {
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getId() == null) {
             throw new ForbiddenOperationException("Unauthenticated");
         }
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(userService.createTeacherByMethodist(current.getId(), dto));
+                .body(userService.createTeacherByMethodist(current.getId(), req));
     }
 
     @DeleteMapping("/teachers/{teacherId}")
@@ -77,16 +91,17 @@ public class UsersController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/teachers/{teacherId}/restore")
-    @PreAuthorize("hasRole('METHODIST')")
-    public ResponseEntity<Void> restoreTeacher(@PathVariable Integer teacherId) {
-        User current = authService.getCurrentUserEntity();
-        if (current == null || current.getId() == null) {
-            throw new ForbiddenOperationException("Unauthenticated");
-        }
-        userService.restoreTeacherByMethodist(current.getId(), teacherId);
-        return ResponseEntity.noContent().build();
-    }
+    // Не нужно! В uml нету такого функционала!
+//    @PostMapping("/teachers/{teacherId}/restore")
+//    @PreAuthorize("hasRole('METHODIST')")
+//    public ResponseEntity<Void> restoreTeacher(@PathVariable Integer teacherId) {
+//        User current = authService.getCurrentUserEntity();
+//        if (current == null || current.getId() == null) {
+//            throw new ForbiddenOperationException("Unauthenticated");
+//        }
+//        userService.restoreTeacherByMethodist(current.getId(), teacherId);
+//        return ResponseEntity.noContent().build();
+//    }
 
     @GetMapping("/teachers")
     @PreAuthorize("hasRole('METHODIST')")
@@ -98,37 +113,47 @@ public class UsersController {
         return ResponseEntity.ok(userService.listTeachersByMethodist(current.getId(), pageable));
     }
 
-    
+    //****************************************** Методист ****************************************//
 
+
+
+
+    @Operation(
+            summary = "Регистрация студента",
+            description = "Регистрация нового студента администратором или методистом. Создает пользователя с обязательными полями: имя, email, пароль и опциональным полем tgId."
+    )
     @PostMapping("/students")
-    @PreAuthorize("hasAnyRole('ADMIN','METHODIST')")
-    public ResponseEntity<UserResponse> createStudent(@Valid @RequestBody UserUpsertRequest dto) {
-        
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createStudent(dto));
+    @PreAuthorize("hasRole('METHODIST')")
+    public ResponseEntity<UserResponse> createStudent(@Valid @RequestBody UserRegisterRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createStudent(req));
     }
 
-    
 
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserUpsertRequest dto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(dto));
-    }
 
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponse> updateUser(@PathVariable Integer id, @Valid @RequestBody UserUpsertRequest dto) {
-        return ResponseEntity.ok(userService.updateUser(id, dto));
-    }
+//    @Operation(
+//            summary = "Создание пользователя с указанием роли",
+//            description = "Универсальный метод создания пользователя с любой ролью. Требует указания roleId. Создает пользователя с обязательными полями: имя, email, пароль и опциональным полем tgId."
+//    )
+//    @PostMapping
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRegisterRequest req) {
+//        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createAdmin(req));
+//    }
 
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Integer id) {
-        userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
-    }
+//    @PutMapping("/{id}")
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<UserResponse> updateUser(@PathVariable Integer id, @Valid @RequestBody UserUpsertRequest dto) {
+//        return ResponseEntity.ok(userService.updateUser(id, dto));
+//    }
+//
+//    @DeleteMapping("/{id}")
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<Void> deleteUser(@PathVariable Integer id) {
+//        userService.deleteUser(id);
+//        return ResponseEntity.noContent().build();
+//    }
 
-    
+
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER')")

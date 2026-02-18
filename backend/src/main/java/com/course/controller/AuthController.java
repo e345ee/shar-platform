@@ -3,7 +3,7 @@ package com.course.controller;
 import com.course.dto.auth.AuthLoginRequest;
 import com.course.dto.auth.AuthRefreshRequest;
 import com.course.dto.auth.AuthTokenResponse;
-import com.course.dto.auth.StudentRegisterRequest;
+import com.course.dto.auth.UserRegisterRequest;
 import com.course.dto.user.UserUpsertRequest;
 import com.course.security.JwtService;
 import com.course.service.UserService;
@@ -36,36 +36,6 @@ public class AuthController {
     private final UserService userService;
 
     private static final String REFRESH_COOKIE = "refresh_token";
-
-    
-
-
-
-    @PostMapping("/register")
-    public ResponseEntity<AuthTokenResponse> register(@Valid @RequestBody StudentRegisterRequest req) {
-        UserUpsertRequest dto = new UserUpsertRequest();
-        dto.setName(req.getName());
-        dto.setEmail(req.getEmail());
-        dto.setPassword(req.getPassword());
-        dto.setTgId(req.getTgId());
-
-        userService.createStudent(dto);
-
-        UserDetails user = userDetailsService.loadUserByUsername(req.getEmail());
-        String token = jwtService.generateAccessToken(user);
-        String refresh = jwtService.generateRefreshToken(user);
-
-        ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, refresh)
-                .httpOnly(true)
-                .path("/api/auth")
-                .sameSite("Lax")
-                .maxAge(jwtService.getRefreshTokenTtlSeconds())
-                .build();
-
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(new AuthTokenResponse("Bearer", token, jwtService.getAccessTokenTtlSeconds()));
-    }
 
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResponse> login(@Valid @RequestBody AuthLoginRequest req) {
