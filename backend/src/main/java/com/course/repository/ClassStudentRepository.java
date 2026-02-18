@@ -2,6 +2,7 @@ package com.course.repository;
 
 import com.course.entity.ClassStudent;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,9 @@ import com.course.entity.User;
 
 public interface ClassStudentRepository extends JpaRepository<ClassStudent, Integer> {
     boolean existsByStudyClassIdAndStudentId(Integer classId, Integer studentId);
+
+    @Query(value = "SELECT enroll_user_to_class(:userId, :classId)", nativeQuery = true)
+    void enrollUserToClass(@Param("userId") Integer userId, @Param("classId") Integer classId);
 
     Optional<ClassStudent> findByStudyClassIdAndStudentId(Integer classId, Integer studentId);
 

@@ -1,16 +1,29 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./StudyMaterial.css";
 import { MaterialsIcon, CloseIcon } from "../../../svgs/MethodistSvg.jsx";
 import { FileIcon, UploadIcon, ChatIcon } from "../../../svgs/StudyMaterialSvg.jsx";
 
-function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
+function AddStudyMaterialModal({
+                                   isOpen,
+                                   onClose,
+                                   onSubmitMaterial,
+                                   courses = [],
+                                   mode = "create",
+                                   initialData = null,
+                                   isSubmitting = false,
+                                   errorMessage = "",
+                               }) {
     const [formData, setFormData] = useState({
+        courseId: "",
         title: "",
         description: "",
+        orderIndex: "",
         file: null,
     });
     const [dragActive, setDragActive] = useState(false);
+    const [localError, setLocalError] = useState("");
     const fileInputRef = useRef(null);
+    const isEditMode = mode === "edit";
 
     const handleInputChange = (field, value) => {
         setFormData((prev) => ({
@@ -19,22 +32,25 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
         }));
     };
 
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            if (file.type !== "application/pdf") {
-                alert("Пожалуйста, загрузите файл в формате PDF");
-                return;
-            }
-            if (file.size > 50 * 1024 * 1024) {
-                alert("Размер файла не должен превышать 50 MB");
-                return;
-            }
-            setFormData((prev) => ({
-                ...prev,
-                file: file,
-            }));
+    const setFileOrError = (file) => {
+        if (!file) return;
+        if (file.type !== "application/pdf") {
+            setLocalError("Пожалуйста, загрузите файл в формате PDF");
+            return;
         }
+        if (file.size > 20 * 1024 * 1024) {
+            setLocalError("Размер файла не должен превышать 20 MB");
+            return;
+        }
+        setLocalError("");
+        setFormData((prev) => ({
+            ...prev,
+            file,
+        }));
+    };
+
+    const handleFileChange = (e) => {
+        setFileOrError(e.target.files[0]);
     };
 
     const handleDrag = (e) => {
@@ -51,22 +67,7 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            const file = e.dataTransfer.files[0];
-            if (file.type !== "application/pdf") {
-                alert("Пожалуйста, загрузите файл в формате PDF");
-                return;
-            }
-            if (file.size > 50 * 1024 * 1024) {
-                alert("Размер файла не должен превышать 50 MB");
-                return;
-            }
-            setFormData((prev) => ({
-                ...prev,
-                file: file,
-            }));
-        }
+        setFileOrError(e.dataTransfer.files && e.dataTransfer.files[0]);
     };
 
     const formatFileSize = (bytes) => {
@@ -74,42 +75,38 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
         const k = 1024;
         const sizes = ["Bytes", "KB", "MB", "GB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+        return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (formData.title && formData.file) {
-            const fileSize = formatFileSize(formData.file.size);
-            const uploadDate = new Date().toLocaleDateString("ru-RU", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-            });
-
-            onAddMaterial({
-                title: formData.title,
-                description: formData.description || "",
-                fileName: formData.file.name,
-                fileSize: fileSize,
-                uploadDate: uploadDate,
-            });
-            setFormData({
-                title: "",
-                description: "",
-                file: null,
-            });
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-            onClose();
+        setLocalError("");
+        if (!isEditMode && !formData.courseId) {
+            setLocalError("Выберите курс");
+            return;
         }
-    };
+        if (!formData.title.trim()) {
+            setLocalError("Введите название урока");
+            return;
+        }
+        if (!isEditMode && !formData.file) {
+            setLocalError("Загрузите PDF-презентацию");
+            return;
+        }
 
-    const handleClose = () => {
+        await onSubmitMaterial({
+            id: initialData?.id,
+            courseId: Number(formData.courseId || initialData?.courseId),
+            title: formData.title.trim(),
+            description: formData.description.trim(),
+            orderIndex: formData.orderIndex ? Number(formData.orderIndex) : undefined,
+            presentation: formData.file,
+        });
         setFormData({
+            courseId: "",
             title: "",
             description: "",
+            orderIndex: "",
             file: null,
         });
         if (fileInputRef.current) {
@@ -117,6 +114,37 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
         }
         onClose();
     };
+
+    const handleClose = () => {
+        if (isSubmitting) return;
+        setLocalError("");
+        setFormData({
+            courseId: "",
+            title: "",
+            description: "",
+            orderIndex: "",
+            file: null,
+        });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+        onClose();
+    };
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setLocalError("");
+        setFormData({
+            courseId: initialData?.courseId ? String(initialData.courseId) : "",
+            title: initialData?.title || "",
+            description: initialData?.description || "",
+            orderIndex: initialData?.orderIndex ? String(initialData.orderIndex) : "",
+            file: null,
+        });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+    }, [isOpen, initialData]);
 
     if (!isOpen) return null;
 
@@ -126,8 +154,13 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
                 <button className="modal-close" onClick={handleClose} type="button">
                     <CloseIcon />
                 </button>
-                <h2 className="modal-title">Добавить материал</h2>
-                <p className="modal-subtitle">Загрузите новый учебный материал в формате PDF</p>
+                <h2 className="modal-title">{isEditMode ? "Редактировать урок" : "Добавить урок"}</h2>
+                <p className="modal-subtitle">
+                    {isEditMode
+                        ? "Измените данные урока. PDF можно заменить при необходимости."
+                        : "Создайте урок и загрузите PDF-презентацию"}
+                </p>
+                {(errorMessage || localError) && <div className="materials-error">{errorMessage || localError}</div>}
                 <form onSubmit={handleSubmit} className="modal-form">
                     <div className="modal-field">
                         <div className="modal-field-icon">
@@ -135,7 +168,31 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
                         </div>
                         <div className="modal-field-content">
                             <label className="modal-label">
-                                Название материала <span className="required">*</span>
+                                Курс <span className="required">*</span>
+                            </label>
+                            <select
+                                className="modal-select"
+                                value={formData.courseId}
+                                onChange={(e) => handleInputChange("courseId", e.target.value)}
+                                disabled={isEditMode}
+                                required
+                            >
+                                <option value="">Выберите курс</option>
+                                {courses.map((course) => (
+                                    <option key={course.id} value={course.id}>
+                                        {course.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="modal-field">
+                        <div className="modal-field-icon">
+                            <MaterialsIcon />
+                        </div>
+                        <div className="modal-field-content">
+                            <label className="modal-label">
+                                Название урока <span className="required">*</span>
                             </label>
                             <input
                                 type="text"
@@ -156,9 +213,25 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
                             <input
                                 type="text"
                                 className="modal-input"
-                                placeholder="Краткое описание содержания материала"
+                                placeholder="Краткое описание содержания урока"
                                 value={formData.description}
                                 onChange={(e) => handleInputChange("description", e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="modal-field">
+                        <div className="modal-field-icon">
+                            <ChatIcon />
+                        </div>
+                        <div className="modal-field-content">
+                            <label className="modal-label">Порядок в курсе (опционально)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="modal-input"
+                                placeholder="Например: 3"
+                                value={formData.orderIndex}
+                                onChange={(e) => handleInputChange("orderIndex", e.target.value)}
                             />
                         </div>
                     </div>
@@ -168,7 +241,7 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
                         </div>
                         <div className="modal-field-content">
                             <label className="modal-label">
-                                PDF файл <span className="required">*</span>
+                                PDF файл {!isEditMode && <span className="required">*</span>}
                             </label>
                             <div
                                 className={`file-upload-area ${dragActive ? "drag-active" : ""}`}
@@ -196,15 +269,15 @@ function AddStudyMaterialModal({ isOpen, onClose, onAddMaterial }) {
                                 ) : (
                                     <div className="file-upload-placeholder">
                                         <UploadIcon />
-                                        <p>Нажмите для загрузки PDF</p>
-                                        <p className="file-size-limit">Максимальный размер: 50 MB</p>
+                                        <p>{isEditMode ? "Нажмите, чтобы заменить PDF" : "Нажмите для загрузки PDF"}</p>
+                                        <p className="file-size-limit">Максимальный размер: 20 MB</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     </div>
-                    <button type="submit" className="modal-submit-btn">
-                        Добавить материал
+                    <button type="submit" className="modal-submit-btn" disabled={isSubmitting}>
+                        {isSubmitting ? "Сохранение..." : isEditMode ? "Сохранить изменения" : "Добавить урок"}
                     </button>
                 </form>
             </div>

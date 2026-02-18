@@ -3,19 +3,17 @@ import imgLogo from "../../images/image.png";
 import svgPaths, { BackgroundCircles, BackgroundRight, UserInputIcon, LockInputIcon } from "../../svgs/AdminSvg.jsx";
 import "./Registration.css";
 
-export default function Registration() {
+export default function Registration({ onLogin, isLoading, errorMessage }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("student");
 
-  // Обработчик отправки формы - переписать сделать свзяь с бэкэндом!
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    alert(`Вход\nРоль: ${role}\nЛогин: ${username}\nПароль: ${password}`);
+    await onLogin(username.trim(), password);
   };
 
   return (
-      <div className="login-page">
+      <div className="registration-login-page">
         {/* левые круги */}
         <BackgroundCircles />
 
@@ -25,19 +23,6 @@ export default function Registration() {
         <div className="login-content">
           <img src={imgLogo} alt="КУБИК" className="logo" />
           <form onSubmit={handleSubmit} className="login-form">
-            <div className="input-wrapper">
-              <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="login-select"
-                  required
-              >
-                <option value="methodist">Методист</option>
-                <option value="student">Ученик</option>
-                <option value="teacher">Преподаватель</option>
-                <option value="admin">Админ</option>
-              </select>
-            </div>
             <div className="input-wrapper">
               {/* реализация человечка */}
               <UserInputIcon svgPaths={svgPaths} />
@@ -62,9 +47,10 @@ export default function Registration() {
                   required
               />
             </div>
-            <button type="submit" className="login-btn">
-              Войти
+            <button type="submit" className="login-btn" disabled={isLoading}>
+              {isLoading ? "Вход..." : "Войти"}
             </button>
+            {errorMessage ? <p className="login-error">{errorMessage}</p> : null}
           </form>
         </div>
       </div>

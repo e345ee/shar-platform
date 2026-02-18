@@ -112,13 +112,7 @@ public class ClassJoinRequestService {
         User student = userService.getUserEntityByUsernameOrEmail(req.getEmail());
         userService.assertUserEntityHasRole(student, RoleName.STUDENT);
 
-        if (!classStudentRepository.existsByStudyClassIdAndStudentId(sc.getId(), student.getId())) {
-            ClassStudent cs = new ClassStudent();
-            cs.setStudyClass(sc);
-            cs.setStudent(student);
-            classStudentRepository.save(cs);
-        }
-
+        classStudentRepository.enrollUserToClass(student.getId(), sc.getId());
         joinRequestRepository.delete(req);
 
         return userService.toDto(student);

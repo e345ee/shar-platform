@@ -7,11 +7,11 @@ body {
   background: #445a6d;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 40px 16px;
 }
 
@@ -32,22 +32,21 @@ body {
 }
 
 .admin-card {
-  width: clamp(720px, 70vw, 1200px);
-  height: 54vh;
-  max-height: none;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
-  padding: 10px 26px 24px;
+  width: min(1200px, 96vw);
+  min-height: calc(100vh - 140px);
+  height: auto;
+  background: transparent;
+  border-radius: 0;
+  padding: 10px 26px 32px;
   display: flex;
   flex-direction: column;
   gap: 18px;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding-top: 44px;
-  overflow-y: auto;
-  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
-  transform: scale(0.9);
-  transform-origin: top center;
+  overflow: visible;
+  box-shadow: none;
+  transform: none;
 }
 
 .admin-logo {
@@ -95,6 +94,25 @@ body {
   margin-top: 8px;
 }
 
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-form .input-wrapper,
+.admin-form .login-btn,
+.admin-card > .admin-logout {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+}
+
+.admin-form .login-input,
+.admin-form .login-select {
+  width: 100%;
+}
+
 .login-form h2 {
   font-size: 16px;
   font-weight: 600;
@@ -120,7 +138,7 @@ body {
   font-family: "Montserrat", sans-serif;
   font-weight: 300;
   font-size: 14px;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .login-textarea {
@@ -142,7 +160,7 @@ body {
   font-family: "Montserrat", sans-serif;
   font-weight: 300;
   font-size: 14px;
-  text-transform: uppercase;
+  text-transform: none;
   appearance: none;
 }
 
@@ -177,8 +195,6 @@ body {
 }
 
 .admin-logout {
-  width: 100%;
-  max-width: 680px;
   margin-top: 8px;
 }
 
@@ -186,6 +202,45 @@ body {
 .admin-logout:hover {
   background: #00d4d4;
   color: white;
+}
+
+.admin-notice {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 4px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.admin-notice-success {
+  background: rgba(87, 191, 124, 0.2);
+  border: 1px solid rgba(155, 231, 181, 0.8);
+  color: #9be7b5;
+}
+
+.admin-notice-error {
+  background: rgba(226, 112, 112, 0.2);
+  border: 1px solid rgba(255, 215, 215, 0.8);
+  color: #ffd7d7;
+}
+
+.admin-notice-close {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: 4px;
+  height: 28px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
 }
 
 @media (max-width: 600px) {

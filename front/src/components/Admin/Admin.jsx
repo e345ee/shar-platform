@@ -1,283 +1,343 @@
 import { useEffect, useState } from "react";
 import "./Admin.css";
 import imgLogo from "../../images/image.png";
+import {
+  changeOwnAdminPassword,
+  createMethodist,
+  deleteMethodist,
+  listMethodists,
+} from "../api/adminApi"
 
-const initialMethodists = [
-  {
-    id: 1,
-    name: "Ирина Шевченко",
-    email: "irina@skillup.ru",
-  },
-  {
-    id: 2,
-    name: "Антон Крылов",
-    email: "anton@skillup.ru",
-  },
-  {
-    id: 3,
-    name: "Мария Фролова",
-    email: "maria@skillup.ru",
-  },
-];
-
-function Admin() {
+function Admin({ onLogout }) {
   const [activeTab, setActiveTab] = useState("add");
-  const [methodists, setMethodists] = useState(initialMethodists);
+  const [methodists, setMethodists] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [methodistForm, setMethodistForm] = useState({
     name: "",
     email: "",
     password: "",
     tgId: "",
   });
-  const [removeMethodistId, setRemoveMethodistId] = useState(
-    initialMethodists[0]?.id ?? "",
-  );
+  const [removeMethodistId, setRemoveMethodistId] = useState("");
   const [passwordForm, setPasswordForm] = useState({
-    methodistId: initialMethodists[0]?.id ?? "",
     password: "",
     confirm: "",
   });
 
   useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rows = await listMethodists();
+        if (!cancelled) {
+          setMethodists(rows);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMethodists([]);
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (methodists.length === 0) {
       setRemoveMethodistId("");
-      setPasswordForm((prev) => ({ ...prev, methodistId: "" }));
       return;
     }
-    if (!methodists.find((methodist) => methodist.id === removeMethodistId)) {
-      setRemoveMethodistId(methodists[0].id);
+    if (!methodists.find((methodist) => methodist.id === Number(removeMethodistId))) {
+      setRemoveMethodistId(String(methodists[0].id));
     }
-    if (
-      !methodists.find((methodist) => methodist.id === passwordForm.methodistId)
-    ) {
-      setPasswordForm((prev) => ({ ...prev, methodistId: methodists[0].id }));
-    }
-  }, [methodists, removeMethodistId, passwordForm.methodistId]);
+  }, [methodists, removeMethodistId]);
 
-  const handleAddMethodist = (event) => {
-    event.preventDefault();
-    if (
-      !methodistForm.name.trim() ||
-      !methodistForm.email.trim() ||
-      !methodistForm.password.trim()
-    ) {
+  const refreshMethodists = async () => {
+    const rows = await listMethodists();
+    setMethodists(rows);
+  };
+
+  useEffect(() => {
+    if (activeTab !== "remove") {
       return;
     }
-    const newMethodist = {
-      id: Date.now(),
-      name: methodistForm.name.trim(),
-      email: methodistForm.email.trim(),
-      password: methodistForm.password.trim(),
-      tgId: methodistForm.tgId.trim(),
+    let cancelled = false;
+    const loadForRemoveTab = async () => {
+      try {
+        const rows = await listMethodists();
+        if (!cancelled) {
+          setMethodists(rows);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMethodists([]);
+        }
+      }
     };
-    setMethodists((prev) => [...prev, newMethodist]);
-    setMethodistForm({
-      name: "",
-      email: "",
-      password: "",
-      tgId: "",
-    });
-    setRemoveMethodistId(newMethodist.id);
-  };
+    loadForRemoveTab();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
 
-  const handleRemoveMethodist = (event) => {
+  const handleAddMethodist = async (event) => {
     event.preventDefault();
-    if (!removeMethodistId) {
+    setErrorMessage("");
+    setMessage("");
+    if (
+        !methodistForm.name.trim() ||
+        !methodistForm.email.trim() ||
+        !methodistForm.password.trim()
+    ) {
+      setErrorMessage("Заполните обязательные поля");
       return;
     }
-    setMethodists((prev) =>
-      prev.filter((methodist) => methodist.id !== removeMethodistId),
-    );
+    setIsLoading(true);
+    try {
+      const created = await createMethodist({
+        name: methodistForm.name.trim(),
+        email: methodistForm.email.trim(),
+        password: methodistForm.password.trim(),
+        tgId: methodistForm.tgId.trim() || null,
+      });
+      setMethodistForm({
+        name: "",
+        email: "",
+        password: "",
+        tgId: "",
+      });
+      setMessage("Методист успешно добавлен");
+      await refreshMethodists();
+      if (created?.id != null) {
+        setRemoveMethodistId(String(created.id));
+      }
+    } catch (e) {
+      setErrorMessage(e?.message || "Не удалось добавить методиста");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handlePasswordUpdate = (event) => {
+  const handleRemoveMethodist = async (event) => {
     event.preventDefault();
-    if (!passwordForm.methodistId || !passwordForm.password.trim()) {
+    setErrorMessage("");
+    setMessage("");
+    if (!removeMethodistId) {
+      setErrorMessage("Выберите методиста");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await deleteMethodist(removeMethodistId);
+      setMessage("Методист удален");
+      await refreshMethodists();
+    } catch (e) {
+      setErrorMessage(e?.message || "Не удалось удалить методиста");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePasswordUpdate = async (event) => {
+    event.preventDefault();
+    setErrorMessage("");
+    setMessage("");
+    if (!passwordForm.password.trim()) {
+      setErrorMessage("Введите новый пароль");
       return;
     }
     if (passwordForm.password !== passwordForm.confirm) {
+      setErrorMessage("Пароли не совпадают");
       return;
     }
-    setPasswordForm((prev) => ({ ...prev, password: "", confirm: "" }));
+    setIsLoading(true);
+    try {
+      await changeOwnAdminPassword(passwordForm.password);
+      setPasswordForm({ password: "", confirm: "" });
+      setMessage("Пароль успешно изменен");
+    } catch (e) {
+      setErrorMessage(e?.message || "Не удалось изменить пароль");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCloseNotice = () => {
+    setMessage("");
+    setErrorMessage("");
   };
 
   return (
-    <div className="login-page admin-login">
-      <div className="login-content">
-        <div className="admin-title-block">администрационная панель</div>
-        <div className="admin-card">
-          <img src={imgLogo} alt="КУБИК" className="admin-logo" />
-          <div className="admin-tabs">
-            <button
-              className={`admin-tab ${activeTab === "add" ? "active" : ""}`}
-              onClick={() => setActiveTab("add")}
-            >
-              Добавить методиста
-            </button>
-            <button
-              className={`admin-tab ${activeTab === "remove" ? "active" : ""}`}
-              onClick={() => setActiveTab("remove")}
-            >
-              Удалить методиста
-            </button>
-            <button
-              className={`admin-tab ${activeTab === "password" ? "active" : ""}`}
-              onClick={() => setActiveTab("password")}
-            >
-              Изменить пароль
-            </button>
+      <div className="login-page admin-login">
+        <div className="login-content">
+          <div className="admin-title-block">администрационная панель</div>
+          <div className="admin-card">
+            <img src={imgLogo} alt="КУБИК" className="admin-logo" />
+            <div className="admin-tabs">
+              <button
+                  className={`admin-tab ${activeTab === "add" ? "active" : ""}`}
+                  onClick={() => setActiveTab("add")}
+              >
+                Добавить методиста
+              </button>
+              <button
+                  className={`admin-tab ${activeTab === "remove" ? "active" : ""}`}
+                  onClick={() => setActiveTab("remove")}
+              >
+                Удалить методиста
+              </button>
+              <button
+                  className={`admin-tab ${activeTab === "password" ? "active" : ""}`}
+                  onClick={() => setActiveTab("password")}
+              >
+                Изменить пароль
+              </button>
+            </div>
+
+            {activeTab === "add" && (
+                <form
+                    className="login-form admin-form"
+                    onSubmit={handleAddMethodist}
+                >
+                  <h2>Добавление методиста</h2>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="text"
+                        value={methodistForm.name}
+                        onChange={(event) =>
+                            setMethodistForm((prev) => ({
+                              ...prev,
+                              name: event.target.value,
+                            }))
+                        }
+                        placeholder="ФИО *"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="email"
+                        value={methodistForm.email}
+                        onChange={(event) =>
+                            setMethodistForm((prev) => ({
+                              ...prev,
+                              email: event.target.value,
+                            }))
+                        }
+                        placeholder="Email *"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="password"
+                        value={methodistForm.password}
+                        onChange={(event) =>
+                            setMethodistForm((prev) => ({
+                              ...prev,
+                              password: event.target.value,
+                            }))
+                        }
+                        placeholder="Пароль *"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="text"
+                        value={methodistForm.tgId}
+                        onChange={(event) =>
+                            setMethodistForm((prev) => ({
+                              ...prev,
+                              tgId: event.target.value,
+                            }))
+                        }
+                        placeholder="Telegram ID"
+                    />
+                  </div>
+                  <button className="login-btn" disabled={isLoading}>Сохранить</button>
+                </form>
+            )}
+
+            {activeTab === "remove" && (
+                <form
+                    className="login-form admin-form"
+                    onSubmit={handleRemoveMethodist}
+                >
+                  <h2>Удаление методиста</h2>
+                  <div className="input-wrapper">
+                    <select
+                        className="login-select"
+                        value={removeMethodistId}
+                        onChange={(event) =>
+                            setRemoveMethodistId(event.target.value)
+                        }
+                    >
+                      {methodists.map((methodist) => (
+                          <option key={methodist.id} value={String(methodist.id)}>
+                            {methodist.name}
+                          </option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="login-btn" disabled={isLoading || methodists.length === 0}>Удалить</button>
+                </form>
+            )}
+
+            {activeTab === "password" && (
+                <form
+                    className="login-form admin-form"
+                    onSubmit={handlePasswordUpdate}
+                >
+                  <h2>Изменение пароля</h2>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="password"
+                        value={passwordForm.password}
+                        onChange={(event) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              password: event.target.value,
+                            }))
+                        }
+                        placeholder="Новый пароль *"
+                    />
+                  </div>
+                  <div className="input-wrapper">
+                    <input
+                        className="login-input"
+                        type="password"
+                        value={passwordForm.confirm}
+                        onChange={(event) =>
+                            setPasswordForm((prev) => ({
+                              ...prev,
+                              confirm: event.target.value,
+                            }))
+                        }
+                        placeholder="Повтор пароля *"
+                    />
+                  </div>
+                  <button className="login-btn" disabled={isLoading}>Сохранить</button>
+                </form>
+            )}
+            <button className="admin-logout" onClick={onLogout} type="button">Выйти</button>
+            {message || errorMessage ? (
+                <div className={`admin-notice ${errorMessage ? "admin-notice-error" : "admin-notice-success"}`}>
+                  <span>{errorMessage || message}</span>
+                  <button type="button" className="admin-notice-close" onClick={handleCloseNotice}>
+                    Закрыть
+                  </button>
+                </div>
+            ) : null}
           </div>
-
-          {activeTab === "add" && (
-            <form
-              className="login-form admin-form"
-              onSubmit={handleAddMethodist}
-            >
-              <h2>Добавление методиста</h2>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="text"
-                  value={methodistForm.name}
-                  onChange={(event) =>
-                    setMethodistForm((prev) => ({
-                      ...prev,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="ФИО *"
-                />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="email"
-                  value={methodistForm.email}
-                  onChange={(event) =>
-                    setMethodistForm((prev) => ({
-                      ...prev,
-                      email: event.target.value,
-                    }))
-                  }
-                  placeholder="Email *"
-                />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="password"
-                  value={methodistForm.password}
-                  onChange={(event) =>
-                    setMethodistForm((prev) => ({
-                      ...prev,
-                      password: event.target.value,
-                    }))
-                  }
-                  placeholder="Пароль *"
-                />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="text"
-                  value={methodistForm.tgId}
-                  onChange={(event) =>
-                    setMethodistForm((prev) => ({
-                      ...prev,
-                      tgId: event.target.value,
-                    }))
-                  }
-                  placeholder="Telegram ID"
-                />
-              </div>
-              <button className="login-btn">Сохранить</button>
-            </form>
-          )}
-
-          {activeTab === "remove" && (
-            <form
-              className="login-form admin-form"
-              onSubmit={handleRemoveMethodist}
-            >
-              <h2>Удаление методиста</h2>
-              <div className="input-wrapper">
-                <select
-                  className="login-select"
-                  value={removeMethodistId}
-                  onChange={(event) =>
-                    setRemoveMethodistId(Number(event.target.value))
-                  }
-                >
-                  {methodists.map((methodist) => (
-                    <option key={methodist.id} value={methodist.id}>
-                      {methodist.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button className="login-btn">Удалить</button>
-            </form>
-          )}
-
-          {activeTab === "password" && (
-            <form
-              className="login-form admin-form"
-              onSubmit={handlePasswordUpdate}
-            >
-              <h2>Изменение пароля</h2>
-              <div className="input-wrapper">
-                <select
-                  className="login-select"
-                  value={passwordForm.methodistId}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({
-                      ...prev,
-                      methodistId: Number(event.target.value),
-                    }))
-                  }
-                >
-                  {methodists.map((methodist) => (
-                    <option key={methodist.id} value={methodist.id}>
-                      {methodist.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="password"
-                  value={passwordForm.password}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({
-                      ...prev,
-                      password: event.target.value,
-                    }))
-                  }
-                  placeholder="Новый пароль *"
-                />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  className="login-input"
-                  type="password"
-                  value={passwordForm.confirm}
-                  onChange={(event) =>
-                    setPasswordForm((prev) => ({
-                      ...prev,
-                      confirm: event.target.value,
-                    }))
-                  }
-                  placeholder="Повтор пароля *"
-                />
-              </div>
-              <button className="login-btn">Сохранить</button>
-            </form>
-          )}
-          <button className="admin-logout">Выйти</button>
         </div>
       </div>
-    </div>
   );
 }
 

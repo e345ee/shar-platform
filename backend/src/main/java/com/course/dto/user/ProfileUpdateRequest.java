@@ -1,5 +1,6 @@
 package com.course.dto.user;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -14,6 +15,15 @@ public class ProfileUpdateRequest {
     @Pattern(regexp = "^(?!\\s*$).+", message = "bio must not be blank")
     @Size(max = 2048, message = "bio must be at most 2048 characters")
     private String bio;
+
+    @Pattern(regexp = "^(?!\\s*$).+", message = "email must not be blank")
+    @Email(message = "email should be valid")
+    @Size(min = 3, max = 127, message = "email must be between 3 and 127 characters")
+    private String email;
+
+    @Pattern(regexp = "^(?!\\s*$).+", message = "tgId must not be blank")
+    @Size(max = 127, message = "tgId must be at most 127 characters")
+    private String tgId;
 
     @Pattern(regexp = "^(?!\\s*$).+", message = "photo must not be blank")
     @Size(max = 1024, message = "photo must be at most 1024 characters")
@@ -57,4 +67,20 @@ public class ProfileUpdateRequest {
         this.password = password;
     }
 
+
+    public String getEmail() {
+        return this.email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getTgId() {
+        return this.tgId;
+    }
+
+    public void setTgId(String tgId) {
+        this.tgId = tgId;
+    }
 }

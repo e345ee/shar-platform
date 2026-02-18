@@ -1,37 +1,95 @@
 import { useState, useEffect } from "react";
 import "./StudyActivity.css";
-import { CloseIcon, PlusIcon, TrashIcon, RadioCheckedIcon, RadioUncheckedIcon } from "../../../svgs/MethodistSvg.jsx";
+import {
+    CloseIcon,
+    PlusIcon,
+    TrashIcon,
+    RadioCheckedIcon,
+    RadioUncheckedIcon,
+} from "../../../svgs/MethodistSvg.jsx";
 
 function TestModal({ isOpen, onClose, activity, onSaveQuestions }) {
     const [questions, setQuestions] = useState([]);
+    const [localError, setLocalError] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         if (activity) {
-            setQuestions(activity.questions || []);
+            setQuestions(
+                (activity.questions || []).map((question) => ({
+                    ...question,
+                    questionType: question.questionType || "SINGLE_CHOICE",
+                    points: question.points || 1,
+                    correctTextAnswer: question.correctTextAnswer || "",
+                    options: Array.isArray(question.options) && question.options.length
+                        ? question.options
+                        : [
+                            { id: 1, text: "" },
+                            { id: 2, text: "" },
+                            { id: 3, text: "" },
+                            { id: 4, text: "" },
+                        ],
+                }))
+            );
+            setLocalError("");
         }
     }, [activity]);
 
     const handleAddQuestion = () => {
+        setLocalError("");
         setQuestions([
             ...questions,
             {
                 id: Date.now(),
                 text: "",
+                questionType: "SINGLE_CHOICE",
+                points: 1,
                 options: [
                     { id: 1, text: "" },
                     { id: 2, text: "" },
                     { id: 3, text: "" },
+                    { id: 4, text: "" },
                 ],
                 correctAnswer: null,
+                correctTextAnswer: "",
             },
         ]);
     };
 
     const handleQuestionChange = (questionId, field, value) => {
-        setQuestions(
-            questions.map((question) =>
-                question.id === questionId ? { ...question, [field]: value } : question
-            )
+        setQuestions((prev) =>
+            prev.map((question) => {
+                if (question.id !== questionId) return question;
+                if (field !== "questionType") {
+                    return { ...question, [field]: value };
+                }
+                if (value === "SINGLE_CHOICE") {
+                    return {
+                        ...question,
+                        questionType: "SINGLE_CHOICE",
+                        options: [
+                            { id: 1, text: question.options?.[0]?.text || "" },
+                            { id: 2, text: question.options?.[1]?.text || "" },
+                            { id: 3, text: question.options?.[2]?.text || "" },
+                            { id: 4, text: question.options?.[3]?.text || "" },
+                        ],
+                        correctTextAnswer: "",
+                    };
+                }
+                if (value === "TEXT") {
+                    return {
+                        ...question,
+                        questionType: "TEXT",
+                        correctAnswer: null,
+                    };
+                }
+                return {
+                    ...question,
+                    questionType: "OPEN",
+                    correctAnswer: null,
+                    correctTextAnswer: "",
+                };
+            })
         );
     };
 
@@ -60,46 +118,21 @@ function TestModal({ isOpen, onClose, activity, onSaveQuestions }) {
         );
     };
 
-    const handleAddOption = (questionId) => {
-        setQuestions(
-            questions.map((question) =>
-                question.id === questionId
-                    ? {
-                        ...question,
-                        options: [
-                            ...question.options,
-                            { id: Date.now(), text: "" },
-                        ],
-                    }
-                    : question
-            )
-        );
-    };
-
-    const handleDeleteOption = (questionId, optionId) => {
-        setQuestions(
-            questions.map((question) =>
-                question.id === questionId
-                    ? {
-                        ...question,
-                        options: question.options.filter((option) => option.id !== optionId),
-                        correctAnswer:
-                            question.correctAnswer === optionId
-                                ? null
-                                : question.correctAnswer,
-                    }
-                    : question
-            )
-        );
-    };
-
     const handleDeleteQuestion = (questionId) => {
         setQuestions(questions.filter((question) => question.id !== questionId));
     };
 
-    const handleSave = () => {
-        onSaveQuestions(activity.id, questions);
-        onClose();
+    const handleSave = async () => {
+        setLocalError("");
+        setIsSaving(true);
+        try {
+            await onSaveQuestions(activity.id, questions);
+            onClose();
+        } catch (error) {
+            setLocalError(error?.message || "Не удалось сохранить вопросы");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     if (!isOpen || !activity) return null;
@@ -114,6 +147,7 @@ function TestModal({ isOpen, onClose, activity, onSaveQuestions }) {
                 <p className="modal-subtitle">
                     {activity.format} - Управление вопросами и заданиями
                 </p>
+                {localError && <div className="activity-error">{localError}</div>}
 
                 <div className="questions-list">
                     {questions.map((question, index) => (
@@ -138,61 +172,82 @@ function TestModal({ isOpen, onClose, activity, onSaveQuestions }) {
                                 }
                                 rows="2"
                             />
-                            <div className="options-list">
-                                {question.options.map((option, optIndex) => (
-                                    <div
-                                        key={option.id}
-                                        className={`option-item ${
-                                            question.correctAnswer === option.id
-                                                ? "option-correct"
-                                                : ""
-                                        }`}
-                                    >
-                                        <button
-                                            className="option-radio"
-                                            onClick={() =>
-                                                handleCorrectAnswerChange(question.id, option.id)
-                                            }
-                                            type="button"
+                            <div className="question-meta-row">
+                                <select
+                                    className="modal-select question-type-select"
+                                    value={question.questionType || "SINGLE_CHOICE"}
+                                    onChange={(e) =>
+                                        handleQuestionChange(question.id, "questionType", e.target.value)
+                                    }
+                                >
+                                    <option value="SINGLE_CHOICE">Тест (один вариант)</option>
+                                    <option value="TEXT">Текстовый ответ</option>
+                                    <option value="OPEN">Открытый ответ</option>
+                                </select>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="modal-input question-points-input"
+                                    value={question.points || 1}
+                                    onChange={(e) =>
+                                        handleQuestionChange(question.id, "points", e.target.value)
+                                    }
+                                    placeholder="Баллы"
+                                />
+                            </div>
+                            {(question.questionType || "SINGLE_CHOICE") === "SINGLE_CHOICE" && (
+                                <div className="options-list">
+                                    {question.options.map((option, optIndex) => (
+                                        <div
+                                            key={option.id}
+                                            className={`option-item ${
+                                                question.correctAnswer === option.id
+                                                    ? "option-correct"
+                                                    : ""
+                                            }`}
                                         >
-                                            {question.correctAnswer === option.id ? (
-                                                <RadioCheckedIcon />
-                                            ) : (
-                                                <RadioUncheckedIcon />
-                                            )}
-                                        </button>
-                                        <input
-                                            type="text"
-                                            className="option-input"
-                                            placeholder={`Вариант ${String.fromCharCode(65 + optIndex)}`}
-                                            value={option.text}
-                                            onChange={(e) =>
-                                                handleOptionChange(question.id, option.id, e.target.value)
-                                            }
-                                        />
-                                        {question.options.length > 2 && (
                                             <button
-                                                className="option-delete-btn"
+                                                className="option-radio"
                                                 onClick={() =>
-                                                    handleDeleteOption(question.id, option.id)
+                                                    handleCorrectAnswerChange(question.id, option.id)
                                                 }
                                                 type="button"
-                                                aria-label="Delete option"
                                             >
-                                                <CloseIcon />
+                                                {question.correctAnswer === option.id ? (
+                                                    <RadioCheckedIcon />
+                                                ) : (
+                                                    <RadioUncheckedIcon />
+                                                )}
                                             </button>
-                                        )}
-                                    </div>
-                                ))}
-                                <button
-                                    className="btn-add-option"
-                                    onClick={() => handleAddOption(question.id)}
-                                    type="button"
-                                >
-                                    <PlusIcon />
-                                    Добавить вариант
-                                </button>
-                            </div>
+                                            <input
+                                                type="text"
+                                                className="option-input"
+                                                placeholder={`Вариант ${String.fromCharCode(65 + optIndex)}`}
+                                                value={option.text}
+                                                onChange={(e) =>
+                                                    handleOptionChange(question.id, option.id, e.target.value)
+                                                }
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {(question.questionType || "SINGLE_CHOICE") === "TEXT" && (
+                                <div className="options-list">
+                                    <textarea
+                                        className="question-text-input"
+                                        placeholder="Правильный текстовый ответ"
+                                        value={question.correctTextAnswer || ""}
+                                        onChange={(e) =>
+                                            handleQuestionChange(question.id, "correctTextAnswer", e.target.value)
+                                        }
+                                        rows="2"
+                                    />
+                                </div>
+                            )}
+                            {(question.questionType || "SINGLE_CHOICE") === "OPEN" && (
+                                <div className="field-helper">Открытый вопрос проверяется вручную, правильный ответ не задается.</div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -203,11 +258,11 @@ function TestModal({ isOpen, onClose, activity, onSaveQuestions }) {
                 </button>
 
                 <div className="modal-actions">
-                    <button className="btn-cancel" onClick={onClose} type="button">
+                    <button className="btn-cancel" onClick={onClose} type="button" disabled={isSaving}>
                         Отмена
                     </button>
-                    <button className="btn-save" onClick={handleSave} type="button">
-                        Сохранить вопросы
+                    <button className="btn-save" onClick={handleSave} type="button" disabled={isSaving}>
+                        {isSaving ? "Сохранение..." : "Сохранить вопросы"}
                     </button>
                 </div>
             </div>

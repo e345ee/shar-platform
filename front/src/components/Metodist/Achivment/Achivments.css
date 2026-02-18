@@ -206,6 +206,24 @@
     gap: 24px;
 }
 
+.achievements-error {
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-weight: 500;
+}
+
+.achievements-empty {
+    padding: 20px;
+    border-radius: 14px;
+    background: #ffffff;
+    border: 1px dashed var(--border, #cbd5e1);
+    color: var(--muted, #64748b);
+}
+
 .achievement-card {
     background: var(--card, #ffffff);
     border-radius: 20px;

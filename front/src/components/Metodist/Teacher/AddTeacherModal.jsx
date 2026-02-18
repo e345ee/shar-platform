@@ -1,17 +1,14 @@
 import { useState } from "react";
 import "./Teacher.css";
 import { CloseIcon } from "../../../svgs/MethodistSvg.jsx";
-import { EmailIcon, PhoneIcon, UserIcon, ImageIcon, TelegramIcon, LockIcon, ChatIcon } from "../../../svgs/TeacherSvg.jsx";
+import { EmailIcon, UserIcon, TelegramIcon, LockIcon } from "../../../svgs/TeacherSvg.jsx";
 
 function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
     const [formData, setFormData] = useState({
         name: "",
         email: "",
         password: "",
-        phone: "",
-        bio: "",
-        photo: "",
-        tg_id: "",
+        tgId: "",
     });
 
     const handleInputChange = (field, value) => {
@@ -21,28 +18,26 @@ function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
         }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (formData.name && formData.email && formData.password && formData.phone) {
-            onAddTeacher({
-                name: formData.name,
-                email: formData.email,
-                password: formData.password,
-                phone: formData.phone,
-                bio: formData.bio || "",
-                photo: formData.photo || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop",
-                tg_id: formData.tg_id || "",
-            });
-            setFormData({
-                name: "",
-                email: "",
-                password: "",
-                phone: "",
-                bio: "",
-                photo: "",
-                tg_id: "",
-            });
-            onClose();
+        if (formData.name && formData.email && formData.password) {
+            try {
+                await onAddTeacher({
+                    name: formData.name.trim(),
+                    email: formData.email.trim(),
+                    password: formData.password,
+                    tgId: formData.tgId.trim(),
+                });
+                setFormData({
+                    name: "",
+                    email: "",
+                    password: "",
+                    tgId: "",
+                });
+                onClose();
+            } catch (e) {
+                // Parent component renders API error message and keeps modal open.
+            }
         }
     };
 
@@ -51,10 +46,7 @@ function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
             name: "",
             email: "",
             password: "",
-            phone: "",
-            bio: "",
-            photo: "",
-            tg_id: "",
+            tgId: "",
         });
         onClose();
     };
@@ -67,19 +59,19 @@ function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
                 <button className="modal-close" onClick={handleClose} type="button">
                     <CloseIcon />
                 </button>
-                <h2 className="modal-title">Добавить нового преподавателя</h2>
-                <p className="modal-subtitle">Заполните информацию о новом преподавателе</p>
+                <h2 className="modal-title">Добавить преподавателя</h2>
+                <p className="modal-subtitle">Доступные поля: имя, email, пароль, telegram id</p>
                 <form onSubmit={handleSubmit} className="modal-form">
                     <div className="modal-field">
                         <div className="modal-field-icon">
                             <UserIcon />
                         </div>
                         <div className="modal-field-content">
-                            <label className="modal-label">ФИО преподавателя</label>
+                            <label className="modal-label">Имя</label>
                             <input
                                 type="text"
                                 className="modal-input"
-                                placeholder="Например: Иванова Мария Петровна"
+                                placeholder="Например: Иванов Иван"
                                 value={formData.name}
                                 onChange={(e) => handleInputChange("name", e.target.value)}
                                 required
@@ -111,47 +103,11 @@ function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
                             <input
                                 type="password"
                                 className="modal-input"
-                                placeholder="Введите пароль"
+                                placeholder="Минимум 6 символов"
                                 value={formData.password}
                                 onChange={(e) => handleInputChange("password", e.target.value)}
                                 required
                             />
-                        </div>
-                    </div>
-                    <div className="modal-field">
-                        <div className="modal-field-icon">
-                            <PhoneIcon />
-                        </div>
-                        <div className="modal-field-content">
-                            <label className="modal-label">Телефон</label>
-                            <input
-                                type="tel"
-                                className="modal-input"
-                                placeholder="+7 (999) 123-45-67"
-                                value={formData.phone}
-                                onChange={(e) => handleInputChange("phone", e.target.value)}
-                                required
-                            />
-                        </div>
-                    </div>
-                    <div className="modal-field">
-                        <div className="modal-field-icon">
-                            <ImageIcon />
-                        </div>
-                        <div className="modal-field-content">
-                            <label className="modal-label">URL фотографии</label>
-                            <input
-                                type="url"
-                                className="modal-input"
-                                placeholder="https://example.com/photo.jpg"
-                                value={formData.photo}
-                                onChange={(e) => handleInputChange("photo", e.target.value)}
-                            />
-                            {formData.photo && (
-                                <div className="image-preview">
-                                    <img src={formData.photo} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} />
-                                </div>
-                            )}
                         </div>
                     </div>
                     <div className="modal-field">
@@ -164,23 +120,8 @@ function AddTeacherModal({ isOpen, onClose, onAddTeacher }) {
                                 type="text"
                                 className="modal-input"
                                 placeholder="@username"
-                                value={formData.tg_id}
-                                onChange={(e) => handleInputChange("tg_id", e.target.value)}
-                            />
-                        </div>
-                    </div>
-                    <div className="modal-field">
-                        <div className="modal-field-icon">
-                            <ChatIcon />
-                        </div>
-                        <div className="modal-field-content">
-                            <label className="modal-label">О преподавателе (биография)</label>
-                            <textarea
-                                className="modal-textarea"
-                                placeholder="Краткая информация о преподавателе, опыт работы, достижения"
-                                value={formData.bio}
-                                onChange={(e) => handleInputChange("bio", e.target.value)}
-                                rows="4"
+                                value={formData.tgId}
+                                onChange={(e) => handleInputChange("tgId", e.target.value)}
                             />
                         </div>
                     </div>
