@@ -3,6 +3,7 @@ import "./Metodist.css";
 import "./Profile/Profile"
 import Teachers from "./Teacher/Teacher";
 import StudyMaterial from "./StudyMaterial/StudyMaterial";
+import Statistics from "./Statistics/Statistics";
 
 import {
   LogoutIcon,
@@ -13,6 +14,7 @@ import {
   TeachersIcon,
   AchievementsIcon,
   ClassesIcon,
+  StatisticsIcon,
 } from "../../svgs/MethodistSvg"
 
 import Profile from "./Profile/Profile";
@@ -68,6 +70,14 @@ const menuCards = [
         "Управление курсами и классами: создание курсов, классов и назначение преподавателей",
     icon: ClassesIcon,
     tone: "purple",
+  },
+  {
+    id: "statistics",
+    title: "Статистика",
+    description:
+        "Просмотр статистики преподавателей и скачивание отчета в формате CSV",
+    icon: StatisticsIcon,
+    tone: "orange",
   },
 ];
 
@@ -210,6 +220,14 @@ function Methodist({ onLogout }) {
   if (activeSection === "activities") {
     return (
         <StudyActivity
+            onBackToMain={() => setActiveSection(null)}
+        />
+    );
+  }
+
+  if (activeSection === "statistics") {
+    return (
+        <Statistics
             onBackToMain={() => setActiveSection(null)}
         />
     );

@@ -1,5 +1,4 @@
 .dashboard {
-  background: var(--bg);
   min-height: 100vh;
   height: 100vh;
   display: flex;
@@ -16,6 +15,7 @@
   flex-direction: column;
   height: 100%;
   flex: 1;
+  background: #445a6d;
 }
 
 .topbar {
@@ -24,8 +24,7 @@
   justify-content: space-between;
   padding: 20px 40px;
   background: var(--bg-dark);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: var(--shadow-md);
+  box-shadow: none;
   border-radius: 0;
   width: 100%;
   min-height: 80px;
@@ -72,6 +71,7 @@
   background: #7c3aed;
   transform: scale(1.05);
 }
+
 
 .topbar-icon-btn svg {
   width: 20px;
@@ -180,7 +180,7 @@
 }
 
 .welcome-title {
-  font-size: 32px;
+  font-size: 42px;
   font-weight: 800;
   color: white;
   margin-bottom: 6px;
@@ -192,7 +192,7 @@
 }
 
 .welcome-subtitle {
-  font-size: 14px;
+  font-size: 18px;
   color: white;
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -226,12 +226,12 @@
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 18px;
   justify-items: stretch;
 }
 
-.menu-grid .menu-card:last-child {
-  grid-column: auto;
+.menu-card:last-child {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 1200px) {
@@ -239,8 +239,8 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .menu-grid .menu-card:last-child {
-    grid-column: auto;
+  .menu-card:last-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -248,15 +248,15 @@
   background: var(--card);
   border-radius: 16px;
   border: 1px solid var(--border);
-  padding: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
   text-align: left;
   position: relative;
-  min-height: 150px;
+  min-height: 168px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -295,8 +295,8 @@
 }
 
 .menu-icon {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -330,8 +330,8 @@
 }
 
 .menu-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 32px;
+  height: 32px;
 }
 
 .menu-content {
@@ -350,14 +350,14 @@
 }
 
 .menu-description {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
-  line-height: 1.35;
+  line-height: 1.6;
   margin: 0;
 }
 
 .menu-link {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   margin-top: auto;
   padding-top: 8px;
@@ -390,6 +390,7 @@
 
 .menu-link.tone-orange {
   color: var(--orange);
+  background: var(--orange-light);
 }
 
 .menu-link.tone-red {
@@ -420,18 +421,18 @@
 }
 
 .stats-section {
-  margin-top: 4px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 14px;
   height: auto;
   background: var(--bg-teal);
-  border-radius: 20px;
+  border-radius: 28px;
 }
 
 .stats-title {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
   color: #ffffff;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   letter-spacing: -0.02em;
   text-align: center;
 }
@@ -439,17 +440,17 @@
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 20px;
 }
 
 .stat-item {
   text-align: center;
-  padding: 10px;
+  padding: 20px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
-  min-height: 86px;
+  min-height: 110px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -461,15 +462,15 @@
 }
 
 .stat-item .stat-value {
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   color: peru;
 }
 
 .stat-item .stat-label {
-  font-size: 12px;
+  font-size: 14px;
   color: peru;
   font-weight: 500;
 }
@@ -515,7 +516,7 @@
 }
 
 .stat-item-common {
-  background: var(--blue-soft); /* любой нужный цвет */
+  background: var(--blue-soft);
   color: #0f172a;
 }
 

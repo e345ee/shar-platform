@@ -19,7 +19,7 @@
     justify-content: space-between;
     margin-bottom: 40px;
     gap: 20px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
 }
 
 .classes-header-left {
@@ -61,9 +61,30 @@
 
 .classes-header-actions {
     display: flex;
+    flex-direction: row;
     align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+}
+
+.classes-header-actions > button {
+    white-space: nowrap;
+}
+
+.classes-header-actions-row {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-end;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+.classes-header-actions-row .classes-header-action-btn {
+    width: auto !important;
+    white-space: nowrap;
 }
 
 .btn-add-class {
@@ -605,7 +626,13 @@
 
     .classes-header-actions {
         width: 100%;
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    .classes-header-actions-row {
+        justify-content: flex-start;
     }
 
     .list-switcher {
@@ -614,7 +641,7 @@
 
     .btn-add-class,
     .btn-home {
-        width: 100%;
+        width: auto;
         justify-content: center;
     }
 
