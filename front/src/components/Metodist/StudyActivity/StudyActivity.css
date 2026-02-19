@@ -465,6 +465,19 @@
     height: 18px;
 }
 
+.btn-schedule-week {
+    color: #1d4ed8;
+    border-color: #93c5fd;
+    background: #eff6ff;
+    box-shadow: none;
+}
+
+.btn-schedule-week:hover {
+    color: #1e40af;
+    border-color: #3b82f6;
+    background: #dbeafe;
+}
+
 .btn-open-access {
     color: var(--green, #10b981);
 }

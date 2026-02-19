@@ -29,14 +29,31 @@ async function requestJson(path, { method = "GET", body, params } = {}) {
         url += `?${searchParams.toString()}`;
     }
 
-    const response = await fetch(url, {
-        method,
-        headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    console.log("[requestJson] Making request", { method, url, hasToken: !!token, hasBody: body !== undefined });
 
-    if (response.status === 204) {
-        return null;
+    let response;
+    try {
+        response = await fetch(url, {
+            method,
+            headers,
+            body: body !== undefined ? JSON.stringify(body) : undefined,
+        });
+        console.log("[requestJson] Response received", { method, url, status: response.status, statusText: response.statusText, ok: response.ok });
+    } catch (networkError) {
+        console.error("[requestJson] Network error", { method, url, error: networkError });
+        const error = new Error("Network error: " + (networkError?.message || "Failed to fetch"));
+        error.isNetworkError = true;
+        error.originalError = networkError;
+        throw error;
+    }
+
+    if (response.status === 204 || response.status === 200) {
+        // Для 204 и 200 без тела возвращаем null
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            console.log("[requestJson] No JSON body, returning null", { status: response.status });
+            return null;
+        }
     }
 
     const text = await response.text();
@@ -45,17 +62,20 @@ async function requestJson(path, { method = "GET", body, params } = {}) {
         try {
             payload = JSON.parse(text);
         } catch (e) {
+            console.warn("[requestJson] Failed to parse JSON", { text, error: e });
             payload = null;
         }
     }
 
     if (!response.ok) {
-        const error = new Error(payload?.message || "Request failed");
+        console.error("[requestJson] Request failed", { method, url, status: response.status, payload });
+        const error = new Error(payload?.message || `Request failed with status ${response.status}`);
         error.status = response.status;
         error.payload = payload;
         throw error;
     }
 
+    console.log("[requestJson] Request successful", { method, url, status: response.status, payload });
     return payload;
 }
 
@@ -79,6 +99,11 @@ function mapUser(user) {
         bio: user?.bio || "",
         photo: user?.photo || "",
         tgId: user?.tgId || "",
+        courseClosedAt:
+            user?.courseClosedAt ||
+            user?.course_closed_at ||
+            user?.closedCourseAt ||
+            null,
     };
 }
 
@@ -86,19 +111,21 @@ function mapJoinRequest(req) {
     return {
         id: req?.id,
         studentId: req?.studentId ?? null,
-        studentName: req?.studentName || "",
-        studentEmail: req?.studentEmail || "",
+        studentName: req?.name || "", // Бэкенд возвращает 'name', а не 'studentName'
+        studentEmail: req?.email || "", // Бэкенд возвращает 'email', а не 'studentEmail'
         classId: req?.classId ?? null,
         className: req?.className || "",
         createdAt: req?.createdAt || "",
         status: req?.status || "",
+        tgId: req?.tgId || "",
     };
 }
 
 function mapAttempt(attempt) {
     return {
         id: attempt?.id,
-        activityId: attempt?.activityId ?? null,
+        testId: attempt?.testId ?? null,
+        activityId: attempt?.testId ?? null, // Для совместимости
         activityTitle: attempt?.activityTitle || "",
         activityType: attempt?.activityType || "",
         studentId: attempt?.studentId ?? null,
@@ -109,21 +136,27 @@ function mapAttempt(attempt) {
         courseId: attempt?.courseId ?? null,
         courseName: attempt?.courseName || "",
         status: attempt?.status || "",
-        grade: attempt?.grade ?? null,
-        maxGrade: attempt?.maxGrade ?? null,
+        score: attempt?.score ?? null,
+        maxScore: attempt?.maxScore ?? null,
+        grade: attempt?.score ?? null, // Для совместимости
+        maxGrade: attempt?.maxScore ?? null, // Для совместимости
         startedAt: attempt?.startedAt || "",
         submittedAt: attempt?.submittedAt || "",
         gradedAt: attempt?.gradedAt || "",
         answers: attempt?.answers || [],
+        attemptNumber: attempt?.attemptNumber ?? null,
+        percent: attempt?.percent ?? null,
     };
 }
 
 function mapPendingAttempt(attempt) {
     return {
-        id: attempt?.id,
-        activityId: attempt?.activityId ?? null,
-        activityTitle: attempt?.activityTitle || "",
-        activityType: attempt?.activityType || "",
+        attemptId: attempt?.attemptId ?? null,
+        id: attempt?.attemptId ?? null, // Для совместимости
+        testId: attempt?.testId ?? null,
+        activityId: attempt?.testId ?? null, // Для совместимости
+        activityTitle: attempt?.activityTitle || "", // Будет загружено отдельно
+        activityType: attempt?.activityType || "", // Будет загружено отдельно
         studentId: attempt?.studentId ?? null,
         studentName: attempt?.studentName || "",
         studentEmail: attempt?.studentEmail || "",
@@ -132,6 +165,7 @@ function mapPendingAttempt(attempt) {
         courseId: attempt?.courseId ?? null,
         courseName: attempt?.courseName || "",
         submittedAt: attempt?.submittedAt || "",
+        ungradedOpenCount: attempt?.ungradedOpenCount ?? 0,
     };
 }
 
@@ -162,6 +196,54 @@ function mapActivity(activity) {
         status: activity?.status || "",
         questionCount: activity?.questionCount ?? 0,
         createdByName: activity?.createdByName || "",
+    };
+}
+
+function mapAchievement(achievement) {
+    return {
+        id: achievement?.id ?? null,
+        courseId: achievement?.courseId ?? null,
+        title: achievement?.title || "",
+        jokeDescription: achievement?.jokeDescription || "",
+        description: achievement?.description || "",
+        photoUrl: achievement?.photoUrl || "",
+        createdById: achievement?.createdById ?? null,
+        createdByName: achievement?.createdByName || "",
+        createdAt: achievement?.createdAt || "",
+        updatedAt: achievement?.updatedAt || "",
+    };
+}
+
+function mapStudentAchievement(item) {
+    return {
+        id: item?.id ?? null,
+        studentId: item?.studentId ?? null,
+        studentName: item?.studentName || "",
+        achievementId: item?.achievementId ?? null,
+        achievementTitle: item?.achievementTitle || "",
+        achievementPhotoUrl: item?.achievementPhotoUrl || "",
+        achievementCourseId: item?.achievementCourseId ?? null,
+        achievementJokeDescription: item?.achievementJokeDescription || "",
+        achievementDescription: item?.achievementDescription || "",
+        awardedById: item?.awardedById ?? null,
+        awardedByName: item?.awardedByName || "",
+        awardedAt: item?.awardedAt || "",
+    };
+}
+
+function mapNotification(notification) {
+    return {
+        id: notification?.id ?? null,
+        type: notification?.type || "",
+        title: notification?.title || "",
+        message: notification?.message || "",
+        isRead: Boolean(notification?.read),
+        courseId: notification?.courseId ?? null,
+        classId: notification?.classId ?? null,
+        testId: notification?.testId ?? null,
+        attemptId: notification?.attemptId ?? null,
+        achievementId: notification?.achievementId ?? null,
+        createdAt: notification?.createdAt || "",
     };
 }
 
@@ -228,6 +310,22 @@ export async function removeStudentFromClass(classId, studentId) {
     });
 }
 
+// Отметить курс как завершенный для ученика в конкретном классе
+export async function closeCourseForStudent(classId, studentId) {
+    return requestJson(`/api/classes/${classId}/students/${studentId}/close-course`, {
+        method: "POST",
+    });
+}
+
+// Создать аккаунт студента
+export async function createStudent(dto) {
+    const created = await requestJson("/api/users/students", {
+        method: "POST",
+        body: dto,
+    });
+    return mapUser(created);
+}
+
 // Получить список попыток для проверки
 export async function listPendingAttempts(options = {}) {
     const { courseId, activityId, classId, page = 0, size = 20 } = options;
@@ -258,16 +356,34 @@ export async function gradeAttempt(attemptId, gradeData) {
 
 // Открыть активность для класса
 export async function openActivityForClass(classId, activityId) {
-    return requestJson(`/api/classes/${classId}/activities/${activityId}/open`, {
-        method: "POST",
-    });
+    const url = `/api/classes/${classId}/activities/${activityId}/open`;
+    console.log("[openActivityForClass] Sending request", { classId, activityId, url, method: "POST" });
+    try {
+        const result = await requestJson(url, {
+            method: "POST",
+        });
+        console.log("[openActivityForClass] Request successful", { classId, activityId, result });
+        return result;
+    } catch (error) {
+        console.error("[openActivityForClass] Request failed", { classId, activityId, error, status: error?.status, message: error?.message });
+        throw error;
+    }
 }
 
 // Открыть урок для класса
 export async function openLessonForClass(classId, lessonId) {
-    return requestJson(`/api/classes/${classId}/lessons/${lessonId}/open`, {
-        method: "POST",
-    });
+    const url = `/api/classes/${classId}/lessons/${lessonId}/open`;
+    console.log("[openLessonForClass] Sending request", { classId, lessonId, url, method: "POST" });
+    try {
+        const result = await requestJson(url, {
+            method: "POST",
+        });
+        console.log("[openLessonForClass] Request successful", { classId, lessonId, result });
+        return result;
+    } catch (error) {
+        console.error("[openLessonForClass] Request failed", { classId, lessonId, error, status: error?.status, message: error?.message });
+        throw error;
+    }
 }
 
 export async function listLessonsByCourse(courseId) {
@@ -321,6 +437,81 @@ export async function listActivityAttempts(activityId) {
         return [];
     }
     return attempts;
+}
+
+// Получить активность по ID (с вопросами для преподавателя)
+export async function getActivityById(activityId) {
+    return requestJson(`/api/activities/${activityId}`);
+}
+
+// Получить достижения курса (доступные для назначения)
+export async function listAchievementsByCourse(courseId) {
+    const achievements = await requestJson(`/api/courses/${courseId}/achievements`);
+    if (!Array.isArray(achievements)) {
+        return [];
+    }
+    return achievements.map(mapAchievement);
+}
+
+// Получить уже назначенные достижения ученика
+export async function listStudentAchievements(studentId) {
+    const rows = await requestJson(`/api/students/${studentId}/achievements`);
+    if (!Array.isArray(rows)) {
+        return [];
+    }
+    return rows.map(mapStudentAchievement);
+}
+
+// Назначить достижение ученику
+export async function awardAchievementToStudent(achievementId, studentId) {
+    const row = await requestJson(`/api/achievements/${achievementId}/award/${studentId}`, {
+        method: "POST",
+    });
+    return mapStudentAchievement(row);
+}
+
+// Снять достижение у ученика
+export async function revokeAchievementFromStudent(achievementId, studentId) {
+    return requestJson(`/api/achievements/${achievementId}/award/${studentId}`, {
+        method: "DELETE",
+    });
+}
+
+// Получить уведомления текущего преподавателя
+export async function listMyNotifications(options = {}) {
+    const { page = 0, size = 50 } = options;
+    const data = await requestJson("/api/me/notifications", {
+        params: { page, size },
+    });
+    const rows = Array.isArray(data?.content) ? data.content : [];
+    return {
+        content: rows.map(mapNotification),
+        totalElements: data?.totalElements ?? 0,
+        totalPages: data?.totalPages ?? 0,
+        pageNumber: data?.pageNumber ?? 0,
+    };
+}
+
+// Получить число непрочитанных уведомлений
+export async function getMyUnreadNotificationsCount() {
+    const data = await requestJson("/api/me/notifications/unread-count");
+    return Number(data?.unread ?? 0);
+}
+
+// Отметить уведомление как прочитанное
+export async function markNotificationRead(notificationId) {
+    const data = await requestJson(`/api/me/notifications/${notificationId}/read`, {
+        method: "PATCH",
+    });
+    return mapNotification(data);
+}
+
+// Отметить все уведомления как прочитанные
+export async function markAllNotificationsRead() {
+    const data = await requestJson("/api/me/notifications/read-all", {
+        method: "PATCH",
+    });
+    return Number(data?.marked ?? 0);
 }
 
 // Получить профиль текущего пользователя

@@ -4,12 +4,12 @@ import { CloseIcon } from "../../../svgs/MethodistSvg.jsx";
 import { OpenLockIcon, ClosedLockIcon } from "../../../svgs/TestSvg.jsx";
 
 function TestAccessModal({
-  isOpen,
-  onClose,
-  activity,
-  classes,
-  onToggleAccess,
-}) {
+                           isOpen,
+                           onClose,
+                           activity,
+                           classes,
+                           onToggleAccess,
+                         }) {
   const [classAccesses, setClassAccesses] = useState({});
 
   useEffect(() => {
@@ -26,25 +26,46 @@ function TestAccessModal({
     }
   }, [activity, classes]);
 
-  const handleToggle = (classId) => {
+  const handleToggle = async (classId) => {
+    if (!activity || !activity.id) {
+      console.error("handleToggle: activity or activity.id is missing", { activity, classId });
+      return;
+    }
+    if (!classId) {
+      console.error("handleToggle: classId is missing", { activity, classId });
+      return;
+    }
+
     const currentAccess = classAccesses[classId];
     const newIsOpen = !currentAccess.isOpen;
-    const newDate = new Date().toLocaleDateString("ru-RU", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
 
-    setClassAccesses((prev) => ({
-      ...prev,
-      [classId]: {
-        isOpen: newIsOpen,
-        date: newDate,
-      },
-    }));
+    // Для закрытия пока не поддерживается
+    if (!newIsOpen) {
+      return;
+    }
 
     if (onToggleAccess) {
-      onToggleAccess(activity.id, classId, newIsOpen);
+      console.log("Calling onToggleAccess", { activityId: activity.id, classId, newIsOpen });
+      try {
+        // Вызываем функцию и ждем результата
+        await onToggleAccess(activity.id, classId, newIsOpen);
+        // Обновляем состояние только после успешного запроса
+        const newDate = new Date().toLocaleDateString("ru-RU", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+        setClassAccesses((prev) => ({
+          ...prev,
+          [classId]: {
+            isOpen: newIsOpen,
+            date: newDate,
+          },
+        }));
+      } catch (error) {
+        // Ошибка уже обработана в родительском компоненте
+        console.error("Error in handleToggle", error);
+      }
     }
   };
 
@@ -69,87 +90,87 @@ function TestAccessModal({
   const tags = getActivityTypeTag(activity.format, activity.type);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content modal-content-large"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button className="modal-close" onClick={onClose} type="button">
-          <CloseIcon />
-        </button>
+      <div className="modal-overlay" onClick={onClose}>
+        <div
+            className="modal-content modal-content-large"
+            onClick={(e) => e.stopPropagation()}
+        >
+          <button className="modal-close" onClick={onClose} type="button">
+            <CloseIcon />
+          </button>
 
-        <div className="test-access-modal-header">
-          <h2 className="test-access-modal-title">{activity.title}</h2>
-          <div className="test-access-modal-meta">
-            <span>{activity.topic}</span>
-            <span className={`test-access-modal-tag tag-${tags.type.color}`}>
+          <div className="test-access-modal-header">
+            <h2 className="test-access-modal-title">{activity.title}</h2>
+            <div className="test-access-modal-meta">
+              <span>{activity.topic}</span>
+              <span className={`test-access-modal-tag tag-${tags.type.color}`}>
               {activity.type}
             </span>
-            <span>{activity.questionsCount} вопросов</span>
+              <span>{activity.questionsCount} вопросов</span>
+            </div>
           </div>
-        </div>
 
-        <div className="test-access-modal-content">
-          <h3 className="test-access-modal-section-title">
-            Доступ для классов
-          </h3>
-          <div className="test-access-classes-list">
-            {classes.map((classItem) => {
-              const access = classAccesses[classItem.id] || {
-                isOpen: false,
-                date: "",
-              };
-              return (
-                <div
-                  key={classItem.id}
-                  className={`test-access-class-item ${access.isOpen ? "open" : ""}`}
-                >
-                  <div
-                    className="test-access-class-icon"
-                    style={{
-                      background: access.isOpen ? "#10b981" : "#e5e7eb",
-                      color: access.isOpen ? "#ffffff" : "#6b7280",
-                    }}
-                  >
-                    {classItem.name}
-                  </div>
-                  <div className="test-access-class-info">
-                    <div className="test-access-class-name">
-                      {classItem.name}
-                    </div>
-                    <div className="test-access-class-subject">
-                      {classItem.subject}
-                    </div>
-                    {access.date && (
-                      <div className="test-access-class-status">
-                        {access.isOpen ? "Открыт" : "Закрыт"}: {access.date}
+          <div className="test-access-modal-content">
+            <h3 className="test-access-modal-section-title">
+              Доступ для классов
+            </h3>
+            <div className="test-access-classes-list">
+              {classes.map((classItem) => {
+                const access = classAccesses[classItem.id] || {
+                  isOpen: false,
+                  date: "",
+                };
+                return (
+                    <div
+                        key={classItem.id}
+                        className={`test-access-class-item ${access.isOpen ? "open" : ""}`}
+                    >
+                      <div
+                          className="test-access-class-icon"
+                          style={{
+                            background: access.isOpen ? "#10b981" : "#e5e7eb",
+                            color: access.isOpen ? "#ffffff" : "#6b7280",
+                          }}
+                      >
+                        {classItem.name}
                       </div>
-                    )}
-                  </div>
-                  <button
-                    className={`btn-toggle-access ${access.isOpen ? "close" : "open"}`}
-                    onClick={() => handleToggle(classItem.id)}
-                    type="button"
-                  >
-                    {access.isOpen ? (
-                      <>
-                        <ClosedLockIcon />
-                        Закрыть
-                      </>
-                    ) : (
-                      <>
-                        <OpenLockIcon />
-                        Открыть
-                      </>
-                    )}
-                  </button>
-                </div>
-              );
-            })}
+                      <div className="test-access-class-info">
+                        <div className="test-access-class-name">
+                          {classItem.name}
+                        </div>
+                        <div className="test-access-class-subject">
+                          {classItem.subject}
+                        </div>
+                        {access.date && (
+                            <div className="test-access-class-status">
+                              {access.isOpen ? "Открыт" : "Закрыт"}: {access.date}
+                            </div>
+                        )}
+                      </div>
+                      <button
+                          className={`btn-toggle-access ${access.isOpen ? "close" : "open"}`}
+                          onClick={() => handleToggle(classItem.id)}
+                          type="button"
+                      >
+                        {access.isOpen ? (
+                            <>
+                              <ClosedLockIcon />
+                              Закрыть
+                            </>
+                        ) : (
+                            <>
+                              <OpenLockIcon />
+                              Открыть
+                            </>
+                        )}
+                      </button>
+                    </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-    </div>
   );
 }
 

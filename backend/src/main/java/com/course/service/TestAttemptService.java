@@ -31,6 +31,8 @@ public class TestAttemptService {
     
     public record StartAttemptResult(AttemptResponse attempt, boolean created) {}
 
+    private static final int MAX_ATTEMPTS_PER_ACTIVITY = 2;
+
     private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
     private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
     private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
@@ -280,6 +282,11 @@ public class TestAttemptService {
         }
 
         int previousCount = attemptRepository.countByTest_IdAndStudent_Id(testId, current.getId());
+        if (previousCount >= MAX_ATTEMPTS_PER_ACTIVITY) {
+            throw new TestAttemptValidationException(
+                    "Достигнут лимит попыток: максимум " + MAX_ATTEMPTS_PER_ACTIVITY
+            );
+        }
 
         TestAttempt attempt = new TestAttempt();
         attempt.setTest(test);

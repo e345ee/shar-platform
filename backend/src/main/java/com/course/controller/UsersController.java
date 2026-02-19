@@ -123,7 +123,7 @@ public class UsersController {
             description = "Регистрация нового студента администратором или методистом. Создает пользователя с обязательными полями: имя, email, пароль и опциональным полем tgId."
     )
     @PostMapping("/students")
-    @PreAuthorize("hasRole('METHODIST')")
+    @PreAuthorize("hasRole('TEACHER')")
     public ResponseEntity<UserResponse> createStudent(@Valid @RequestBody UserRegisterRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(userService.createStudent(req));
     }

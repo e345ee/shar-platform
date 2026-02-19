@@ -97,3 +97,90 @@ export async function getMyStatisticsTopics(courseId) {
     return requestJson(`/api/me/statistics/topics${query}`);
 }
 
+export async function getClassAchievementFeed(classId, page = 0, size = 20) {
+    return requestJson(`/api/classes/${classId}/achievement-feed?page=${page}&size=${size}`);
+}
+
+export async function createJoinRequest(classCode) {
+    return requestJson("/api/join-requests", {
+        method: "POST",
+        body: { classCode },
+    });
+}
+
+export async function listMyLessonsInCourse(courseId) {
+    const data = await requestJson(`/api/me/courses/${courseId}/lessons`);
+    return Array.isArray(data) ? data : [];
+}
+
+export async function listActivitiesByLesson(lessonId) {
+    const data = await requestJson(`/api/lessons/${lessonId}/activities`);
+    return Array.isArray(data) ? data : [];
+}
+
+export async function listWeeklyActivitiesByCourse(courseId) {
+    const data = await requestJson(`/api/courses/${courseId}/activities/weekly`);
+    return Array.isArray(data) ? data : [];
+}
+
+export async function listMyAttempts(activityId) {
+    const data = await requestJson(`/api/activities/${activityId}/attempts/my`);
+    return Array.isArray(data) ? data : [];
+}
+
+export async function getLatestCompletedAttempt(activityId) {
+    return requestJson(`/api/me/activities/${activityId}/attempts/latest`);
+}
+
+export async function getLatestCompletedAttemptByLesson(lessonId) {
+    return requestJson(`/api/me/lessons/${lessonId}/activity/attempts/latest`);
+}
+
+// Profile functions
+export async function getMyProfile() {
+    return requestJson("/api/me");
+}
+
+export async function updateMyProfile(dto) {
+    return requestJson("/api/me/profile", {
+        method: "PATCH",
+        body: dto,
+    });
+}
+
+export async function uploadMyAvatar(file) {
+    const token = getAccessToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const response = await fetch(`${API_BASE_URL}/api/me/avatar`, {
+        method: "POST",
+        headers,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (e) {
+                payload = null;
+            }
+        }
+        const error = new Error(payload?.message || "Не удалось загрузить фото");
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+    }
+
+    return response.json();
+}
+
+export async function deleteMyAvatar() {
+    return requestJson("/api/me/avatar", {
+        method: "DELETE",
+    });
+}

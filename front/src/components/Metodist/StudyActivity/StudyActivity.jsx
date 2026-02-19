@@ -12,8 +12,10 @@ import AddStudyActivityModal from "./AddStudyActivityModal";
 import TextModal from "./TextModal";
 import TestModal from "./TestModal";
 import {
+    assignWeeklyActivity,
     createActivityQuestion,
     createCourseActivity,
+    deleteCourseActivity,
     deleteActivityQuestion,
     getActivityById,
     listActivitiesByLesson,
@@ -43,6 +45,21 @@ function formatDate(deadline) {
     });
 }
 
+function toIsoDateLocal(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function getCurrentWeekMondayIso() {
+    const now = new Date();
+    const normalized = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dayIndexFromMonday = (normalized.getDay() + 6) % 7;
+    normalized.setDate(normalized.getDate() - dayIndexFromMonday);
+    return toIsoDateLocal(normalized);
+}
+
 function mapActivityToCard(activity, courses) {
     const uiMeta = ACTIVITY_TYPE_UI[activity.activityType] || {
         format: activity.activityType || "Активность",
@@ -65,6 +82,7 @@ function mapActivityToCard(activity, courses) {
         activityType: activity.activityType,
         status: activity.status || "",
         deadline: activity.deadline,
+        assignedWeekStart: activity.assignedWeekStart || "",
         tasks: [],
         questions: [],
     };
@@ -79,6 +97,7 @@ function StudyActivity({ onBackToMain }) {
     const [courses, setCourses] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    const [isAssigningWeek, setIsAssigningWeek] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [modalMode, setModalMode] = useState("create");
     const [editingActivity, setEditingActivity] = useState(null);
@@ -380,8 +399,19 @@ function StudyActivity({ onBackToMain }) {
         );
     };
 
-    const handleDeleteActivity = (id) => {
-        setActivities(activities.filter((activity) => activity.id !== id));
+    const handleDeleteActivity = async (id) => {
+        setErrorMessage("");
+        if (!id) {
+            setErrorMessage("Не удалось определить активность для удаления");
+            return;
+        }
+        try {
+            await deleteCourseActivity(id);
+            setActivities((prev) => prev.filter((activity) => activity.id !== id));
+        } catch (error) {
+            const httpCode = error?.status ? ` (HTTP ${error.status})` : "";
+            setErrorMessage((error?.message || "Не удалось удалить активность") + httpCode);
+        }
     };
 
     const handlePublishActivity = async (activityId) => {
@@ -400,6 +430,26 @@ function StudyActivity({ onBackToMain }) {
             setErrorMessage(error?.message || "Не удалось опубликовать активность");
         } finally {
             setIsPublishing(false);
+        }
+    };
+
+    const handleAssignWeeklyActivity = async (activityId) => {
+        const weekStart = getCurrentWeekMondayIso();
+        setIsAssigningWeek(true);
+        setErrorMessage("");
+        try {
+            const assigned = await assignWeeklyActivity(activityId, weekStart);
+            const updatedCard = mapActivityToCard(assigned, courses);
+            setActivities((prev) =>
+                prev.map((activity) => (activity.id === activityId ? { ...activity, ...updatedCard } : activity))
+            );
+            setSelectedActivity((prev) =>
+                prev && prev.id === activityId ? { ...prev, ...updatedCard } : prev
+            );
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось назначить еженедельное задание");
+        } finally {
+            setIsAssigningWeek(false);
         }
     };
 
@@ -530,6 +580,12 @@ function StudyActivity({ onBackToMain }) {
                                                 <DocumentIcon />
                                                 <span>Статус: {activity.status || "неизвестно"}</span>
                                             </div>
+                                            {activity.activityType === "WEEKLY_STAR" && activity.assignedWeekStart && (
+                                                <div className="activity-detail-item">
+                                                    <CalendarIcon />
+                                                    <span>Назначено на неделю: {formatDate(activity.assignedWeekStart)}</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <p className="activity-description">{activity.description}</p>
                                         {activity.type === "Текст" && (
@@ -558,6 +614,18 @@ function StudyActivity({ onBackToMain }) {
                                         )}
                                     </div>
                                     <div className="activity-actions">
+                                        {activity.activityType === "WEEKLY_STAR" && activity.status === "READY" && (
+                                            <button
+                                                className="activity-action-btn btn-schedule-week"
+                                                type="button"
+                                                aria-label="Schedule week"
+                                                onClick={() => handleAssignWeeklyActivity(activity.id)}
+                                                disabled={isAssigningWeek}
+                                                title={isAssigningWeek ? "Назначение..." : "Назначить на текущую неделю"}
+                                            >
+                                                <CalendarIcon />
+                                            </button>
+                                        )}
                                         {activity.status !== "READY" && (
                                             <button
                                                 className="activity-action-btn btn-ready"

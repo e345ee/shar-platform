@@ -119,6 +119,7 @@ public class StudentCoursePageService {
                 AttemptStatusResponse a = new AttemptStatusResponse();
                 a.setTestId(tid);
                 a.setAttemptId(ta.getId());
+                a.setAttemptNumber(ta.getAttemptNumber());
                 a.setStatus(ta.getStatus() != null ? ta.getStatus().name() : null);
                 a.setScore(ta.getScore());
                 a.setMaxScore(ta.getMaxScore());

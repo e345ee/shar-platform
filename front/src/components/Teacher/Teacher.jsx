@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import "./Teacher.css";
-import { ProfileIcon, LogoutIcon } from "../../svgs/MethodistSvg.jsx";
+import { ProfileIcon, LogoutIcon, AchievementsIcon } from "../../svgs/MethodistSvg.jsx";
 import {
   ClassManagementIcon,
   HomeworkCheckIcon,
@@ -13,6 +13,7 @@ import Notifications from "./Notifications/Notifications";
 import HomeworkCheck from "./HomeworkCheck/HomeworkCheck";
 import TestAccess from "./TestAcess/TestAcess";
 import ClassManagement from "./ClassManagment";
+import AchievementAssignment from "./AchievementAssignment/AchievementAssignment";
 import {
   listMyClasses,
   listPendingAttempts,
@@ -55,6 +56,13 @@ const menuCards = [
         "Просмотр уведомлений о новых заданиях, ответах студентов и важных событиях",
     icon: NotificationsIcon,
     tone: "orange",
+  },
+  {
+    id: "achievement-assignment",
+    title: "Назначение достижений",
+    description: "Выдача и снятие достижений ученикам в ваших классах",
+    icon: AchievementsIcon,
+    tone: "cyan",
   },
 ];
 
@@ -156,6 +164,10 @@ function Teacher({ onLogout }) {
 
   if (activeSection === "class-management") {
     return <ClassManagement onBackToMain={() => setActiveSection(null)} />;
+  }
+
+  if (activeSection === "achievement-assignment") {
+    return <AchievementAssignment onBackToMain={() => setActiveSection(null)} />;
   }
 
   return (

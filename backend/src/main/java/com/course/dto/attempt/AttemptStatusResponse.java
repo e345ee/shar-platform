@@ -8,12 +8,14 @@ import java.time.LocalDateTime;
 public class AttemptStatusResponse {
     private Integer testId;
     private Integer attemptId;
+    private Integer attemptNumber;
     private String status;
     private Integer score;
     private Integer maxScore;
     private Integer weightedScore;
     private Integer weightedMaxScore;
     private LocalDateTime submittedAt;
+
 
     
 
@@ -31,6 +33,14 @@ public class AttemptStatusResponse {
 
     public void setAttemptId(Integer attemptId) {
         this.attemptId = attemptId;
+    }
+
+    public Integer getAttemptNumber() {
+        return this.attemptNumber;
+    }
+
+    public void setAttemptNumber(Integer attemptNumber) {
+        this.attemptNumber = attemptNumber;
     }
 
     public String getStatus() {

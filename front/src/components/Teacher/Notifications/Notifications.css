@@ -66,6 +66,33 @@
   flex-wrap: wrap;
 }
 
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: var(--card, #ffffff);
+  color: var(--text, #1e293b);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--orange, #f97316);
+  background: #fff7ed;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .btn-home {
   display: flex;
   align-items: center;
@@ -273,6 +300,61 @@
 .notification-date svg {
   width: 16px;
   height: 16px;
+}
+
+.notification-actions {
+  margin-top: 8px;
+}
+
+.btn-mark-read {
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 55%, #ea580c 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 8px 16px rgba(249, 115, 22, 0.28);
+  transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease,
+          filter 0.2s ease,
+          background 0.2s ease;
+}
+
+.btn-mark-read:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(249, 115, 22, 0.34);
+}
+
+.btn-mark-read:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(249, 115, 22, 0.25);
+}
+
+.btn-mark-read:focus-visible {
+  outline: none;
+  box-shadow:
+          0 0 0 3px rgba(251, 146, 60, 0.35),
+          0 10px 20px rgba(249, 115, 22, 0.28);
+}
+
+.notifications-empty {
+  padding: 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border, #cbd5e1);
+  color: var(--muted, #64748b);
+  font-size: 16px;
+}
+
+.notifications-error {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
 }
 
 @media (max-width: 1024px) {
