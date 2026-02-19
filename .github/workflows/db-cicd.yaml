@@ -1,0 +1,76 @@
+name: DB CI/CD (upload init SQL + run init.sh)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - "db/init/**"
+      - ".github/workflows/db-cicd.yaml"
+
+concurrency:
+  group: "shar-db-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  upload-and-init:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Pack db/init
+        run: |
+          set -euxo pipefail
+          ls -la db/init
+          tar -czf db-init.tgz -C db init
+          ls -la db-init.tgz
+          tar -tzf db-init.tgz
+
+      - name: Upload db-init.tgz to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: db-init.tgz
+          target: shar/postgress
+          debug: true
+
+      - name: Unpack to ~/shar/postgress and run init.sh
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          script: |
+            set -euxo pipefail
+
+            PG_DIR="$HOME/shar/postgress"
+
+            echo "=== BEFORE: $PG_DIR ==="
+            ls -la "$PG_DIR" || true
+
+            echo "=== Unpack db-init.tgz into $PG_DIR ==="
+            test -f "$PG_DIR/db-init.tgz"
+            tar -xzf "$PG_DIR/db-init.tgz" -C "$PG_DIR"
+            rm -f "$PG_DIR/db-init.tgz"
+
+            # Файлы лежат в $PG_DIR/init/*.sql — перенесём в корень, как у тебя в ls
+            test -d "$PG_DIR/init"
+            mv -f "$PG_DIR/init/"*.sql "$PG_DIR/"
+            rmdir "$PG_DIR/init"
+
+            echo "=== AFTER: $PG_DIR ==="
+            ls -la "$PG_DIR"
+
+            # проверим что init.sh есть на сервере
+            test -f "$PG_DIR/init.sh"
+            chmod +x "$PG_DIR/init.sh"
+
+            echo "=== Run init.sh (must succeed) ==="
+            cd "$PG_DIR"
+            ./init.sh
