@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Debug: repo tree (before build)
+      - name: Debug repo tree (before build)
         run: |
           set -euxo pipefail
           pwd
