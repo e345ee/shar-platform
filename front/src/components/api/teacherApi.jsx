@@ -135,6 +135,36 @@ function mapPendingAttempt(attempt) {
     };
 }
 
+function mapLesson(lesson) {
+    return {
+        id: lesson?.id,
+        courseId: lesson?.courseId ?? null,
+        orderIndex: lesson?.orderIndex ?? null,
+        title: lesson?.title || "",
+        description: lesson?.description || "",
+        presentationUrl: lesson?.presentationUrl || "",
+        createdAt: lesson?.createdAt || "",
+        updatedAt: lesson?.updatedAt || "",
+    };
+}
+
+function mapActivity(activity) {
+    return {
+        id: activity?.id,
+        lessonId: activity?.lessonId ?? null,
+        courseId: activity?.courseId ?? null,
+        activityType: activity?.activityType || "",
+        timeLimitSeconds: activity?.timeLimitSeconds ?? null,
+        title: activity?.title || "",
+        description: activity?.description || "",
+        topic: activity?.topic || "",
+        deadline: activity?.deadline || "",
+        status: activity?.status || "",
+        questionCount: activity?.questionCount ?? 0,
+        createdByName: activity?.createdByName || "",
+    };
+}
+
 // Получить список классов учителя
 export async function listMyClasses() {
     const classes = await requestJson("/api/classes/my");
@@ -238,6 +268,30 @@ export async function openLessonForClass(classId, lessonId) {
     return requestJson(`/api/classes/${classId}/lessons/${lessonId}/open`, {
         method: "POST",
     });
+}
+
+export async function listLessonsByCourse(courseId) {
+    const lessons = await requestJson(`/api/courses/${courseId}/lessons`);
+    if (!Array.isArray(lessons)) {
+        return [];
+    }
+    return lessons.map(mapLesson);
+}
+
+export async function listActivitiesByLesson(lessonId) {
+    const activities = await requestJson(`/api/lessons/${lessonId}/activities`);
+    if (!Array.isArray(activities)) {
+        return [];
+    }
+    return activities.map(mapActivity);
+}
+
+export async function listWeeklyActivitiesByCourse(courseId) {
+    const activities = await requestJson(`/api/courses/${courseId}/activities/weekly`);
+    if (!Array.isArray(activities)) {
+        return [];
+    }
+    return activities.map(mapActivity);
 }
 
 // Получить статистику по классу

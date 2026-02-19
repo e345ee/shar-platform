@@ -190,6 +190,22 @@
   gap: 24px;
 }
 
+.activity-error {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.activity-empty {
+  padding: 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid var(--border, #cbd5e1);
+  color: var(--muted, #64748b);
+}
+
 .test-access-card {
   background: var(--card, #ffffff);
   border-radius: 20px;

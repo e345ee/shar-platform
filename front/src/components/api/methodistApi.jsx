@@ -240,6 +240,12 @@ export async function listMyClasses() {
     return classes.map(mapStudyClass);
 }
 
+export async function openActivityForClass(classId, activityId) {
+    return requestJson(`/api/classes/${classId}/activities/${activityId}/open`, {
+        method: "POST",
+    });
+}
+
 export async function listLessonsByCourse(courseId) {
     const lessons = await requestJson(`/api/courses/${courseId}/lessons`);
     if (!Array.isArray(lessons)) {
@@ -405,6 +411,13 @@ export async function updateCourseActivity(activityId, dto) {
         body: dto,
     });
     return mapActivity(updated);
+}
+
+export async function publishActivity(activityId) {
+    const published = await requestJson(`/api/activities/${activityId}/publish`, {
+        method: "POST",
+    });
+    return mapActivity(published);
 }
 
 export async function createActivityQuestion(activityId, dto) {
