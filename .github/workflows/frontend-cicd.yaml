@@ -36,6 +36,8 @@ jobs:
       - name: Build
         working-directory: front
         run: npm run build
+        env:
+          CI: "false"
 
       - name: Pack build
         run: tar -czf front-build.tgz -C front build
