@@ -183,9 +183,9 @@ function Class({ onBackToMain }) {
                             <p className="classes-subtitle">Управление курсами и классами из базы данных</p>
                         </div>
                     </div>
-                    <div className="classes-header-actions">
+                    <div className="classes-header-actions classes-header-actions-row">
                         <button
-                            className="btn-add-class btn-add-course"
+                            className="btn-add-class btn-add-course classes-header-action-btn"
                             onClick={() => {
                                 setCourseErrorMessage("");
                                 setShowCourseModal(true);
@@ -196,7 +196,7 @@ function Class({ onBackToMain }) {
                             Создать курс
                         </button>
                         <button
-                            className="btn-add-class"
+                            className="btn-add-class classes-header-action-btn"
                             onClick={() => {
                                 setClassErrorMessage("");
                                 setEditingClass(null);
@@ -207,7 +207,7 @@ function Class({ onBackToMain }) {
                             <PlusIcon />
                             Добавить класс
                         </button>
-                        <button className="btn-home" onClick={onBackToMain} type="button">
+                        <button className="btn-home classes-header-action-btn" onClick={onBackToMain} type="button">
                             <HomeIcon />
                             На главную
                         </button>

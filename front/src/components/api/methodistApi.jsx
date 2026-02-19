@@ -60,6 +60,19 @@ function mapTeacher(user) {
     };
 }
 
+function mapTeacherStats(row) {
+    return {
+        teacherId: row?.teacherId ?? null,
+        teacherName: row?.teacherName || "",
+        teacherEmail: row?.teacherEmail || "",
+        classesCount: row?.classesCount ?? 0,
+        studentsCount: row?.studentsCount ?? 0,
+        submittedAttemptsCount: row?.submittedAttemptsCount ?? 0,
+        gradedAttemptsCount: row?.gradedAttemptsCount ?? 0,
+        avgGradePercent: row?.avgGradePercent ?? null,
+    };
+}
+
 function mapCourse(course) {
     return {
         id: course?.id,
@@ -147,6 +160,45 @@ export async function listTeachers(page = 0, size = 100) {
     const data = await requestJson(`/api/users/teachers?page=${page}&size=${size}`);
     const teachers = Array.isArray(data?.content) ? data.content : [];
     return teachers.map(mapTeacher);
+}
+
+export async function listTeacherStatistics(methodistId) {
+    const query = methodistId != null ? `?methodistId=${encodeURIComponent(methodistId)}` : "";
+    const rows = await requestJson(`/api/statistics/teachers${query}`);
+    if (!Array.isArray(rows)) {
+        return [];
+    }
+    return rows.map(mapTeacherStats);
+}
+
+export async function downloadTeacherStatisticsCsv(methodistId) {
+    const token = getAccessToken();
+    const query = methodistId != null ? `?methodistId=${encodeURIComponent(methodistId)}` : "";
+    const response = await fetch(`${API_BASE_URL}/api/statistics/teachers/export/csv${query}`, {
+        method: "GET",
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Accept: "text/csv",
+        },
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        let payload = null;
+        if (text) {
+            try {
+                payload = JSON.parse(text);
+            } catch (e) {
+                payload = null;
+            }
+        }
+        const error = new Error(payload?.message || "Не удалось скачать CSV");
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+    }
+
+    return response.blob();
 }
 
 export async function createTeacher(dto) {

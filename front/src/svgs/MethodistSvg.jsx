@@ -74,6 +74,25 @@ export const ClassesIcon = () => (
     </svg>
 );
 
+export const StatisticsIcon = () => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+        <path d="M4 20h16v2H2V4h2v16z" />
+        <path d="M8 18h2v-7H8v7zm4 0h2V7h-2v11zm4 0h2v-4h-2v4z" />
+    </svg>
+);
+
+export const DownloadIcon = () => (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+            d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+    </svg>
+);
+
 // Classes Management Icons
 export const HomeIcon = () => (
     <svg viewBox="0 0 24 24" fill="none">
