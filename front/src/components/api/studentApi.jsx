@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "";
 const AUTH_TOKEN_KEY = "auth_access_token";
 
 function getAccessToken() {

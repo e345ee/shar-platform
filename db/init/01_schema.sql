@@ -1,20 +1,13 @@
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_name') THEN
 CREATE TYPE role_name AS ENUM ('ADMIN','METHODIST','TEACHER','STUDENT');
-END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_type') THEN
 CREATE TYPE notification_type AS ENUM (
-            'CLASS_JOIN_REQUEST',
+'CLASS_JOIN_REQUEST',
             'MANUAL_GRADING_REQUIRED',
             'GRADE_RECEIVED',
             'OPEN_ANSWER_CHECKED',
             'WEEKLY_ASSIGNMENT_AVAILABLE',
             'ACHIEVEMENT_AWARDED'
-        );
-END IF;
-END$$;
+);
 
 
 CREATE TABLE IF NOT EXISTS role (

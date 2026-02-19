@@ -1,0 +1,174 @@
+name: Backend CI/CD (deploy jar to ~/shar/backend)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-cicd.yaml"
+
+concurrency:
+  group: "shar-backend-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Build backend (mvn package)
+        working-directory: backend
+        run: |
+          set -euxo pipefail
+          mvn -B clean package \
+            -DDB_URL="${{ secrets.DB_URL }}" \
+            -DDB_USERNAME="${{ secrets.DB_USERNAME }}" \
+            -DDB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+
+      - name: Pick built jar
+        run: |
+          set -euxo pipefail
+          JAR_PATH="$(ls -1 backend/target/*.jar | grep -vE '(sources|javadoc)\.jar$' | head -n 1)"
+          test -f "$JAR_PATH"
+          cp "$JAR_PATH" app.jar
+          ls -la app.jar
+
+      - name: Show jar size
+        run: |
+          ls -lh backend/target/*.jar
+
+      - name: Upload app.jar to ~/shar/backend/
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: app.jar
+          target: shar/backend
+          debug: true
+
+      - name: Restart backend on helios (port 10679) and wait health
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          script: |
+            set -euo pipefail
+
+            APP_DIR="$HOME/shar/backend"
+            APP_JAR="$APP_DIR/app.jar"
+            LOG_FILE="$APP_DIR/backend.log"
+            PID_FILE="$APP_DIR/backend.pid"
+
+            APP_PORT="10679"
+            FRONT_PORT="10677"
+
+            # MinIO локально на сервере
+            MINIO_HOST="127.0.0.1"
+            MINIO_PORT="18743"
+
+            echo "=== Ensure dir & jar exists ==="
+            cd "$APP_DIR"
+            test -f "$APP_JAR"
+            ls -la "$APP_DIR"
+
+            echo "=== Stop previous backend by pidfile (if any) ==="
+            if [ -f "$PID_FILE" ]; then
+              OLD_PID="$(cat "$PID_FILE" || true)"
+              if [ -n "${OLD_PID:-}" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+                echo "Stopping PID=$OLD_PID"
+                kill "$OLD_PID" || true
+                for i in $(seq 1 20); do
+                  kill -0 "$OLD_PID" 2>/dev/null || break
+                  sleep 1
+                done
+                kill -0 "$OLD_PID" 2>/dev/null && kill -9 "$OLD_PID" || true
+              fi
+              rm -f "$PID_FILE"
+            fi
+
+            echo "=== Safety: kill anything listening on :$APP_PORT ==="
+            PIDS="$(sockstat -l -P tcp | awk '$6 ~ /:'"$APP_PORT"'$/ {print $3}' | sort -u || true)"
+            if [ -n "${PIDS:-}" ]; then
+              echo "Found listeners on :$APP_PORT => $PIDS"
+              for p in $PIDS; do kill "$p" 2>/dev/null || true; done
+              sleep 2
+              PIDS2="$(sockstat -l -P tcp | awk '$6 ~ /:'"$APP_PORT"'$/ {print $3}' | sort -u || true)"
+              if [ -n "${PIDS2:-}" ]; then
+                echo "Force kill => $PIDS2"
+                for p in $PIDS2; do kill -9 "$p" 2>/dev/null || true; done
+              fi
+            fi
+
+            echo "=== Export runtime env ==="
+            export SERVER_PORT="$APP_PORT"
+
+            # Postgres
+            export SPRING_DATASOURCE_URL="${{ secrets.DB_URL }}"
+            export SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USERNAME }}"
+            export SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}"
+
+            # CORS / фронт
+            export APP_CORS_ALLOWED_ORIGINS="${{ secrets.APP_CORS_ALLOWED_ORIGINS }}"
+
+            # MinIO/S3
+            export APP_S3_REGION="${{ secrets.APP_S3_REGION }}"
+            export APP_S3_ACCESS_KEY="${{ secrets.APP_S3_ACCESS_KEY }}"
+            export APP_S3_SECRET_KEY="${{ secrets.APP_S3_SECRET_KEY }}"
+            export APP_S3_BUCKET="${{ secrets.APP_S3_BUCKET }}"
+            # внутренний эндпоинт MinIO (локально)
+            export APP_S3_HOST="$MINIO_HOST"
+            export APP_S3_PORT="$MINIO_PORT"
+            # если твоё приложение использует PUBLIC_* — оставим их тоже
+            export APP_S3_PUBLIC_HOST="${{ secrets.APP_S3_PUBLIC_HOST }}"
+            export APP_S3_PUBLIC_PORT="${{ secrets.APP_S3_PUBLIC_PORT }}"
+
+            echo "=== JVM env (before unset) ==="
+            echo "_JAVA_OPTIONS=${_JAVA_OPTIONS:-<empty>}"
+            echo "JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:-<empty>}"
+
+            unset _JAVA_OPTIONS
+            unset JAVA_TOOL_OPTIONS
+
+            echo "=== Start backend from $APP_DIR ==="
+            JAVA_OPTS="-Dserver.port=${APP_PORT} -Xms128m -Xmx512m"
+            nohup java $JAVA_OPTS -jar "$APP_JAR" >> "$LOG_FILE" 2>&1 &
+            echo $! > "$PID_FILE"
+            echo "Started PID=$(cat "$PID_FILE")"
+
+            echo "=== Wait listener :$APP_PORT ==="
+            for i in $(seq 1 40); do
+              if sockstat -l -P tcp | awk '$6 ~ /:'"$APP_PORT"'$/ {found=1} END{exit found?0:1}'; then
+                echo "listener up"
+                break
+              fi
+              sleep 1
+            done
+
+            echo "=== Healthcheck /actuator/health ==="
+            for i in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:${APP_PORT}/actuator/health" >/dev/null; then
+                echo "OK"
+                exit 0
+              fi
+              sleep 1
+            done
+
+            echo "Backend failed to become healthy"
+            echo "=== Last 200 lines of log ==="
+            tail -n 200 "$LOG_FILE" || true
+            exit 1

@@ -1,9 +1,9 @@
 INSERT INTO role(rolename, description) VALUES
-                                            ('ADMIN', 'Администратор системы'),
-                                            ('METHODIST', 'Методист'),
-                                            ('TEACHER', 'Преподаватель'),
-                                            ('STUDENT', 'Студент')
-    ON CONFLICT (rolename) DO NOTHING;
+ ('ADMIN', 'Администратор системы'),
+ ('METHODIST', 'Методист'),
+ ('TEACHER', 'Преподаватель'),
+ ('STUDENT', 'Студент')
+ON CONFLICT (rolename) DO NOTHING;
 
 
 
@@ -189,5 +189,5 @@ VALUES
 INSERT INTO test_attempt_answers(attempt_id, question_id, selected_option, is_correct, points_awarded, graded_at)
 SELECT a.id, q.id, q.correct_option, TRUE, q.points, NOW()
 FROM test_attempts a
-         JOIN test_questions q ON q.test_id = a.test_id
+JOIN test_questions q ON q.test_id = a.test_id
 WHERE a.status='GRADED';

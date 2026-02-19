@@ -1,0 +1,157 @@
+name: Frontend CI/CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'front/**'
+      - 'httpd.conf'
+      - 'shar/front/**'
+      - '.github/workflows/frontend-cicd.yaml'
+
+concurrency:
+  group: "shar-frontend-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug repo tree (before build)
+        run: |
+          set -euxo pipefail
+          pwd
+          echo "=== root ==="
+          ls -la
+          echo "=== front ==="
+          ls -la front || true
+          echo "=== shar/front ==="
+          ls -la shar/front || true
+          echo "=== httpd.conf ==="
+          ls -la httpd.conf || true
+          echo "=== find restart-httpd.sh ==="
+          find . -maxdepth 5 -type f -name "restart-httpd.sh" -print || true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        working-directory: front
+        run: |
+          set -euxo pipefail
+          npm ci
+
+      - name: Build
+        working-directory: front
+        env:
+          CI: "false"
+        run: |
+          set -euxo pipefail
+          npm run build
+          echo "=== front/build after build ==="
+          ls -la build || true
+
+      - name: Pack build
+        run: |
+          set -euxo pipefail
+          echo "=== verify front/build exists ==="
+          ls -la front/build || true
+          tar -czf front-build.tgz -C front build
+          echo "=== front-build.tgz ==="
+          ls -la front-build.tgz
+          tar -tzf front-build.tgz | head -n 30
+
+      - name: Debug files to upload (before scp)
+        run: |
+          set -euxo pipefail
+          test -f front-build.tgz
+          test -f httpd.conf
+          if [ -f shar/front/restart-httpd.sh ]; then
+            ls -la shar/front/restart-httpd.sh
+          else
+            echo "MISSING: shar/front/restart-httpd.sh"
+            echo "Found candidates:"
+            find . -maxdepth 5 -type f -name "restart-httpd.sh" -print || true
+            exit 1
+          fi
+
+      - name: Upload build to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: front-build.tgz
+          target: shar/front
+          debug: true
+
+      - name: Upload httpd.conf to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: httpd.conf
+          target: shar/front
+          debug: true
+
+      - name: Upload restart-httpd.sh to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: shar/front/restart-httpd.sh
+          target: shar/front
+          debug: true
+
+      - name: Deploy + restart httpd
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          script: |
+            set -euxo pipefail
+
+            FRONT_DIR="$HOME/shar/front"
+            WWW_DIR="$FRONT_DIR/www"
+
+            echo "=== server: list front dir BEFORE ==="
+            ls -la "$FRONT_DIR" || true
+
+            mkdir -p "$WWW_DIR"
+
+            echo "=== server: unpack build tgz ==="
+            ls -la "$FRONT_DIR/front-build.tgz"
+            tar -xzf "$FRONT_DIR/front-build.tgz" -C "$FRONT_DIR"
+            rm -f "$FRONT_DIR/front-build.tgz"
+
+            echo "=== server: update www ==="
+            rm -rf "$WWW_DIR"/*
+            cp -a "$FRONT_DIR/build/." "$WWW_DIR/"
+            rm -rf "$FRONT_DIR/build"
+
+            echo "=== server: verify files ==="
+            test -f "$FRONT_DIR/httpd.conf"
+            test -f "$FRONT_DIR/restart-httpd.sh"
+            chmod +x "$FRONT_DIR/restart-httpd.sh"
+
+            echo "=== server: restart httpd ==="
+            "$FRONT_DIR/restart-httpd.sh"
+
+            echo "=== server: health-check ==="
+            curl -v --fail "http://127.0.0.1:10677/" >/dev/null

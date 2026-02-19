@@ -3,9 +3,9 @@ spring:
     name: course-management
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/course_db
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -40,8 +40,8 @@ spring:
           starttls:
             enable: ${SPRING_MAIL_SMTP_STARTTLS:false}
 
-  server:
-    port: 8080
+server:
+  port: ${SERVER_PORT}
 
 logging:
   level:
@@ -52,29 +52,23 @@ logging:
 
 app:
   jwt:
-
-
     secret: "dev-secret-change-me-please-dev-secret-change-me"
-
     access-token-ttl-minutes: 120
-
     refresh-token-ttl-minutes: 10080
 
   s3:
-    endpoint: http://localhost:9000
-    region: us-east-1
-    access-key: minioadmin
-    secret-key: minioadmin
-    bucket: avatars
-    public-url: http://localhost:9000
-    max-avatar-bytes: 2097152
-    max-achievement-photo-bytes: 5242880
-    max-lesson-pdf-bytes: 10485760
+    endpoint: http://${APP_S3_HOST}:${APP_S3_PORT}
+    region: ${APP_S3_REGION:us-east-1}
+    access-key: ${APP_S3_ACCESS_KEY:minioadmin}
+    secret-key: ${APP_S3_SECRET_KEY:minioadmin}
+    bucket: ${APP_S3_BUCKET:avatars}
+    public-url: http://${APP_S3_PUBLIC_HOST}:${APP_S3_PUBLIC_PORT}
+    max-avatar-bytes: ${APP_S3_MAX_AVATAR_BYTES:2097152}
+    max-achievement-photo-bytes: ${APP_S3_MAX_ACHIEVEMENT_PHOTO_BYTES:5242880}
+    max-lesson-pdf-bytes: ${APP_S3_MAX_LESSON_PDF_BYTES:10485760}
 
   remedial:
-
-
-    min-percent: 50.0
+    min-percent: ${APP_REMEDIAL_MIN_PERCENT:50.0}
 
   mail:
     enabled: ${APP_MAIL_ENABLED:false}
