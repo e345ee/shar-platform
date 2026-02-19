@@ -70,7 +70,7 @@ jobs:
           ls -la front-build.tgz
           tar -tzf front-build.tgz | head -n 30
 
-      - name: Debug: files to upload (before scp)
+      - name: Debug files to upload (before scp)
         run: |
           set -euxo pipefail
           test -f front-build.tgz
