@@ -1,0 +1,108 @@
+name: Frontend CI/CD
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'front/**'
+      - 'httpd.conf'
+      - 'shar/front/**'
+      - '.github/workflows/frontend-cicd.yaml'
+
+concurrency:
+  group: shar-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: front/package-lock.json
+
+      - name: Install dependencies
+        working-directory: front
+        run: npm ci
+
+      - name: Build
+        working-directory: front
+        run: npm run build
+
+      - name: Pack build
+        run: tar -czf front-build.tgz -C front build
+
+      # 1) отправляем билд
+      - name: Upload build to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: front-build.tgz
+          target: shar/front
+
+      # 2) отправляем httpd.conf (лежит в корне репозитория)
+      - name: Upload httpd.conf to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: httpd.conf
+          target: shar/front
+
+      # 3) отправляем restart-скрипт
+      - name: Upload restart-httpd.sh to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          source: shar/front/restart-httpd.sh
+          target: shar/front
+
+      - name: Deploy + restart httpd
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          script: |
+            set -euo pipefail
+
+            FRONT_DIR="$HOME/shar/front"
+            WWW_DIR="$FRONT_DIR/www"
+
+            mkdir -p "$WWW_DIR"
+
+            # распаковать билд
+            tar -xzf "$FRONT_DIR/front-build.tgz" -C "$FRONT_DIR"
+            rm -f "$FRONT_DIR/front-build.tgz"
+
+            # обновить статику
+            rm -rf "$WWW_DIR"/*
+            cp -a "$FRONT_DIR/build/." "$WWW_DIR/"
+            rm -rf "$FRONT_DIR/build"
+
+            # убедиться что конфиг и рестарт-скрипт на месте
+            test -f "$FRONT_DIR/httpd.conf"
+            chmod +x "$FRONT_DIR/restart-httpd.sh"
+
+            # рестарт апача
+            "$FRONT_DIR/restart-httpd.sh"
+
+            # health-check
+            curl -fsS "http://127.0.0.1:10677/" >/dev/null
