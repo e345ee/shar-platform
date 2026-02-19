@@ -200,6 +200,18 @@
   gap: 24px;
 }
 
+.study-activities-type-group {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.study-activities-type-title {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text, #1e293b);
+}
+
 .study-activity-card {
   background: var(--card, #ffffff);
   border-radius: 20px;
@@ -234,17 +246,6 @@
   line-height: 1.6;
 }
 
-.study-activity-course {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: var(--yellow-soft, #fefce8);
-  color: var(--yellow, #f59e0b);
-  font-size: 14px;
-  font-weight: 600;
-  margin-right: 8px;
-}
-
 .study-activity-meta {
   display: flex;
   gap: 16px;
@@ -255,6 +256,25 @@
   padding: 6px 12px;
   background: var(--blue-soft, #eff6ff);
   color: var(--blue, #3b82f6);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.study-activity-suitability {
+  padding: 6px 12px;
+  background: #ecfdf5;
+  color: #047857;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.study-activity-attempt-status {
+  padding: 6px 12px;
+  background: #f8fafc;
+  color: var(--text, #1e293b);
+  border: 1px solid var(--border, #cbd5e1);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
@@ -286,6 +306,40 @@
   background: #2563eb;
   transform: translateY(-1px);
   box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.study-activity-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.study-activity-my-attempts-btn {
+  padding: 12px 24px;
+  background: #fff;
+  color: var(--text, #1e293b);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.study-activity-my-attempts-btn:hover {
+  border-color: var(--blue, #3b82f6);
+  color: var(--blue, #3b82f6);
+  transform: translateY(-1px);
+}
+
+.study-activity-locked-note {
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px dashed var(--border, #cbd5e1);
+  color: var(--muted, #64748b);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .study-activities-error {

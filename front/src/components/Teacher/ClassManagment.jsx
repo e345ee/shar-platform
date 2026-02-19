@@ -23,7 +23,9 @@ import {
   approveJoinRequest,
   rejectJoinRequest,
   removeStudentFromClass,
+  closeCourseForStudent,
   listClassStudents,
+  createStudent,
 } from "../api/teacherApi";
 
 function ClassManagement({ onBackToMain }) {
@@ -35,7 +37,17 @@ function ClassManagement({ onBackToMain }) {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [showClassCodesModal, setShowClassCodesModal] = useState(false);
+  const [isCreatingStudent, setIsCreatingStudent] = useState(false);
+  const [createdStudentMessage, setCreatedStudentMessage] = useState("");
   const [copiedCode, setCopiedCode] = useState(null);
+  const [closingCourseKey, setClosingCourseKey] = useState("");
+  const [studentForm, setStudentForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    tgId: "",
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -175,11 +187,93 @@ function ClassManagement({ onBackToMain }) {
     }
   };
 
+  const handleCloseCourseForStudent = async (classId, studentId, studentName) => {
+    const confirmText = `Отметить курс как пройденный для ученика "${studentName || "Без имени"}"?`;
+    if (!window.confirm(confirmText)) {
+      return;
+    }
+
+    const actionKey = `${classId}:${studentId}`;
+    setClosingCourseKey(actionKey);
+    setErrorMessage("");
+
+    try {
+      await closeCourseForStudent(classId, studentId);
+      const studentsData = await listClassStudents(classId, 0, 100);
+      setStudentsByClass((prev) => ({
+        ...prev,
+        [classId]: studentsData.content || [],
+      }));
+    } catch (error) {
+      setErrorMessage(error?.message || "Не удалось отметить прохождение курса");
+    } finally {
+      setClosingCourseKey("");
+    }
+  };
+
   const toggleClass = (classId) => {
     setExpandedClasses((prev) => ({
       ...prev,
       [classId]: !prev[classId],
     }));
+  };
+
+  const handleStudentFormChange = (field, value) => {
+    setStudentForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateStudent = async (e) => {
+    e.preventDefault();
+    setErrorMessage("");
+    setCreatedStudentMessage("");
+    setIsCreatingStudent(true);
+    try {
+      const payload = {
+        name: studentForm.name.trim(),
+        email: studentForm.email.trim(),
+        password: studentForm.password,
+        tgId: studentForm.tgId.trim() || null,
+      };
+      const created = await createStudent(payload);
+      setCreatedStudentMessage(`Ученик ${created?.name || payload.name} успешно создан`);
+      setStudentForm({
+        name: "",
+        email: "",
+        password: "",
+        tgId: "",
+      });
+    } catch (error) {
+      setErrorMessage(error?.message || "Не удалось создать ученика");
+    } finally {
+      setIsCreatingStudent(false);
+    }
+  };
+
+  const handleCopyCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (err) {
+      // Fallback для старых браузеров
+      const textArea = document.createElement("textarea");
+      textArea.value = code;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand("copy");
+        setCopiedCode(code);
+        setTimeout(() => setCopiedCode(null), 2000);
+      } catch (e) {
+        console.error("Не удалось скопировать код", e);
+      }
+      document.body.removeChild(textArea);
+    }
   };
 
   return (
@@ -198,6 +292,14 @@ function ClassManagement({ onBackToMain }) {
               </div>
             </div>
             <div className="class-management-header-actions">
+              <button
+                  className="btn-view-codes"
+                  onClick={() => setShowClassCodesModal(true)}
+                  type="button"
+              >
+                <BuildingIcon />
+                Коды классов
+              </button>
               <button
                   className="btn-add-student"
                   onClick={() => setShowAddStudentModal(true)}
@@ -395,10 +497,6 @@ function ClassManagement({ onBackToMain }) {
                                       <UsersIcon />
                                       <span>{students.length} учеников</span>
                                     </div>
-                                    <span className="class-info-separator">•</span>
-                                    <div className="class-info-item">
-                                      <span>Курс: {classItem.courseName || "Не указан"}</span>
-                                    </div>
                                   </div>
                                   <button
                                       className="btn-expand-class"
@@ -421,33 +519,60 @@ function ClassManagement({ onBackToMain }) {
                                         <div className="class-students-grid">
                                           {students.map((student) => (
                                               <div key={student.id} className="student-card">
-                                                <div
-                                                    className="student-avatar"
-                                                    style={{ background: "#3b82f6" }}
-                                                >
-                                                  {getInitials(student.name)}
-                                                </div>
-                                                <div className="student-info">
-                                                  <div className="student-name">
-                                                    {student.name || "Не указано"}
-                                                  </div>
-                                                  <div className="student-contact">
-                                                    <div className="contact-item">
-                                                      <EmailIcon />
-                                                      <span>{student.email || "Не указан"}</span>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                                <button
-                                                    className="btn-delete-student"
-                                                    onClick={() =>
-                                                        handleDeleteStudent(classItem.id, student.id)
-                                                    }
-                                                    type="button"
-                                                    aria-label="Delete"
-                                                >
-                                                  <TrashIcon />
-                                                </button>
+                                                {(() => {
+                                                  const actionKey = `${classItem.id}:${student.id}`;
+                                                  const isClosing = closingCourseKey === actionKey;
+                                                  const isCourseClosed = Boolean(
+                                                      student?.courseClosedAt
+                                                  );
+                                                  return (
+                                                      <>
+                                                        <div
+                                                            className="student-avatar"
+                                                            style={{ background: "#3b82f6" }}
+                                                        >
+                                                          {getInitials(student.name)}
+                                                        </div>
+                                                        <div className="student-info">
+                                                          <div className="student-name">
+                                                            {student.name || "Не указано"}
+                                                          </div>
+                                                          <div className="student-contact">
+                                                            <div className="contact-item">
+                                                              <EmailIcon />
+                                                              <span>{student.email || "Не указан"}</span>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                        <div className="student-actions">
+                                                          <button
+                                                              className={`btn-close-course-student ${isCourseClosed ? "is-closed" : ""}`}
+                                                              onClick={() =>
+                                                                  handleCloseCourseForStudent(classItem.id, student.id, student.name)
+                                                              }
+                                                              type="button"
+                                                              disabled={isClosing || isCourseClosed}
+                                                          >
+                                                            {isClosing
+                                                                ? "Сохраняем..."
+                                                                : isCourseClosed
+                                                                    ? "Завершено"
+                                                                    : "Завершить курс"}
+                                                          </button>
+                                                          <button
+                                                              className="btn-delete-student"
+                                                              onClick={() =>
+                                                                  handleDeleteStudent(classItem.id, student.id)
+                                                              }
+                                                              type="button"
+                                                              aria-label="Delete"
+                                                          >
+                                                            <TrashIcon />
+                                                          </button>
+                                                        </div>
+                                                      </>
+                                                  );
+                                                })()}
                                               </div>
                                           ))}
                                         </div>
@@ -463,63 +588,171 @@ function ClassManagement({ onBackToMain }) {
           )}
 
           {showAddStudentModal && (
-              <div className="modal-overlay" onClick={() => setShowAddStudentModal(false)}>
+              <div className="modal-overlay" onClick={() => {
+                setShowAddStudentModal(false);
+                setCreatedStudentMessage("");
+              }}>
                 <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                   <button
                       className="modal-close"
-                      onClick={() => setShowAddStudentModal(false)}
+                      onClick={() => {
+                        setShowAddStudentModal(false);
+                        setCreatedStudentMessage("");
+                      }}
                       type="button"
                       aria-label="Закрыть"
                   >
                     <XIcon />
                   </button>
-                  <h2 className="modal-title">Добавление ученика в класс</h2>
+                  <h2 className="modal-title">Создание ученика</h2>
                   <p className="modal-subtitle">
-                    Ученики могут присоединиться к классу, используя код класса.
-                    Отправьте код класса ученику, чтобы он мог подать заявку на вступление.
+                    Создайте аккаунт ученика на платформе. После создания можно дать ему код класса для вступления.
+                  </p>
+                  {createdStudentMessage && (
+                      <div className="class-management-success">{createdStudentMessage}</div>
+                  )}
+
+                  <form className="student-create-form" onSubmit={handleCreateStudent}>
+                    <label className="student-create-label" htmlFor="student-name">
+                      Имя
+                    </label>
+                    <input
+                        id="student-name"
+                        className="student-create-input"
+                        type="text"
+                        value={studentForm.name}
+                        onChange={(e) => handleStudentFormChange("name", e.target.value)}
+                        placeholder="Введите имя ученика"
+                        required
+                    />
+
+                    <label className="student-create-label" htmlFor="student-email">
+                      Email
+                    </label>
+                    <input
+                        id="student-email"
+                        className="student-create-input"
+                        type="email"
+                        value={studentForm.email}
+                        onChange={(e) => handleStudentFormChange("email", e.target.value)}
+                        placeholder="student@example.com"
+                        required
+                    />
+
+                    <label className="student-create-label" htmlFor="student-password">
+                      Пароль
+                    </label>
+                    <input
+                        id="student-password"
+                        className="student-create-input"
+                        type="password"
+                        value={studentForm.password}
+                        onChange={(e) => handleStudentFormChange("password", e.target.value)}
+                        placeholder="Минимум 6 символов"
+                        minLength={6}
+                        required
+                    />
+
+                    <label className="student-create-label" htmlFor="student-tgid">
+                      Telegram ID (опционально)
+                    </label>
+                    <input
+                        id="student-tgid"
+                        className="student-create-input"
+                        type="text"
+                        value={studentForm.tgId}
+                        onChange={(e) => handleStudentFormChange("tgId", e.target.value)}
+                        placeholder="@username или id"
+                    />
+
+                    <div className="modal-actions">
+                      <button
+                          className="btn-secondary"
+                          onClick={() => {
+                            setShowAddStudentModal(false);
+                            setCreatedStudentMessage("");
+                          }}
+                          type="button"
+                          disabled={isCreatingStudent}
+                      >
+                        Закрыть
+                      </button>
+                      <button className="btn-accept" type="submit" disabled={isCreatingStudent}>
+                        <CheckIcon />
+                        {isCreatingStudent ? "Создание..." : "Создать ученика"}
+                      </button>
+                    </div>
+                  </form>
+
+                </div>
+              </div>
+          )}
+
+          {showClassCodesModal && (
+              <div className="modal-overlay" onClick={() => setShowClassCodesModal(false)}>
+                <div className="modal-content modal-content-large" onClick={(e) => e.stopPropagation()}>
+                  <button
+                      className="modal-close"
+                      onClick={() => setShowClassCodesModal(false)}
+                      type="button"
+                      aria-label="Закрыть"
+                  >
+                    <XIcon />
+                  </button>
+                  <h2 className="modal-title">Коды классов</h2>
+                  <p className="modal-subtitle">
+                    Коды для вступления в ваши классы. Поделитесь кодом с учениками, чтобы они могли подать заявку на вступление.
                   </p>
 
-                  <div className="modal-class-codes">
-                    <h3>Коды классов:</h3>
-                    {classes.length === 0 ? (
-                        <p className="modal-empty">У вас пока нет классов</p>
-                    ) : (
-                        <div className="class-codes-list">
-                          {classes.map((classItem) => (
-                              <div key={classItem.id} className="class-code-item">
+                  {classes.length === 0 ? (
+                      <div className="class-codes-empty">
+                        <BuildingIcon />
+                        <p>У вас пока нет классов</p>
+                      </div>
+                  ) : (
+                      <div className="class-codes-list">
+                        {classes.map((classItem) => (
+                            <div key={classItem.id} className="class-code-card">
+                              <div className="class-code-header">
                                 <div className="class-code-info">
-                                  <strong>{classItem.name}</strong>
-                                  {classItem.courseName && (
-                                      <span className="class-code-course">{classItem.courseName}</span>
-                                  )}
+                                  <h3 className="class-code-name">{classItem.name}</h3>
                                 </div>
-                                <div className="class-code-wrapper">
-                                  <code className="class-code">{classItem.joinCode || "Не указан"}</code>
+                              </div>
+                              <div className="class-code-body">
+                                <div className="class-code-label">Код для вступления:</div>
+                                <div className="class-code-value-wrapper">
+                                  <div className="class-code-value">
+                                    {classItem.joinCode || "Не указан"}
+                                  </div>
                                   <button
                                       className="btn-copy-code"
-                                      onClick={() => {
-                                        if (classItem.joinCode) {
-                                          navigator.clipboard.writeText(classItem.joinCode);
-                                          setCopiedCode(classItem.id);
-                                          setTimeout(() => setCopiedCode(null), 2000);
-                                        }
-                                      }}
+                                      onClick={() => handleCopyCode(classItem.joinCode)}
                                       type="button"
-                                      disabled={!classItem.joinCode}
+                                      title="Скопировать код"
                                   >
-                                    {copiedCode === classItem.id ? "Скопировано!" : "Копировать"}
+                                    {copiedCode === classItem.joinCode ? (
+                                        <>
+                                          <CheckIcon />
+                                          Скопировано
+                                        </>
+                                    ) : (
+                                        <>
+                                          <PlusIcon />
+                                          Копировать
+                                        </>
+                                    )}
                                   </button>
                                 </div>
                               </div>
-                          ))}
-                        </div>
-                    )}
-                  </div>
+                            </div>
+                        ))}
+                      </div>
+                  )}
 
                   <div className="modal-actions">
                     <button
                         className="btn-secondary"
-                        onClick={() => setShowAddStudentModal(false)}
+                        onClick={() => setShowClassCodesModal(false)}
                         type="button"
                     >
                       Закрыть

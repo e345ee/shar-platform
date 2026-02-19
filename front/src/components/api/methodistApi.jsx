@@ -29,19 +29,27 @@ async function requestJson(path, { method = "GET", body } = {}) {
     }
 
     const text = await response.text();
+    const rawText = text ? text.trim() : "";
     let payload = null;
-    if (text) {
+    if (rawText) {
         try {
-            payload = JSON.parse(text);
+            payload = JSON.parse(rawText);
         } catch (e) {
             payload = null;
         }
     }
 
     if (!response.ok) {
-        const error = new Error(payload?.message || "Request failed");
+        const errorMessage =
+            payload?.message
+            || payload?.error
+            || rawText
+            || response.statusText
+            || "Request failed";
+        const error = new Error(errorMessage);
         error.status = response.status;
         error.payload = payload;
+        error.rawText = rawText;
         throw error;
     }
 
@@ -113,6 +121,7 @@ function mapActivity(activity) {
         lessonId: activity?.lessonId ?? null,
         courseId: activity?.courseId ?? null,
         activityType: activity?.activityType || "",
+        assignedWeekStart: activity?.assignedWeekStart || "",
         timeLimitSeconds: activity?.timeLimitSeconds ?? null,
         title: activity?.title || "",
         description: activity?.description || "",
@@ -418,6 +427,20 @@ export async function publishActivity(activityId) {
         method: "POST",
     });
     return mapActivity(published);
+}
+
+export async function assignWeeklyActivity(activityId, weekStart) {
+    const assigned = await requestJson(`/api/activities/${activityId}/schedule-week`, {
+        method: "POST",
+        body: { weekStart },
+    });
+    return mapActivity(assigned);
+}
+
+export async function deleteCourseActivity(activityId) {
+    return requestJson(`/api/activities/${activityId}`, {
+        method: "DELETE",
+    });
 }
 
 export async function createActivityQuestion(activityId, dto) {

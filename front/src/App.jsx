@@ -5,7 +5,6 @@ import Methodist from "./components/Metodist/Metodist";
 import Student from "./components/Student/Student";
 import Teacher from "./components/Teacher/Teacher";
 import { authenticateUser } from "./components/api/authApi";
-import StudentPage from "./components/Pages/StudentPage";
 
 const AUTH_TOKEN_KEY = "auth_access_token";
 const AUTH_ROLE_KEY = "auth_role_name";
