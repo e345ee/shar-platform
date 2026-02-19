@@ -1,0 +1,75 @@
+name: MinIO restart (remote only)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - ".github/workflows/minio-restart.yaml"
+
+concurrency:
+  group: "shar-minio-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  restart-minio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restart MinIO on helios
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.REMOTE_PORT }}
+          script: |
+            set -euo pipefail
+
+            MINIO_DIR="$HOME/shar/minio"
+            MINIO_PORT="18743"
+            MINIO_CONSOLE_PORT="18744"
+
+            echo "=== Go to $MINIO_DIR ==="
+            cd "$MINIO_DIR"
+            ls -la
+
+            echo "=== Stop previous MinIO (if running) ==="
+            MINIO_PORT="$MINIO_PORT" sh "$MINIO_DIR/stop.sh" || true
+
+            echo "=== Check listeners after stop ==="
+            sockstat -l -P tcp | egrep ":${MINIO_PORT}|:${MINIO_CONSOLE_PORT}" || echo "no listeners"
+
+            echo "=== Start MinIO ==="
+            # Важно: запуск в фоне + логирование
+            nohup "$MINIO_DIR/bin/minio" server "$MINIO_DIR/data" \
+              --address ":${MINIO_PORT}" \
+              --console-address ":${MINIO_CONSOLE_PORT}" \
+              >> "$MINIO_DIR/minio.log" 2>&1 &
+
+            echo "=== Wait for listeners ==="
+            # ждём до ~30 секунд появления слушателей
+            for i in $(seq 1 30); do
+              if sockstat -l -P tcp | egrep -q ":${MINIO_PORT}|:${MINIO_CONSOLE_PORT}"; then
+                echo "listeners are up"
+                break
+              fi
+              sleep 1
+            done
+
+            echo "=== Verify listeners ==="
+            sockstat -l -P tcp | egrep ":${MINIO_PORT}|:${MINIO_CONSOLE_PORT}" || (echo "MinIO ports not listening" && exit 1)
+
+            echo "=== Healthcheck ==="
+            # ждём пока /minio/health/live начнет отвечать (до ~60 секунд)
+            for i in $(seq 1 60); do
+              if curl -fsS "http://127.0.0.1:${MINIO_PORT}/minio/health/live" >/dev/null; then
+                echo OK
+                exit 0
+              fi
+              sleep 1
+            done
+
+            echo "Healthcheck failed"
+            echo "=== Last 200 lines of minio.log ==="
+            tail -n 200 "$MINIO_DIR/minio.log" || true
+            exit 1
