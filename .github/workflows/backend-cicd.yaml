@@ -44,6 +44,10 @@ jobs:
           cp "$JAR_PATH" app.jar
           ls -la app.jar
 
+      - name: Show jar size
+        run: |
+          ls -lh backend/target/*.jar
+
       - name: Upload app.jar to ~/shar/backend/
         uses: appleboy/scp-action@v0.1.7
         with:
