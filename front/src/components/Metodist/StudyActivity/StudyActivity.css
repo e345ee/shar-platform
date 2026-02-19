@@ -441,6 +441,40 @@
     height: 20px;
 }
 
+.activity-action-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-ready {
+    color: #047857;
+    border-color: #86efac;
+    background: #ecfdf5;
+    box-shadow: none;
+}
+
+.btn-ready:hover {
+    color: #065f46;
+    border-color: #10b981;
+    background: #dcfce7;
+}
+
+.btn-ready svg {
+    width: 18px;
+    height: 18px;
+}
+
+.btn-open-access {
+    color: var(--green, #10b981);
+}
+
+.btn-open-access:hover {
+    border-color: var(--green, #10b981);
+    color: var(--green, #10b981);
+    background: #f0fdf4;
+}
+
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -544,6 +578,12 @@
     flex: 1;
     display: grid;
     gap: 8px;
+}
+
+.access-modal-body {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
 }
 
 .modal-label {

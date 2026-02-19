@@ -7,7 +7,7 @@ import {
     TrashIcon,
     HomeIcon,
 } from "../../../svgs/MethodistSvg.jsx";
-import {CalendarIcon, BookIcon, LocationIcon, DocumentIcon, TestIcon, QuestionsListIcon } from "../../../svgs/ActivitySvg.jsx";
+import {CalendarIcon, BookIcon, LocationIcon, DocumentIcon, TestIcon, QuestionsListIcon, CheckIcon } from "../../../svgs/ActivitySvg.jsx";
 import AddStudyActivityModal from "./AddStudyActivityModal";
 import TextModal from "./TextModal";
 import TestModal from "./TestModal";
@@ -20,6 +20,7 @@ import {
     listMyCourses,
     listLessonsByCourse,
     listWeeklyActivitiesByCourse,
+    publishActivity,
     updateActivityQuestion,
     updateCourseActivity,
 } from "../../api/methodistApi";
@@ -51,6 +52,7 @@ function mapActivityToCard(activity, courses) {
     const courseName = courses.find((course) => course.id === activity.courseId)?.name || "";
     return {
         id: activity.id,
+        courseId: activity.courseId ?? null,
         title: activity.title,
         topic: activity.topic,
         format: uiMeta.format,
@@ -61,6 +63,7 @@ function mapActivityToCard(activity, courses) {
         questionsCount: activity.questionCount || 0,
         color: uiMeta.color,
         activityType: activity.activityType,
+        status: activity.status || "",
         deadline: activity.deadline,
         tasks: [],
         questions: [],
@@ -75,6 +78,7 @@ function StudyActivity({ onBackToMain }) {
     const [activities, setActivities] = useState([]);
     const [courses, setCourses] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [modalMode, setModalMode] = useState("create");
     const [editingActivity, setEditingActivity] = useState(null);
@@ -83,13 +87,13 @@ function StudyActivity({ onBackToMain }) {
         let isCancelled = false;
         setErrorMessage("");
         listMyCourses()
-            .then((data) => {
+            .then((coursesData) => {
                 if (isCancelled) return;
-                setCourses(data);
+                setCourses(coursesData);
             })
             .catch((error) => {
                 if (isCancelled) return;
-                setErrorMessage(error?.message || "Не удалось загрузить курсы");
+                setErrorMessage(error?.message || "Не удалось загрузить данные");
             });
         return () => {
             isCancelled = true;
@@ -380,6 +384,25 @@ function StudyActivity({ onBackToMain }) {
         setActivities(activities.filter((activity) => activity.id !== id));
     };
 
+    const handlePublishActivity = async (activityId) => {
+        setIsPublishing(true);
+        setErrorMessage("");
+        try {
+            const published = await publishActivity(activityId);
+            const updatedCard = mapActivityToCard(published, courses);
+            setActivities((prev) =>
+                prev.map((activity) => (activity.id === activityId ? { ...activity, ...updatedCard } : activity))
+            );
+            setSelectedActivity((prev) =>
+                prev && prev.id === activityId ? { ...prev, ...updatedCard } : prev
+            );
+        } catch (error) {
+            setErrorMessage(error?.message || "Не удалось опубликовать активность");
+        } finally {
+            setIsPublishing(false);
+        }
+    };
+
     const getActivityTypeTag = (format, type) => {
         const formatColors = {
             "Контрольная работа": "red",
@@ -503,6 +526,10 @@ function StudyActivity({ onBackToMain }) {
                                                 <CalendarIcon />
                                                 <span>{activity.date}</span>
                                             </div>
+                                            <div className="activity-detail-item">
+                                                <DocumentIcon />
+                                                <span>Статус: {activity.status || "неизвестно"}</span>
+                                            </div>
                                         </div>
                                         <p className="activity-description">{activity.description}</p>
                                         {activity.type === "Текст" && (
@@ -531,6 +558,18 @@ function StudyActivity({ onBackToMain }) {
                                         )}
                                     </div>
                                     <div className="activity-actions">
+                                        {activity.status !== "READY" && (
+                                            <button
+                                                className="activity-action-btn btn-ready"
+                                                type="button"
+                                                aria-label="Publish"
+                                                onClick={() => handlePublishActivity(activity.id)}
+                                                disabled={isPublishing}
+                                                title={isPublishing ? "Публикация..." : "Опубликовать активность"}
+                                            >
+                                                <CheckIcon />
+                                            </button>
+                                        )}
                                         <button
                                             className="activity-action-btn"
                                             type="button"
