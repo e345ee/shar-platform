@@ -11,7 +11,7 @@ on:
       - '.github/workflows/frontend-cicd.yaml'
 
 concurrency:
-  group: shar-frontend-${{ github.ref }}
+  group: "shar-frontend-${{ github.ref }}"
   cancel-in-progress: true
 
 jobs:
@@ -28,8 +28,6 @@ jobs:
           pwd
           echo "=== root ==="
           ls -la
-          echo "=== .github/workflows ==="
-          ls -la .github/workflows || true
           echo "=== front ==="
           ls -la front || true
           echo "=== shar/front ==="
@@ -37,7 +35,7 @@ jobs:
           echo "=== httpd.conf ==="
           ls -la httpd.conf || true
           echo "=== find restart-httpd.sh ==="
-          find . -maxdepth 4 -type f -name "restart-httpd.sh" -print || true
+          find . -maxdepth 5 -type f -name "restart-httpd.sh" -print || true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -54,19 +52,18 @@ jobs:
 
       - name: Build
         working-directory: front
+        env:
+          CI: "false"
         run: |
           set -euxo pipefail
           npm run build
           echo "=== front/build after build ==="
           ls -la build || true
-        env:
-          CI: "false"
 
       - name: Pack build
         run: |
           set -euxo pipefail
           echo "=== verify front/build exists ==="
-          ls -la front || true
           ls -la front/build || true
           tar -czf front-build.tgz -C front build
           echo "=== front-build.tgz ==="
@@ -76,23 +73,17 @@ jobs:
       - name: Debug: files to upload (before scp)
         run: |
           set -euxo pipefail
-          echo "=== root ==="
-          ls -la
-          echo "=== should exist: front-build.tgz ==="
           test -f front-build.tgz
-          echo "=== should exist: httpd.conf ==="
           test -f httpd.conf
-          echo "=== should exist: shar/front/restart-httpd.sh ==="
-          if [[ -f shar/front/restart-httpd.sh ]]; then
+          if [ -f shar/front/restart-httpd.sh ]; then
             ls -la shar/front/restart-httpd.sh
           else
             echo "MISSING: shar/front/restart-httpd.sh"
-            echo "Here are possible locations:"
+            echo "Found candidates:"
             find . -maxdepth 5 -type f -name "restart-httpd.sh" -print || true
             exit 1
           fi
 
-      # 1) отправляем билд
       - name: Upload build to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -104,7 +95,6 @@ jobs:
           target: shar/front
           debug: true
 
-      # 2) отправляем httpd.conf (лежит в корне репозитория)
       - name: Upload httpd.conf to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -116,7 +106,6 @@ jobs:
           target: shar/front
           debug: true
 
-      # 3) отправляем restart-скрипт
       - name: Upload restart-httpd.sh to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -157,8 +146,6 @@ jobs:
             rm -rf "$FRONT_DIR/build"
 
             echo "=== server: verify files ==="
-            ls -la "$FRONT_DIR" || true
-            ls -la "$WWW_DIR" | head -n 50 || true
             test -f "$FRONT_DIR/httpd.conf"
             test -f "$FRONT_DIR/restart-httpd.sh"
             chmod +x "$FRONT_DIR/restart-httpd.sh"
