@@ -11,6 +11,8 @@ import java.util.Optional;
 
 public interface TestAttemptRepository extends JpaRepository<TestAttempt, Integer> {
 
+
+
     List<TestAttempt> findAllByTest_IdAndStudent_IdOrderByAttemptNumberDesc(Integer testId, Integer studentId);
 
     List<TestAttempt> findAllByTest_IdOrderByCreatedAtDesc(Integer testId);

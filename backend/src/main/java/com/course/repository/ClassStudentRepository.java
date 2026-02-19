@@ -15,6 +15,8 @@ import com.course.entity.User;
 public interface ClassStudentRepository extends JpaRepository<ClassStudent, Integer> {
     boolean existsByStudyClassIdAndStudentId(Integer classId, Integer studentId);
 
+    boolean existsByStudyClassIdAndStudentIdAndCourseClosedAtIsNotNull(Integer classId, Integer studentId);
+
     @Query(value = "SELECT enroll_user_to_class(:userId, :classId)", nativeQuery = true)
     void enrollUserToClass(@Param("userId") Integer userId, @Param("classId") Integer classId);
 

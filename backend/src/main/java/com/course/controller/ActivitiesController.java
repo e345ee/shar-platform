@@ -24,7 +24,6 @@ public class ActivitiesController {
 
     private final TestService testService;
 
-    
 
     @PostMapping(value = "/lessons/{lessonId}/activities", consumes = {"application/json"})
     @PreAuthorize("hasRole('METHODIST')")
