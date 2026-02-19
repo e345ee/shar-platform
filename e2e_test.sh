@@ -2,7 +2,7 @@
 set -euo pipefail
 
 
-BASE_URL="${BASE_URL:-http://localhost:9090}"
+BASE_URL="${BASE_URL:-http://localhost:${BACKEND_PORT}}"
 
 
 
@@ -604,21 +604,30 @@ STUDENT_NAME="student_$SUF"
 STUDENT_EMAIL="student_$SUF@example.com"
 STUDENT_TG="tg_$SUF"
 
-log "Student REGISTRATION via /api/auth/register (public)"
-request_json POST "/api/auth/register" "" \
+log "Create STUDENT via /api/users/students (METHODIST)"
+request_json POST "/api/users/students" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$STUDENT_NAME\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
-expect_code 200 "student register"
-STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
-[[ -n "$STUDENT_JWT" && "$STUDENT_JWT" != "null" ]] || fail "No accessToken in student register response"
-pass "Student registered and JWT acquired"
+expect_code 201 "create student"
+STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
+[[ -n "$STUDENT_ID" && "$STUDENT_ID" != "null" ]] || fail "No student id in create student response"
+pass "Student created: id=$STUDENT_ID"
 
-log "Negative: duplicate student registration email rejected"
-request_json POST "/api/auth/register" "" \
+log "Login as STUDENT via /api/auth/login"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect_code 200 "student login"
+STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+[[ -n "$STUDENT_JWT" && "$STUDENT_JWT" != "null" ]] || fail "No accessToken in student login response"
+pass "Student JWT acquired"
+
+log "Negative: duplicate student creation email rejected"
+request_json POST "/api/users/students" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"${STUDENT_NAME}_dup\",\"email\":\"$STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
-expect_code_one_of "duplicate student registration" 400 409 422
-pass "Duplicate registration rejected"
+expect_code_one_of "duplicate student create" 400 409 422
+pass "Duplicate student creation rejected"
 
 log "Negative: JOIN REQUEST requires auth (public disabled)"
 request_json POST "/api/join-requests" "" \
@@ -1811,13 +1820,23 @@ STUDENT2_NAME="student2_$SUF"
 STUDENT2_EMAIL="student2_$SUF@example.com"
 STUDENT2_TG="tg2_$SUF"
 
-log "Register STUDENT2"
-request_json POST "/api/auth/register" ""   -H "Content-Type: application/json"   -d "{\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
-expect_code 200 "register student2"
+log "Create STUDENT2 via /api/users/students (METHODIST)"
+request_json POST "/api/users/students" "$METHODIST_AUTH" \
+  -H "Content-Type: application/json" \
+  -d "{\"name\":\"$STUDENT2_NAME\",\"email\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT2_TG\"}"
+expect_code 201 "create student2"
+STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
+[[ -n "$STUDENT2_ID" && "$STUDENT2_ID" != "null" ]] || fail "No id for student2 after create"
+
+log "Login as STUDENT2 via /api/auth/login"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT2_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect_code 200 "student2 login"
 STUDENT2_JWT=$(json_get "$HTTP_BODY" '.accessToken')
-[[ -n "$STUDENT2_JWT" && "$STUDENT2_JWT" != "null" ]] || fail "No accessToken for student2 after register"
+[[ -n "$STUDENT2_JWT" && "$STUDENT2_JWT" != "null" ]] || fail "No accessToken for student2 after login"
 STUDENT2_AUTH="$STUDENT2_JWT"
-pass "Student2 registered and JWT acquired"
+pass "Student2 created and JWT acquired"
 
 log "Create JOIN REQUEST for STUDENT2 by class code"
 request_json POST "/api/join-requests" "$STUDENT2_AUTH"   -H "Content-Type: application/json"   -d "{\"classCode\":\"$CLASS_CODE\"}"
@@ -1826,7 +1845,10 @@ REQUEST2_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/join-requests/$REQUEST2_ID/approve?classId=$CLASS_ID" "$TEACHER_AUTH" -H "Accept: application/json"
 expect_code 200 "approve join request 2"
-STUDENT2_ID=$(json_get "$HTTP_BODY" '.id')
+STUDENT2_ID_FROM_APPROVE=$(json_get "$HTTP_BODY" '.id')
+if [[ -n "$STUDENT2_ID_FROM_APPROVE" && "$STUDENT2_ID_FROM_APPROVE" != "null" ]]; then
+  [[ "$STUDENT2_ID_FROM_APPROVE" == "$STUDENT2_ID" ]] || log "WARN: approve returned id=$STUDENT2_ID_FROM_APPROVE but created student2 id=$STUDENT2_ID"
+fi
 
 
 log "Negative: STUDENT2 cannot access remedial activity assigned to STUDENT1"
@@ -1915,15 +1937,23 @@ STUDENT3_EMAIL="student3_$SUF@example.com"
 STUDENT3_TG="tg3_$SUF"
 STUDENT3_PASS="StudentPass3!"
 
-log "Register STUDENT3 via /api/auth/register (public)"
-request_json POST "/api/auth/register" "" \
+log "Create STUDENT3 via /api/users/students (METHODIST)"
+request_json POST "/api/users/students" "$METHODIST_AUTH" \
   -H "Content-Type: application/json" \
   -d "{\"name\":\"$STUDENT3_NAME\",\"email\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\",\"tgId\":\"$STUDENT3_TG\"}"
-expect_code 200 "student3 register"
+expect_code 201 "create student3"
+STUDENT3_ID=$(json_get "$HTTP_BODY" '.id')
+[[ -n "$STUDENT3_ID" && "$STUDENT3_ID" != "null" ]] || fail "No id for student3 after create"
+
+log "Login as STUDENT3 via /api/auth/login"
+request_json POST "/api/auth/login" "" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$STUDENT3_EMAIL\",\"password\":\"$STUDENT3_PASS\"}"
+expect_code 200 "student3 login"
 STUDENT3_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 [[ -n "$STUDENT3_JWT" && "$STUDENT3_JWT" != "null" ]] || fail "No accessToken for student3"
 STUDENT3_AUTH="$STUDENT3_JWT"
-pass "Student3 registered and JWT acquired"
+pass "Student3 created and JWT acquired"
 
 log "Create JOIN REQUEST for STUDENT3 by class code"
 request_json POST "/api/join-requests" "$STUDENT3_AUTH" \
@@ -1934,8 +1964,11 @@ REQUEST3_ID=$(json_get "$HTTP_BODY" '.id')
 
 request_json POST "/api/join-requests/$REQUEST3_ID/approve?classId=$CLASS2_ID" "$TEACHER2_AUTH" -H "Accept: application/json"
 expect_code 200 "approve join request 3"
-STUDENT3_ID=$(json_get "$HTTP_BODY" '.id')
-pass "Student3 created: id=$STUDENT3_ID"
+STUDENT3_ID_FROM_APPROVE=$(json_get "$HTTP_BODY" '.id')
+if [[ -n "$STUDENT3_ID_FROM_APPROVE" && "$STUDENT3_ID_FROM_APPROVE" != "null" ]]; then
+  [[ "$STUDENT3_ID_FROM_APPROVE" == "$STUDENT3_ID" ]] || log "WARN: approve returned id=$STUDENT3_ID_FROM_APPROVE but created student3 id=$STUDENT3_ID"
+fi
+pass "Student3 joined class2"
 
 log "Negative: TEACHER #1 cannot view statistics for чужой class (class2)"
 request_json GET "/api/statistics/classes/$CLASS2_ID/topics" "$TEACHER_AUTH" -H "Accept: application/json"

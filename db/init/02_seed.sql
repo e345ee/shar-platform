@@ -1,10 +1,3 @@
-
-
-
-
-
-
-
 INSERT INTO role(rolename, description) VALUES
  ('ADMIN', 'Администратор системы'),
  ('METHODIST', 'Методист'),
@@ -14,49 +7,46 @@ ON CONFLICT (rolename) DO NOTHING;
 
 
 
-
-
-
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'admin', 'admin@demo.local', 'admin'
+SELECT r.id, 'admin', 'admin@demo.local', '$2b$10$FVpKNvkJNsv32TiDExuewuy2YtOZT1PYRriYIxHZlFhc46lJuKHdG' -- пароль до хеширования: admin
 FROM role r WHERE r.rolename = 'ADMIN'
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'methodist_anna', 'anna@demo.local', 'pass'
+SELECT r.id, 'methodist_anna', 'anna@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'METHODIST'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'methodist_boris', 'boris@demo.local', 'pass'
+SELECT r.id, 'methodist_boris', 'boris@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'METHODIST'
 ON CONFLICT DO NOTHING;
 
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'teacher_alex', 'alex@demo.local', 'pass'
+SELECT r.id, 'teacher_alex', 'alex@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'TEACHER'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'teacher_irina', 'irina@demo.local', 'pass'
+SELECT r.id, 'teacher_irina', 'irina@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'TEACHER'
 ON CONFLICT DO NOTHING;
 
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'student_ivan', 'ivan@demo.local', 'pass'
+SELECT r.id, 'student_ivan', 'ivan@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'STUDENT'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'student_maria', 'maria@demo.local', 'pass'
+SELECT r.id, 'student_maria', 'maria@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'STUDENT'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO users(role_id, name, email, password)
-SELECT r.id, 'student_oleg', 'oleg@demo.local', 'pass'
+SELECT r.id, 'student_oleg', 'oleg@demo.local', '$2b$10$bKmYqnW7WQ6Oo94kiRCeC.XRoVt5CQ2p15VANIsYmna/AKRo17.EO' -- пароль до хеширования: pass
 FROM role r WHERE r.rolename = 'STUDENT'
 ON CONFLICT DO NOTHING;
 
@@ -201,8 +191,3 @@ SELECT a.id, q.id, q.correct_option, TRUE, q.points, NOW()
 FROM test_attempts a
 JOIN test_questions q ON q.test_id = a.test_id
 WHERE a.status='GRADED';
-
-
-
-
-

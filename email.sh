@@ -2,12 +2,11 @@
 set -euo pipefail
 
 
-BASE_URL="${BASE_URL:-http://localhost:9090}"
+BASE_URL="${BASE_URL:-http://localhost:${BACKEND_PORT}}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 ADMIN_PASS="${ADMIN_PASS:-admin}"
 
-
-TARGET_STUDENT_EMAIL="gsad1030@gmail.com"
+TARGET_STUDENT_EMAIL="${TARGET_STUDENT_EMAIL:-gsad1030@gmail.com}"
 
 
 : "${APP_MAIL_ENABLED:?APP_MAIL_ENABLED must be set (true/false)}"
@@ -134,7 +133,7 @@ CLASS_NAME="Class_$SUF"
 wait_health
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$ADMIN_USER\",\"password\":\"$ADMIN_PASS\"}"
 expect 200 "admin login"
 ADMIN_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -144,7 +143,7 @@ expect 201 "create methodist"
 METHODIST_ID=$(json_get "$HTTP_BODY" '.id')
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$METHODIST_EMAIL\",\"password\":\"$METHODIST_PASS\"}"
 expect 200 "methodist login"
 METHODIST_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -154,7 +153,7 @@ expect 201 "create teacher"
 TEACHER_ID=$(json_get "$HTTP_BODY" '.id')
 
 
-request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+request POST "/api/auth/login" "" "{\"username\":\"$TEACHER_EMAIL\",\"password\":\"$TEACHER_PASS\"}"
 expect 200 "teacher login"
 TEACHER_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
@@ -171,8 +170,12 @@ CLASS_CODE=$(json_get "$HTTP_BODY" '.joinCode')
 
 
 
-request POST "/api/auth/register" "" "{\"name\":\"$STUDENT_NAME\",\"email\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
-expect 200 "student register"
+request POST "/api/users/students" "$METHODIST_JWT" "{\"name\":\"$STUDENT_NAME\",\"email\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\",\"tgId\":\"$STUDENT_TG\"}"
+expect 201 "create student"
+STUDENT_ID_CREATED=$(json_get "$HTTP_BODY" '.id')
+
+request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
+expect 200 "student login"
 STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
 
 
@@ -185,10 +188,14 @@ request POST "/api/join-requests/$REQUEST_ID/approve?classId=$CLASS_ID" "$TEACHE
 expect 200 "approve join request"
 STUDENT_ID=$(json_get "$HTTP_BODY" '.id')
 
+if [[ -n "$STUDENT_ID_CREATED" && "$STUDENT_ID_CREATED" != "null" && -n "$STUDENT_ID" && "$STUDENT_ID" != "null" ]]; then
+  if [[ "$STUDENT_ID" != "$STUDENT_ID_CREATED" ]]; then
+    echo "[WARN] approve join request returned student id=$STUDENT_ID but created id=$STUDENT_ID_CREATED" >&2
+  fi
+fi
 
-request POST "/api/auth/login" "" "{\"username\":\"$TARGET_STUDENT_EMAIL\",\"password\":\"$STUDENT_PASS\"}"
-expect 200 "student login"
-STUDENT_JWT=$(json_get "$HTTP_BODY" '.accessToken')
+
+# (student JWT already acquired)
 
 DEADLINE="$(date -u -d "+3 days" +"%Y-%m-%dT%H:%M:%S")"
 request POST "/api/courses/$COURSE_ID/activities" "$METHODIST_JWT" "{\"activityType\":\"CONTROL_WORK\",\"title\":\"Control_$SUF\",\"description\":\"Simple control\",\"topic\":\"Topic_$SUF\",\"deadline\":\"$DEADLINE\",\"weightMultiplier\":1,\"timeLimitSeconds\":120}"
