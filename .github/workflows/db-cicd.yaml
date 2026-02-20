@@ -32,8 +32,8 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           source: db-init.tgz
           target: shar/postgress
@@ -43,8 +43,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           script: |
             set -euxo pipefail

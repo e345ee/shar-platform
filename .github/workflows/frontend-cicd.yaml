@@ -88,8 +88,8 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           source: front-build.tgz
           target: shar/front
@@ -99,8 +99,8 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           source: httpd.conf
           target: shar/front
@@ -110,8 +110,8 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           source: shar/front/restart-httpd.sh
           target: shar/front
@@ -121,8 +121,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           script: |
             set -euxo pipefail
