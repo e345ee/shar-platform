@@ -115,6 +115,7 @@ jobs:
           port: ${{ secrets.REMOTE_PORT }}
           source: shar/front/restart-httpd.sh
           target: shar/front
+          strip_components: 2
           debug: true
 
       - name: Deploy + restart httpd
