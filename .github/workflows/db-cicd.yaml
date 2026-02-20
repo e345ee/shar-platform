@@ -3,7 +3,7 @@ name: DB CI/CD (upload init SQL + run init.sh)
 on:
   workflow_dispatch:
   push:
-    branches: [ for-you ]
+    branches: [ main, master  ]
     paths:
       - "db/init/**"
       - ".github/workflows/db-cicd.yaml"
