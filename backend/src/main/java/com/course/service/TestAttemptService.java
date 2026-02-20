@@ -162,6 +162,8 @@ public class TestAttemptService {
         
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
+
+            
         }
         
         remedialAssignmentService.markCompletedIfRemedial(saved);
@@ -321,9 +323,190 @@ public AttemptResponse getLatestCompletedAttemptForTest(Integer testId) {
         Test test = testService.getEntityById(testId);
         
         testService.getEntityForCurrentUser(testId);
+
+        Integer courseId = null;
+        if (test.getLesson() != null && test.getLesson().getCourse() != null) {
+            courseId = test.getLesson().getCourse().getId();
+        } else if (test.getCourse() != null) {
+            courseId = test.getCourse().getId();
+        }
+
+        
+        if (isRole(current, ROLE_TEACHER)) {
+            if (courseId == null) {
+                throw new TestAttemptValidationException("Course is missing");
+            }
+            return attemptRepository
+                    .findAllByTestIdForTeacher(testId, current.getId(), courseId)
+                    .stream().map(this::toSummaryDto).toList();
+        }
+
+        
+        return attemptRepository
+                .findAllByTest_IdOrderByCreatedAtDesc(testId)
+                .stream().map(this::toSummaryDto).toList();
+    }
+
+    
+    @Transactional(readOnly = true)
+    public List<AttemptSummaryResponse> listAttemptsForCourse(Integer courseId) {
+        User current = authService.getCurrentUserEntity();
+        assertAnyRole(current, ROLE_METHODIST, ROLE_ADMIN);
+
+        
+        var course = courseService.getEntityById(courseId);
+        if (isRole(current, ROLE_METHODIST)) {
+            if (course.getCreatedBy() == null || course.getCreatedBy().getId() == null
+                    || !course.getCreatedBy().getId().equals(current.getId())) {
+                throw new TestAttemptAccessDeniedException("Methodist can access only own courses");
+            }
+        }
+
+        return attemptRepository.findAllByCourseIdOrderByCreatedAtDesc(courseId)
+                .stream().map(this::toCourseSummaryDto).toList();
+    }
+
+    
+    @Transactional(readOnly = true)
+    public AttemptResponse getAttempt(Integer attemptId) {
+        TestAttempt attempt = getEntityById(attemptId);
+        assertCanViewAttempt(attempt);
+
+        
+        boolean includeAnswers = true;
+        return toDto(attempt, includeAnswers);
+    }
+
+    
+    public AttemptResponse submit(Integer attemptId, AttemptSubmitRequest dto) {
+        User current = authService.getCurrentUserEntity();
+        userService.assertUserEntityHasRole(current, ROLE_STUDENT);
+
+        if (dto == null || dto.getAnswers() == null) {
+            throw new TestAttemptValidationException("Answers are required");
+        }
+
+        TestAttempt attempt = getEntityById(attemptId);
+        assertOwnerAttempt(attempt, current);
+
+        if (attempt.getStatus() != TestAttemptStatus.IN_PROGRESS) {
+            throw new TestAttemptValidationException("Only IN_PROGRESS attempt can be submitted");
+        }
+
+        Test test = attempt.getTest();
+        if (test == null || test.getId() == null) {
+            throw new TestAttemptValidationException("Attempt test is missing");
+        }
+
+        
+        testService.getEntityForCurrentUser(test.getId());
+        assertReady(test);
+        assertBeforeDeadline(test);
+        assertWithinTimeLimit(attempt, test);
+
+        List<TestQuestion> questions = questionRepository.findAllByTest_IdOrderByOrderIndexAsc(test.getId());
+        if (questions.isEmpty()) {
+            throw new TestAttemptValidationException("Test has no questions");
+        }
+
+        Map<Integer, TestQuestion> byId = new HashMap<>();
+        for (TestQuestion q : questions) {
+            if (q.getId() != null) {
+                byId.put(q.getId(), q);
+            }
+        }
+
+        
+        Set<Integer> seen = new HashSet<>();
+        for (AttemptSubmitAnswerRequest a : dto.getAnswers()) {
+            if (a == null || a.getQuestionId() == null) {
+                throw new TestAttemptValidationException("Each answer must contain questionId");
+            }
+            if (!seen.add(a.getQuestionId())) {
+                throw new TestAttemptValidationException("Duplicate answers for questionId=" + a.getQuestionId());
+            }
+            if (!byId.containsKey(a.getQuestionId())) {
+                throw new TestAttemptValidationException("Question " + a.getQuestionId() + " does not belong to this test");
+            }
+            TestQuestion q = byId.get(a.getQuestionId());
+            TestQuestionType type = q.getQuestionType() == null ? TestQuestionType.SINGLE_CHOICE : q.getQuestionType();
+            if (type == TestQuestionType.SINGLE_CHOICE) {
+                Integer selected = a.getSelectedOption();
+                if (selected == null || selected < 1 || selected > 4) {
+                    throw new TestAttemptValidationException("selectedOption must be between 1 and 4 for SINGLE_CHOICE");
+                }
+            } else if (type == TestQuestionType.TEXT || type == TestQuestionType.OPEN) {
+                String text = a.getTextAnswer();
+                if (text == null || text.trim().isEmpty()) {
+                    throw new TestAttemptValidationException("textAnswer is required for " + type + " questions");
+                }
+            } else {
+                throw new TestAttemptValidationException("Unsupported questionType for questionId=" + a.getQuestionId());
+            }
+        }
+        if (seen.size() != questions.size()) {
+            throw new TestAttemptValidationException("All questions must be answered. Expected " + questions.size() + ", got " + seen.size());
+        }
+
+        
+        attempt.getAnswers().clear();
+
+        int awardedTotal = 0;
+        int maxTotal = 0;
+        boolean hasOpenQuestions = false;
+        for (AttemptSubmitAnswerRequest a : dto.getAnswers()) {
+            TestQuestion q = byId.get(a.getQuestionId());
+            TestQuestionType type = q.getQuestionType() == null ? TestQuestionType.SINGLE_CHOICE : q.getQuestionType();
+            if (type == TestQuestionType.OPEN) {
+                hasOpenQuestions = true;
+            }
+            int qPoints = (q.getPoints() == null || q.getPoints() < 1) ? 1 : q.getPoints();
+            maxTotal += qPoints;
+
+            boolean isCorrect;
+            Integer selectedOption = null;
+            String textAnswer = null;
+            if (type == TestQuestionType.SINGLE_CHOICE) {
+                selectedOption = a.getSelectedOption();
+                isCorrect = q.getCorrectOption() != null && q.getCorrectOption().equals(selectedOption);
+            } else if (type == TestQuestionType.TEXT) {
+                textAnswer = safeTrim(a.getTextAnswer());
+                isCorrect = isTextAnswerCorrect(textAnswer, q.getCorrectTextAnswer());
+            } else if (type == TestQuestionType.OPEN) {
+                
+                textAnswer = safeTrim(a.getTextAnswer());
+                isCorrect = false;
+            } else {
+                throw new TestAttemptValidationException("Unsupported questionType for questionId=" + a.getQuestionId());
+            }
+
+            int pointsAwarded = (type == TestQuestionType.OPEN) ? 0 : (isCorrect ? qPoints : 0);
+            awardedTotal += pointsAwarded;
+
+            TestAttemptAnswer ans = new TestAttemptAnswer();
+            ans.setAttempt(attempt);
+            ans.setQuestion(q);
+            ans.setSelectedOption(selectedOption);
+            ans.setTextAnswer(textAnswer);
+            ans.setIsCorrect(isCorrect);
+            ans.setPointsAwarded(pointsAwarded);
+            ans.setFeedback(null);
+            ans.setGradedAt(null);
+            attempt.getAnswers().add(ans);
+        }
+
+        attempt.setMaxScore(maxTotal);
+        attempt.setScore(awardedTotal);
+        attempt.setStatus(hasOpenQuestions ? TestAttemptStatus.SUBMITTED : TestAttemptStatus.GRADED);
+        attempt.setSubmittedAt(LocalDateTime.now());
+
+        TestAttempt saved = attemptRepository.save(attempt);
+
+        
         if (saved.getStatus() == TestAttemptStatus.GRADED) {
             remedialAssignmentService.considerAssignAfterGrading(saved);
         }
+        
         remedialAssignmentService.markCompletedIfRemedial(saved);
 
         return toDto(saved, true);

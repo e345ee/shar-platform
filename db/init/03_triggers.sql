@@ -56,91 +56,83 @@ BEGIN
     FROM users u
     WHERE u.id = NEW.student_id;
 
-    v_score := COALESCE(NEW.score, (SELECT COALESCE(SUM(COALESCE(points_awarded, 0)), 0) FROM test_attempt_answers WHERE attempt_id = NEW.id));
-    v_max_score := COALESCE(NEW.max_score, (SELECT COALESCE(SUM(GREATEST(COALESCE(points, 1), 1)), 0) FROM test_questions WHERE test_id = NEW.test_id));
+    SELECT
+        COALESCE((SELECT SUM(COALESCE(points_awarded, 0)) FROM test_attempt_answers WHERE attempt_id = NEW.id), 0),
+        COALESCE((SELECT SUM(GREATEST(COALESCE(points, 1), 1)) FROM test_questions WHERE test_id = NEW.test_id), 0)
+    INTO v_score, v_max_score;
 
     SELECT EXISTS(
-        SELECT 1 FROM test_questions
+        SELECT 1
+        FROM test_questions
         WHERE test_id = NEW.test_id AND question_type = 'OPEN'
-    ) INTO v_has_open;
+    )
+    INTO v_has_open;
 
     IF NEW.status = 'SUBMITTED' THEN
-        BEGIN
-            INSERT INTO notifications (user_id, type, title, message, course_id, test_id, attempt_id)
-            SELECT r.user_id,
-                   'MANUAL_GRADING_REQUIRED'::notification_type,
-                   'Новая задача на проверку',
-                   'Есть задание на проверку: ' || COALESCE(v_test_title, '') || ' от ' || COALESCE(v_student_name, ''),
-                   v_course_id,
-                   NEW.test_id,
-                   NEW.id
-            FROM (
-                SELECT DISTINCT c.teacher_id AS user_id
-                FROM class_students cs
-                JOIN classes c ON c.id = cs.class_id
-                WHERE cs.student_id = NEW.student_id
-                  AND c.course_id = v_course_id
-                  AND c.teacher_id IS NOT NULL
+        INSERT INTO notifications (user_id, type, title, message, course_id, test_id, attempt_id)
+        SELECT r.user_id,
+               'MANUAL_GRADING_REQUIRED'::notification_type,
+               'Новая задача на проверку',
+               'Есть задание на проверку: ' || COALESCE(v_test_title, '') || ' от ' || COALESCE(v_student_name, ''),
+               v_course_id,
+               NEW.test_id,
+               NEW.id
+        FROM (
+            SELECT DISTINCT c.teacher_id AS user_id
+            FROM class_students cs
+            JOIN classes c ON c.id = cs.class_id
+            WHERE cs.student_id = NEW.student_id
+              AND c.course_id = v_course_id
+              AND c.teacher_id IS NOT NULL
 
-                UNION
+            UNION
 
-                SELECT co.created_by AS user_id
-                FROM courses co
-                WHERE co.id = v_course_id
-            ) r
-            WHERE NOT EXISTS (
-                SELECT 1 FROM notifications n
-                WHERE n.user_id = r.user_id
-                  AND n.type = 'MANUAL_GRADING_REQUIRED'::notification_type
-                  AND n.attempt_id = NEW.id
-            );
-        EXCEPTION
-            WHEN OTHERS THEN
-                NULL;
-        END;
+            SELECT co.created_by AS user_id
+            FROM courses co
+            WHERE co.id = v_course_id
+        ) r
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM notifications n
+            WHERE n.user_id = r.user_id
+              AND n.type = 'MANUAL_GRADING_REQUIRED'::notification_type
+              AND n.attempt_id = NEW.id
+        );
     END IF;
 
     IF NEW.status = 'GRADED' THEN
-        BEGIN
+        INSERT INTO notifications (user_id, type, title, message, course_id, test_id, attempt_id)
+        SELECT NEW.student_id,
+               'GRADE_RECEIVED'::notification_type,
+               'Получена оценка',
+               'Проверено задание: ' || COALESCE(v_test_title, '') || '. Оценка: ' || v_score::text || '/' || v_max_score::text,
+               v_course_id,
+               NEW.test_id,
+               NEW.id
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM notifications n
+            WHERE n.user_id = NEW.student_id
+              AND n.type = 'GRADE_RECEIVED'::notification_type
+              AND n.attempt_id = NEW.id
+        );
+
+        IF v_has_open THEN
             INSERT INTO notifications (user_id, type, title, message, course_id, test_id, attempt_id)
             SELECT NEW.student_id,
-                   'GRADE_RECEIVED'::notification_type,
-                   'Получена оценка',
-                   'Проверено задание: ' || COALESCE(v_test_title, '') || '. Оценка: ' || COALESCE(v_score, 0)::text || '/' || COALESCE(v_max_score, 0)::text,
+                   'OPEN_ANSWER_CHECKED'::notification_type,
+                   'Открытый ответ проверен',
+                   'Учитель проверил открытый ответ в задании: ' || COALESCE(v_test_title, ''),
                    v_course_id,
                    NEW.test_id,
                    NEW.id
             WHERE NOT EXISTS (
-                SELECT 1 FROM notifications n
+                SELECT 1
+                FROM notifications n
                 WHERE n.user_id = NEW.student_id
-                  AND n.type = 'GRADE_RECEIVED'::notification_type
+                  AND n.type = 'OPEN_ANSWER_CHECKED'::notification_type
                   AND n.attempt_id = NEW.id
             );
-        EXCEPTION
-            WHEN OTHERS THEN
-                NULL;
-        END;
-
-        IF v_has_open THEN
-            BEGIN
-                INSERT INTO notifications (user_id, type, title, message, course_id, test_id, attempt_id)
-                SELECT NEW.student_id,
-                       'OPEN_ANSWER_CHECKED'::notification_type,
-                       'Открытый ответ проверен',
-                       'Учитель проверил открытый ответ в задании: ' || COALESCE(v_test_title, ''),
-                       v_course_id,
-                       NEW.test_id,
-                       NEW.id
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM notifications n
-                    WHERE n.user_id = NEW.student_id
-                      AND n.type = 'OPEN_ANSWER_CHECKED'::notification_type
-                      AND n.attempt_id = NEW.id
-                );
-            EXCEPTION
-                WHEN OTHERS THEN
-                    NULL;
-            END;
         END IF;
     END IF;
 
