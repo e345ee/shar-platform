@@ -319,6 +319,15 @@
     border-top: 1px solid var(--border);
 }
 
+.profile-actions-centered {
+    width: 100%;
+    justify-content: center;
+}
+
+.profile-actions-centered .btn-primary {
+    margin: 0 auto;
+}
+
 .btn-primary {
     padding: 18px 56px;
     border-radius: 12px;

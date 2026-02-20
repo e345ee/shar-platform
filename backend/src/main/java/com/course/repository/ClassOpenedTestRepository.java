@@ -37,4 +37,11 @@ public interface ClassOpenedTestRepository extends JpaRepository<ClassOpenedTest
               AND cot.test.course.id = :courseId
             """)
     List<Integer> findOpenedTestIdsForStudentInCourse(@Param("studentId") Integer studentId, @Param("courseId") Integer courseId);
+
+    @Query("""
+            SELECT DISTINCT cot.studyClass.id
+            FROM ClassOpenedTest cot
+            WHERE cot.test.id = :testId
+            """)
+    List<Integer> findOpenedClassIdsByTestId(@Param("testId") Integer testId);
 }

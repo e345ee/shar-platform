@@ -778,6 +778,29 @@ public class TestService {
         }
     }
 
+
+    @Transactional(readOnly = true)
+    public List<Integer> listOpenClassIdsForActivity(Integer activityId) {
+        Test test = getEntityById(activityId);
+        User current = authService.getCurrentUserEntity();
+
+        if (!isRole(current, ROLE_ADMIN)) {
+            if (test.getCourse() == null || test.getCourse().getId() == null) {
+                throw new TestValidationException("Test course is missing");
+            }
+            Integer courseId = test.getCourse().getId();
+            if (isRole(current, ROLE_METHODIST)) {
+                assertOwner(test.getCourse().getCreatedBy(), current, "Methodist can access only own courses");
+            } else if (isRole(current, ROLE_TEACHER)) {
+                studyClassService.assertTeacherCanManageCourse(courseId, current);
+            } else {
+                throw new ForbiddenOperationException("Forbidden");
+            }
+        }
+
+        return classOpenedTestService.findOpenedClassIdsByTestId(test.getId());
+    }
+
     private TestQuestionType parseQuestionType(String raw, TestQuestionType defaultValue) {
         if (!StringUtils.hasText(raw)) {
             return defaultValue;

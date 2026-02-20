@@ -361,129 +361,11 @@
   height: 18px;
 }
 
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+.test-access-class-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal-content {
-  background: var(--card, #ffffff);
-  border-radius: 24px;
-  padding: 40px;
-  max-width: 800px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  position: relative;
-  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
-}
-
-.modal-content-large {
-  max-width: 1000px;
-}
-
-.modal-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: #f8fafc;
-  color: var(--text, #1e293b);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.modal-close:hover {
-  background: #e2e8f0;
-  transform: scale(1.1);
-}
-
-.modal-close svg {
-  width: 20px;
-  height: 20px;
-}
-
-/* Test Access Modal Styles */
-.test-access-modal-header {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border, #cbd5e1);
-}
-
-.test-access-modal-title {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text, #1e293b);
-  margin: 0 0 16px 0;
-}
-
-.test-access-modal-meta {
-  display: flex;
-  align-items: center;
-  gap: 16px;
   flex-wrap: wrap;
-}
-
-.test-access-modal-meta span {
-  font-size: 14px;
-  color: var(--muted, #64748b);
-}
-
-.test-access-modal-tag {
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.test-access-modal-content {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.test-access-modal-section-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text, #1e293b);
-  margin: 0;
-}
-
-.test-access-classes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.test-access-class-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  border-radius: 16px;
-  border: 2px solid var(--border, #cbd5e1);
-  background: var(--card, #ffffff);
-  transition: all 0.2s ease;
-}
-
-.test-access-class-item.open {
-  border-color: var(--green, #10b981);
-  background: var(--green-soft, #d1fae5);
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .test-access-class-icon {
@@ -547,15 +429,16 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
-.btn-toggle-access.close {
-  background: var(--red, #ef4444);
-  color: #ffffff;
+.btn-toggle-access.opened {
+  background: #e2e8f0;
+  color: #475569;
+  cursor: not-allowed;
 }
 
-.btn-toggle-access.close:hover {
-  background: #dc2626;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+.btn-toggle-access:disabled {
+  opacity: 1;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-toggle-access svg {
@@ -597,13 +480,8 @@
     justify-content: center;
   }
 
-  .modal-content {
-    padding: 24px;
-  }
-
-  .test-access-class-item {
-    flex-direction: column;
-    align-items: flex-start;
+  .test-access-class-actions {
+    width: 100%;
   }
 
   .btn-toggle-access {

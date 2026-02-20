@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -78,6 +80,7 @@ public class GlobalExceptionHandler {
     private static String ruReasonPhrase(HttpStatus status) {
         return switch (status) {
             case BAD_REQUEST -> "Некорректный запрос";
+            case UNAUTHORIZED -> "Не авторизован";
             case FORBIDDEN -> "Запрещено";
             case NOT_FOUND -> "Не найдено";
             case CONFLICT -> "Конфликт";
@@ -298,6 +301,19 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
+    public ResponseEntity<ApiErrorResponse> handleAuthExceptions(Exception ex,
+                                                                 HttpServletRequest request) {
+        ApiErrorResponse body = ApiErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error(ruReasonPhrase(HttpStatus.UNAUTHORIZED))
+                .message("Неправильный логин или пароль")
+                .path(request.getRequestURI())
+                .build();
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
     }
 
     @ExceptionHandler(Exception.class)

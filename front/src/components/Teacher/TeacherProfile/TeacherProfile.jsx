@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import "./TeacherProfile.css";
 import {
   HomeIcon,
@@ -9,6 +9,7 @@ import {
   TelegramIcon,
 } from "../../../svgs/ProfileSvg.jsx";
 import {
+  deleteMyAvatar,
   getMyProfile,
   updateMyProfile,
   uploadMyAvatar,
@@ -16,9 +17,6 @@ import {
 
 function TeacherProfile({ onBackToMain, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -27,29 +25,33 @@ function TeacherProfile({ onBackToMain, onLogout }) {
     tgId: "",
     photo: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const loadProfile = async () => {
+    setIsLoading(true);
+    setErrorMessage("");
+    try {
+      const me = await getMyProfile();
+      setProfile({
+        name: me?.name || "",
+        email: me?.email || "",
+        password: "",
+        bio: me?.bio || "",
+        tgId: me?.tgId || "",
+        photo: me?.photo || "",
+      });
+    } catch (error) {
+      setErrorMessage(error?.message || "Не удалось загрузить профиль");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadProfile = async () => {
-      setIsLoading(true);
-      setErrorMessage("");
-      try {
-        const data = await getMyProfile();
-        setProfile({
-          name: data.name || "",
-          email: data.email || "",
-          password: "",
-          bio: data.bio || "",
-          tgId: data.tgId || "",
-          photo: data.photo || "",
-        });
-      } catch (error) {
-        setErrorMessage(error?.message || "Не удалось загрузить профиль");
-        console.error("Ошибка загрузки профиля:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadProfile();
   }, []);
 
@@ -60,87 +62,66 @@ function TeacherProfile({ onBackToMain, onLogout }) {
     }));
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsSaving(true);
-    setErrorMessage("");
-    try {
-      const updated = await uploadMyAvatar(file);
-      setProfile((prev) => ({
-        ...prev,
-        photo: updated.photo || prev.photo,
-      }));
-    } catch (error) {
-      setErrorMessage(error?.message || "Не удалось загрузить фото");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleSave = async () => {
     setIsSaving(true);
     setErrorMessage("");
+    setSuccessMessage("");
     try {
-      const updateData = {};
-      if (profile.name) updateData.name = profile.name;
-      if (profile.email) updateData.email = profile.email;
-      if (profile.bio) updateData.bio = profile.bio;
-      if (profile.tgId) updateData.tgId = profile.tgId;
-      if (profile.photo) updateData.photo = profile.photo;
-      // Пароль обновляется отдельно через changePassword
-
-      const updated = await updateMyProfile(updateData);
-      setProfile((prev) => ({
-        ...prev,
-        name: updated.name || prev.name,
-        email: updated.email || prev.email,
-        bio: updated.bio || prev.bio,
-        tgId: updated.tgId || prev.tgId,
-        photo: updated.photo || prev.photo,
-        password: "", // Очищаем пароль после сохранения
-      }));
+      const dto = {
+        name: profile.name.trim(),
+        email: profile.email.trim(),
+        bio: profile.bio,
+        tgId: profile.tgId.trim(),
+      };
+      if (profile.password.trim()) {
+        dto.password = profile.password;
+      }
+      await updateMyProfile(dto);
+      await loadProfile();
+      setProfile((prev) => ({ ...prev, password: "" }));
       setIsEditing(false);
+      setSuccessMessage("Профиль сохранен");
     } catch (error) {
-      setErrorMessage(error?.message || "Не удалось сохранить изменения");
+      setErrorMessage(error?.message || "Не удалось сохранить профиль");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleCancel = () => {
-    setIsEditing(false);
-    // Перезагружаем профиль для отмены изменений
-    const loadProfile = async () => {
-      try {
-        const data = await getMyProfile();
-        setProfile({
-          name: data.name || "",
-          email: data.email || "",
-          password: "",
-          bio: data.bio || "",
-          tgId: data.tgId || "",
-          photo: data.photo || "",
-        });
-      } catch (error) {
-        console.error("Ошибка загрузки профиля:", error);
-      }
-    };
-    loadProfile();
+  const handleChoosePhoto = async (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      return;
+    }
+    setIsPhotoUploading(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    try {
+      const updated = await uploadMyAvatar(file);
+      setProfile((prev) => ({ ...prev, photo: updated?.photo || prev.photo }));
+      setSuccessMessage("Фото профиля обновлено");
+    } catch (error) {
+      setErrorMessage(error?.message || "Не удалось загрузить фото");
+    } finally {
+      setIsPhotoUploading(false);
+      e.target.value = "";
+    }
   };
 
-  if (isLoading) {
-    return (
-        <div className="profile-page">
-          <div className="profile-container">
-            <div className="profile-card">
-              <div className="profile-loading">Загрузка профиля...</div>
-            </div>
-          </div>
-        </div>
-    );
-  }
+  const handleDeletePhoto = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+    setIsPhotoUploading(true);
+    try {
+      const updated = await deleteMyAvatar();
+      setProfile((prev) => ({ ...prev, photo: updated?.photo || "" }));
+      setSuccessMessage("Фото профиля удалено");
+    } catch (error) {
+      setErrorMessage(error?.message || "Не удалось удалить фото");
+    } finally {
+      setIsPhotoUploading(false);
+    }
+  };
 
   return (
       <div className="profile-page">
@@ -151,57 +132,51 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                 <h1 className="profile-header-title">Профиль преподавателя</h1>
               </div>
               <div className="profile-header-actions">
-                <button
-                    className="btn-secondary"
-                    onClick={onBackToMain}
-                    type="button"
-                >
+                <button className="btn-secondary" onClick={onBackToMain} type="button">
                   <HomeIcon />
                   На главную
                 </button>
               </div>
             </header>
 
-            {errorMessage && (
-                <div className="profile-error">{errorMessage}</div>
-            )}
-
             <main className="profile-main">
+              {errorMessage && <div className="profile-error">{errorMessage}</div>}
+              {successMessage && <div className="profile-success">{successMessage}</div>}
+              {isLoading && <div className="profile-success">Загрузка профиля...</div>}
+
               <div className="profile-photo-section">
-                <div className="profile-photo-wrapper">
+                <label className="profile-photo-upload profile-photo-wrapper" htmlFor="profile-photo-input">
                   {profile.photo ? (
                       <img
                           src={profile.photo}
                           alt="Профиль"
                           className="profile-photo"
-                          onError={(e) => {
-                            e.target.src = "https://via.placeholder.com/200";
-                          }}
                       />
                   ) : (
-                      <div className="profile-photo-placeholder">
+                      <div className="profile-photo profile-photo-empty" aria-label="Фото не загружено">
                         <UserIcon />
                       </div>
                   )}
-                </div>
+                  <span className="profile-photo-hint">
+                                    {isPhotoUploading ? "Загрузка..." : "Нажмите, чтобы загрузить фото"}
+                                </span>
+                </label>
+                <input
+                    id="profile-photo-input"
+                    className="profile-photo-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleChoosePhoto}
+                    disabled={isPhotoUploading}
+                />
                 <div className="profile-photo-info">
-                  <label className="profile-label">Фото профиля</label>
-                  {isEditing ? (
-                      <div>
-                        <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileChange}
-                            className="profile-file-input"
-                            disabled={isSaving}
-                        />
-                        {profile.photo && (
-                            <div className="profile-url">{profile.photo}</div>
-                        )}
-                      </div>
-                  ) : (
-                      <div className="profile-url">
-                        {profile.photo || "Фото не загружено"}
+                  <label className="profile-label">Фото профиля </label>
+                  <div className="profile-url">{profile.photo ? "Фото загружено" : "Фото не загружено"}</div>
+                  {isEditing && (
+                      <div className="profile-photo-actions">
+                        <button className="btn-secondary" type="button" onClick={handleDeletePhoto}>
+                          Удалить фото
+                        </button>
                       </div>
                   )}
                 </div>
@@ -219,9 +194,7 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                             type="text"
                             className="profile-input"
                             value={profile.name}
-                            onChange={(e) =>
-                                handleInputChange("name", e.target.value)
-                            }
+                            onChange={(e) => handleInputChange("name", e.target.value)}
                         />
                     ) : (
                         <div className="profile-value">{profile.name}</div>
@@ -240,9 +213,7 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                             type="email"
                             className="profile-input"
                             value={profile.email}
-                            onChange={(e) =>
-                                handleInputChange("email", e.target.value)
-                            }
+                            onChange={(e) => handleInputChange("email", e.target.value)}
                         />
                     ) : (
                         <div className="profile-value">{profile.email}</div>
@@ -260,13 +231,12 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                         <input
                             type="password"
                             className="profile-input"
+                            placeholder="Оставьте пустым, если не нужно менять"
                             value={profile.password}
-                            onChange={(e) =>
-                                handleInputChange("password", e.target.value)
-                            }
+                            onChange={(e) => handleInputChange("password", e.target.value)}
                         />
                     ) : (
-                        <div className="profile-value">{profile.password}</div>
+                        <div className="profile-value">********</div>
                     )}
                   </div>
                 </div>
@@ -281,16 +251,11 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                         <textarea
                             className="profile-textarea"
                             value={profile.bio}
-                            onChange={(e) =>
-                                handleInputChange("bio", e.target.value)
-                            }
+                            onChange={(e) => handleInputChange("bio", e.target.value)}
                             rows="4"
-                            placeholder="Расскажите о себе"
                         />
                     ) : (
-                        <div className="profile-value">
-                          {profile.bio || "Не указано"}
-                        </div>
+                        <div className="profile-value">{profile.bio || "нет информации"}</div>
                     )}
                   </div>
                 </div>
@@ -306,46 +271,22 @@ function TeacherProfile({ onBackToMain, onLogout }) {
                             type="text"
                             className="profile-input"
                             value={profile.tgId}
-                            onChange={(e) =>
-                                handleInputChange("tgId", e.target.value)
-                            }
-                            placeholder="@username"
+                            onChange={(e) => handleInputChange("tgId", e.target.value)}
                         />
                     ) : (
-                        <div className="profile-value">
-                          {profile.tgId || "Не указано"}
-                        </div>
+                        <div className="profile-value">{profile.tgId || "Не указан"}</div>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="profile-actions">
+              <div className="profile-actions profile-actions-centered">
                 {isEditing ? (
-                    <>
-                      <button
-                          className="btn-secondary"
-                          onClick={handleCancel}
-                          type="button"
-                          disabled={isSaving}
-                      >
-                        Отмена
-                      </button>
-                      <button
-                          className="btn-primary"
-                          onClick={handleSave}
-                          type="button"
-                          disabled={isSaving}
-                      >
-                        {isSaving ? "Сохранение..." : "Сохранить изменения"}
-                      </button>
-                    </>
+                    <button className="btn-primary" onClick={handleSave} type="button" disabled={isSaving}>
+                      Сохранить изменения
+                    </button>
                 ) : (
-                    <button
-                        className="btn-primary"
-                        onClick={() => setIsEditing(true)}
-                        type="button"
-                    >
+                    <button className="btn-primary" onClick={() => setIsEditing(true)} type="button">
                       Редактировать профиль
                     </button>
                 )}

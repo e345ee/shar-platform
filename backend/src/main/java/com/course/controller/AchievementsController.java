@@ -32,6 +32,7 @@ public class AchievementsController {
     private final AuthService authService;
     private final UserService userService;
     private final ClassStudentService classStudentService;
+    private final TestService testService;
 
     
 
@@ -49,6 +50,12 @@ public class AchievementsController {
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<List<AchievementResponse>> listByCourse(@PathVariable Integer courseId) {
         return ResponseEntity.ok(achievementService.listByCourse(courseId));
+    }
+
+    @GetMapping("/activities/{id}/open-classes")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
+    public ResponseEntity<List<Integer>> getOpenClasses(@PathVariable Integer id) {
+        return ResponseEntity.ok(testService.listOpenClassIdsForActivity(id));
     }
 
     @GetMapping("/achievements/{id}")

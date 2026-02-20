@@ -5,7 +5,6 @@ import {
   LockIcon,
   ManageIcon,
   OpenLockIcon,
-  ClosedLockIcon,
 } from "../../../svgs/TestSvg.jsx";
 import {
   CalendarIcon,
@@ -13,10 +12,11 @@ import {
   TagIcon,
   LocationIcon,
 } from "../../../svgs/ActivitySvg.jsx";
-import TestAccessModal from "./TestAcessModal";
 import {
   listActivitiesByLesson,
   listLessonsByCourse,
+  listOpenClassIdsForActivity,
+  listOpenClassIdsForLesson,
   listMyClasses,
   listWeeklyActivitiesByCourse,
   openActivityForClass,
@@ -42,11 +42,11 @@ function formatDate(deadline) {
 }
 
 function TestAccess({ onBackToMain }) {
-  const [showModal, setShowModal] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState(null);
   const [activities, setActivities] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [openedLessonAccesses, setOpenedLessonAccesses] = useState({});
+  const [openingLessonAccesses, setOpeningLessonAccesses] = useState({});
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -54,6 +54,8 @@ function TestAccess({ onBackToMain }) {
     totalActivities: activities.length,
     totalClasses: classes.length,
   }), [activities, classes.length]);
+
+  const getLessonAccessKey = (lessonId, classId) => `${lessonId}-${classId}`;
 
   useEffect(() => {
     let isCancelled = false;
@@ -126,8 +128,36 @@ function TestAccess({ onBackToMain }) {
             .sort((a, b) => (b.id || 0) - (a.id || 0));
 
         if (!isCancelled) {
-          setLessons(collectedLessons.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)));
-          setActivities(cards);
+          const cardsWithOpenClasses = await Promise.all(
+              cards.map(async (card) => {
+                try {
+                  const openClassIds = await listOpenClassIdsForActivity(card.id);
+                  return { ...card, openClasses: openClassIds };
+                } catch {
+                  return card;
+                }
+              }),
+          );
+          const sortedLessons = collectedLessons.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+          const lessonOpenPairs = await Promise.all(
+              sortedLessons.map(async (lesson) => {
+                try {
+                  const openClassIds = await listOpenClassIdsForLesson(lesson.id);
+                  return { lessonId: lesson.id, openClassIds };
+                } catch {
+                  return { lessonId: lesson.id, openClassIds: [] };
+                }
+              }),
+          );
+          const nextOpenedLessonAccesses = {};
+          lessonOpenPairs.forEach(({ lessonId, openClassIds }) => {
+            openClassIds.forEach((classId) => {
+              nextOpenedLessonAccesses[getLessonAccessKey(lessonId, classId)] = true;
+            });
+          });
+          setOpenedLessonAccesses(nextOpenedLessonAccesses);
+          setLessons(sortedLessons);
+          setActivities(cardsWithOpenClasses);
         }
       } catch (error) {
         if (!isCancelled) {
@@ -145,17 +175,6 @@ function TestAccess({ onBackToMain }) {
       isCancelled = true;
     };
   }, []);
-
-  const handleOpenModal = (activity) => {
-    setErrorMessage("");
-    setSelectedActivity(activity);
-    setShowModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedActivity(null);
-  };
 
   const handleOpenLesson = async (lessonId, classId) => {
     if (!lessonId || !classId) {
@@ -187,6 +206,11 @@ function TestAccess({ onBackToMain }) {
       setErrorMessage("");
       const classIdNum = Number(classId);
       const lessonIdNum = Number(lessonId);
+      const accessKey = getLessonAccessKey(lessonIdNum, classIdNum);
+
+      if (openedLessonAccesses[accessKey] || openingLessonAccesses[accessKey]) {
+        return;
+      }
 
       if (isNaN(classIdNum) || isNaN(lessonIdNum)) {
         setErrorMessage("Некорректные параметры запроса.");
@@ -194,35 +218,62 @@ function TestAccess({ onBackToMain }) {
         return;
       }
 
+      setOpeningLessonAccesses((prev) => ({ ...prev, [accessKey]: true }));
       console.log("Opening lesson for class", { classId: classIdNum, lessonId: lessonIdNum });
       await openLessonForClass(classIdNum, lessonIdNum);
       console.log("Lesson opened successfully", { classId: classIdNum, lessonId: lessonIdNum });
+      const openClassIds = await listOpenClassIdsForLesson(lessonIdNum);
+      setOpenedLessonAccesses((prev) => {
+        const next = { ...prev };
+        // Remove stale flags for this lesson, then set the backend-actual state.
+        Object.keys(next).forEach((key) => {
+          if (key.startsWith(`${lessonIdNum}-`)) {
+            delete next[key];
+          }
+        });
+        openClassIds.forEach((openedClassId) => {
+          next[getLessonAccessKey(lessonIdNum, openedClassId)] = true;
+        });
+        return next;
+      });
     } catch (error) {
       console.error("Error opening lesson for class", { error, classId, lessonId, status: error?.status, message: error?.message });
       setErrorMessage(error?.message || `Не удалось открыть урок для класса. ${error?.status ? `Статус: ${error.status}` : ""}`);
-      throw error;
+    } finally {
+      const classIdNum = Number(classId);
+      const lessonIdNum = Number(lessonId);
+      if (!isNaN(classIdNum) && !isNaN(lessonIdNum)) {
+        const accessKey = getLessonAccessKey(lessonIdNum, classIdNum);
+        setOpeningLessonAccesses((prev) => {
+          if (!prev[accessKey]) {
+            return prev;
+          }
+          const next = { ...prev };
+          delete next[accessKey];
+          return next;
+        });
+      }
     }
   };
 
-  const handleToggleAccess = async (activityId, classId, isOpen) => {
-    if (!isOpen) {
-      setErrorMessage("Закрытие доступа пока не поддерживается.");
+  const handleToggleAccess = async (activityId, classId) => {
+    const targetActivity = activities.find((activity) => activity.id === activityId);
+    if (targetActivity?.openClasses?.includes(classId)) {
       return;
     }
 
     // Проверка параметров
     if (!activityId || activityId === null || activityId === undefined) {
       setErrorMessage("ID активности не указан.");
-      console.error("handleToggleAccess: activityId is missing", { activityId, classId, isOpen });
+      console.error("handleToggleAccess: activityId is missing", { activityId, classId });
       return;
     }
     if (!classId || classId === null || classId === undefined) {
       setErrorMessage("ID класса не указан.");
-      console.error("handleToggleAccess: classId is missing", { activityId, classId, isOpen });
+      console.error("handleToggleAccess: classId is missing", { activityId, classId });
       return;
     }
 
-    const targetActivity = activities.find((activity) => activity.id === activityId);
     if (!targetActivity) {
       setErrorMessage("Активность не найдена.");
       console.error("handleToggleAccess: activity not found", { activityId, classId });
@@ -259,25 +310,20 @@ function TestAccess({ onBackToMain }) {
       console.log("Opening activity for class", { classId: classIdNum, activityId: activityIdNum });
       await openActivityForClass(classIdNum, activityIdNum);
       console.log("Activity opened successfully", { classId: classIdNum, activityId: activityIdNum });
-
-      // Обновляем состояние только после успешного запроса
+      const openClassIds = await listOpenClassIdsForActivity(activityIdNum);
       setActivities((prev) =>
           prev.map((activity) =>
               activity.id !== activityIdNum
                   ? activity
                   : {
                     ...activity,
-                    openClasses: activity.openClasses.includes(classIdNum)
-                        ? activity.openClasses
-                        : [...activity.openClasses, classIdNum],
+                    openClasses: openClassIds,
                   },
           ),
       );
     } catch (error) {
       console.error("Error opening activity for class", { error, classId, activityId, status: error?.status, message: error?.message });
       setErrorMessage(error?.message || `Не удалось открыть доступ к активности. ${error?.status ? `Статус: ${error.status}` : ""}`);
-      // Пробрасываем ошибку, чтобы модальное окно могло обработать её
-      throw error;
     }
   };
 
@@ -380,19 +426,28 @@ function TestAccess({ onBackToMain }) {
                           )}
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        {relevantClasses.map((classItem) => (
-                            <button
-                                key={classItem.id}
-                                className="btn-manage-access"
-                                onClick={() => handleOpenLesson(lesson.id, classItem.id)}
-                                type="button"
-                                style={{ fontSize: "14px", padding: "8px 16px" }}
-                            >
-                              <OpenLockIcon />
-                              Открыть для {classItem.name}
-                            </button>
-                        ))}
+                      <div className="test-access-class-actions">
+                        {relevantClasses.map((classItem) => {
+                          const accessKey = getLessonAccessKey(lesson.id, classItem.id);
+                          const isOpenForClass = Boolean(openedLessonAccesses[accessKey]);
+                          const isOpeningForClass = Boolean(openingLessonAccesses[accessKey]);
+                          return (
+                              <button
+                                  key={classItem.id}
+                                  className={`btn-toggle-access ${isOpenForClass ? "opened" : "open"}`}
+                                  onClick={() => void handleOpenLesson(lesson.id, classItem.id)}
+                                  type="button"
+                                  disabled={isOpenForClass || isOpeningForClass}
+                              >
+                                <OpenLockIcon />
+                                {isOpenForClass
+                                    ? `Открыто для ${classItem.name}`
+                                    : isOpeningForClass
+                                        ? `Открывается для ${classItem.name}...`
+                                        : `Открыть для ${classItem.name}`}
+                              </button>
+                          );
+                        })}
                       </div>
                     </div>
                 );
@@ -404,7 +459,7 @@ function TestAccess({ onBackToMain }) {
             <div className="test-access-list-header">
               <h2 className="test-access-list-title">Активности</h2>
               <p className="test-access-list-subtitle">
-                Нажмите на активность для управления доступом
+                Откройте доступ к активности для нужного класса
               </p>
             </div>
             <div className="test-access-list">
@@ -456,30 +511,34 @@ function TestAccess({ onBackToMain }) {
                           </div>
                         </div>
                       </div>
-                      <button
-                          className="btn-manage-access"
-                          onClick={() => handleOpenModal(activity)}
-                          type="button"
-                      >
-                        <ManageIcon />
-                        Управление
-                      </button>
+                      <div className="test-access-class-actions">
+                        {classes
+                            .filter((classItem) =>
+                                activity.courseId ? classItem.courseId === activity.courseId : true,
+                            )
+                            .map((classItem) => {
+                              const isOpenForClass = Array.isArray(activity.openClasses)
+                                  && activity.openClasses.includes(classItem.id);
+                              return (
+                                  <button
+                                      key={classItem.id}
+                                      className={`btn-toggle-access ${isOpenForClass ? "opened" : "open"}`}
+                                      onClick={() => void handleToggleAccess(activity.id, classItem.id)}
+                                      type="button"
+                                      disabled={isOpenForClass}
+                                  >
+                                    {isOpenForClass ? <OpenLockIcon /> : <ManageIcon />}
+                                    {isOpenForClass ? `Открыто для ${classItem.name}` : `Открыть для ${classItem.name}`}
+                                  </button>
+                              );
+                            })}
+                      </div>
                     </div>
                 );
               })}
             </div>
           </section>
         </div>
-
-        <TestAccessModal
-            isOpen={showModal}
-            onClose={handleCloseModal}
-            activity={selectedActivity}
-            classes={classes.filter((classItem) =>
-                selectedActivity?.courseId ? classItem.courseId === selectedActivity.courseId : true,
-            )}
-            onToggleAccess={handleToggleAccess}
-        />
       </div>
   );
 }

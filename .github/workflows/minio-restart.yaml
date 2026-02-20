@@ -3,7 +3,7 @@ name: MinIO restart (remote only)
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ for-you ]
     paths:
       - ".github/workflows/minio-restart.yaml"
 

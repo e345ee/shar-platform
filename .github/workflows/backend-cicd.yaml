@@ -3,7 +3,7 @@ name: Backend CI/CD (deploy jar to ~/shar/backend)
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ for-you ]
     paths:
       - "backend/**"
       - ".github/workflows/backend-cicd.yaml"

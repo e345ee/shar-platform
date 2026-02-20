@@ -292,10 +292,13 @@
   background: var(--cyan, #06b6d4);
   color: #ffffff;
   border-radius: 8px;
+  border: none;
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
   transition: all 0.2s ease;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .study-material-download:hover {
