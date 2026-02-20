@@ -35,6 +35,8 @@ DROP FUNCTION IF EXISTS validate_class_opened_test_consistency() CASCADE;
 DROP FUNCTION IF EXISTS set_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS set_submitted_at_on_status() CASCADE;
 DROP FUNCTION IF EXISTS recalc_attempt_score() CASCADE;
+DROP FUNCTION IF EXISTS create_attempt_notifications() CASCADE;
+
 
 DROP FUNCTION IF EXISTS create_student_by_tg(TEXT, TEXT, TEXT, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS create_join_request_by_code(TEXT, TEXT, TEXT, TEXT) CASCADE;
