@@ -28,4 +28,11 @@ public interface ClassOpenedLessonRepository extends JpaRepository<ClassOpenedLe
               AND col.studyClass.course.id = :courseId
             """)
     List<Integer> findOpenedLessonIdsForStudentInCourse(@Param("studentId") Integer studentId, @Param("courseId") Integer courseId);
+
+    @Query("""
+            SELECT DISTINCT col.studyClass.id
+            FROM ClassOpenedLesson col
+            WHERE col.lesson.id = :lessonId
+            """)
+    List<Integer> findOpenClassIdsByLessonId(@Param("lessonId") Integer lessonId);
 }

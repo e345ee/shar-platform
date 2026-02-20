@@ -41,6 +41,14 @@ public class ClassOpenedLessonService {
         return classOpenedLessonRepository.findOpenedLessonIdsForStudentInCourse(studentId, courseId);
     }
 
+    @Transactional(readOnly = true)
+    public List<Integer> findOpenedClassIdsByLessonId(Integer lessonId) {
+        if (lessonId == null) {
+            return List.of();
+        }
+        return classOpenedLessonRepository.findOpenClassIdsByLessonId(lessonId);
+    }
+
     @Transactional
     public void openLessonForClass(StudyClass studyClass, Lesson lesson, User teacher) {
         if (studyClass == null || lesson == null) {

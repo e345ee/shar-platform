@@ -19,6 +19,8 @@ import ActivityResults from "./ActivityResults/ActivityResults";
 import Certificate from "./Certificate/Certificate";
 import MyClasses from "./MyClasses/MyClasses";
 import {
+  getMyAchievementsPage,
+  getMyCoursePage,
   getMyStatisticsOverview,
   listMyCourses,
 } from "../api/studentApi";
@@ -108,17 +110,34 @@ function Student({ onLogout }) {
 
     const loadStats = async () => {
       try {
-        const [courses, stats] = await Promise.all([
+        const [courses, stats, achievementsPage] = await Promise.all([
           listMyCourses(),
           getMyStatisticsOverview(),
+          getMyAchievementsPage(),
         ]);
+
+        const coursePages = await Promise.allSettled(
+            courses.map((course) => getMyCoursePage(course.id)),
+        );
+        const completedByClosedFlag = coursePages.reduce((acc, result) => {
+          if (result.status !== "fulfilled") {
+            return acc;
+          }
+          return result.value?.courseClosed ? acc + 1 : acc;
+        }, 0);
+
+        const earnedAchievementsCount = Number(
+            achievementsPage?.totalEarned
+            ?? (Array.isArray(achievementsPage?.earned) ? achievementsPage.earned.length : 0)
+        );
 
         if (!isCancelled) {
           setStatsData({
             courses: courses.length,
             attempts: stats?.attemptsTotal || 0,
-            achievements: stats?.testsGraded || 0,
-            completed: stats?.coursesCompleted || 0,
+            achievements: earnedAchievementsCount,
+            // Dashboard completion is shown by explicit course closure flag per course.
+            completed: completedByClosedFlag,
           });
         }
       } catch (e) {

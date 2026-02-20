@@ -61,4 +61,12 @@ public class ClassOpenedTestService {
         rec.setTest(test);
         classOpenedTestRepository.save(rec);
     }
+
+    @Transactional(readOnly = true)
+    public List<Integer> findOpenedClassIdsByTestId(Integer testId) {
+        if (testId == null) {
+            return List.of();
+        }
+        return classOpenedTestRepository.findOpenedClassIdsByTestId(testId);
+    }
 }

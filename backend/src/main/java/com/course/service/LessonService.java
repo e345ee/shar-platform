@@ -30,6 +30,7 @@ import jakarta.validation.constraints.NotNull;
 @Transactional
 public class LessonService {
 
+    private static final RoleName ROLE_ADMIN = RoleName.ADMIN;
     private static final RoleName ROLE_METHODIST = RoleName.METHODIST;
     private static final RoleName ROLE_TEACHER = RoleName.TEACHER;
     private static final RoleName ROLE_STUDENT = RoleName.STUDENT;
@@ -67,7 +68,7 @@ public class LessonService {
 
         String url = presentationStorageService.uploadPresentation(courseId, form.getPresentation());
 
-        
+
         int maxOrder = lessonRepository.findMaxOrderIndexInCourse(courseId);
         int appendIndex = maxOrder + 1;
 
@@ -131,6 +132,28 @@ public class LessonService {
 
         return lessonRepository.findAllByCourse_IdOrderByOrderIndexAsc(courseId)
                 .stream().map(this::toDto).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Integer> listOpenClassIdsForLesson(Integer lessonId) {
+        Lesson lesson = getEntityById(lessonId);
+        User current = authService.getCurrentUserEntity();
+
+        if (!isRole(current, ROLE_ADMIN)) {
+            if (lesson.getCourse() == null || lesson.getCourse().getId() == null) {
+                throw new LessonValidationException("Lesson course is missing");
+            }
+            Integer courseId = lesson.getCourse().getId();
+            if (isRole(current, ROLE_METHODIST)) {
+                assertOwner(lesson.getCourse().getCreatedBy(), current, "Methodist can access only own courses");
+            } else if (isRole(current, ROLE_TEACHER)) {
+                studyClassService.assertTeacherCanManageCourse(courseId, current);
+            } else {
+                throw new LessonAccessDeniedException("Forbidden");
+            }
+        }
+
+        return classOpenedLessonService.findOpenedClassIdsByLessonId(lesson.getId());
     }
 
     public LessonResponse update(@NotNull Integer id, @Valid @NotNull LessonUpdateRequest dto) {
@@ -314,7 +337,7 @@ public class LessonService {
             throw new LessonAccessDeniedException("Forbidden");
         }
 
-        
+
         if (isRole(current, ROLE_METHODIST)) {
             User owner = lesson.getCourse().getCreatedBy();
             if (owner == null || owner.getId() == null || current.getId() == null || !owner.getId().equals(current.getId())) {
@@ -323,7 +346,7 @@ public class LessonService {
             return;
         }
 
-        
+
         if (isRole(current, ROLE_TEACHER)) {
             Integer courseId = lesson.getCourse().getId();
             studyClassService.assertTeacherCanManageCourse(courseId, current);
@@ -338,8 +361,8 @@ public class LessonService {
                     "Student does not belong to this course"
             );
 
-            
-            
+
+
             classOpenedLessonService.assertLessonOpenedForStudent(
                     current.getId(),
                     lesson.getId(),
@@ -355,7 +378,7 @@ public class LessonService {
                 && role == user.getRole().getRolename();
     }
 
-    
+
     private void reorderWithinCourse(Integer courseId, Integer lessonId, Integer desiredOrderIndex) {
         if (courseId == null || lessonId == null || desiredOrderIndex == null || desiredOrderIndex < 1) {
             return;
@@ -398,7 +421,7 @@ public class LessonService {
             return;
         }
 
-        
+
         final int OFFSET = 1_000_000;
         for (int i = 0; i < lessons.size(); i++) {
             Lesson l = lessons.get(i);
@@ -407,7 +430,7 @@ public class LessonService {
         lessonRepository.saveAll(lessons);
         lessonRepository.flush();
 
-        
+
         for (int i = 0; i < lessons.size(); i++) {
             lessons.get(i).setOrderIndex(i + 1);
         }

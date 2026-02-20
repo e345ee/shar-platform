@@ -422,10 +422,19 @@ function StudyActivity({ onBackToMain }) {
             setErrorMessage("Не удалось определить активность для удаления");
             return;
         }
+        const targetActivity = activities.find((activity) => activity.id === id);
+        if (targetActivity?.status === "READY") {
+            setErrorMessage("Тест уже опубликован!");
+            return;
+        }
         try {
             await deleteCourseActivity(id);
             setActivities((prev) => prev.filter((activity) => activity.id !== id));
         } catch (error) {
+            if (error?.status === 400) {
+                setErrorMessage("Тест уже опубликован!");
+                return;
+            }
             const httpCode = error?.status ? ` (HTTP ${error.status})` : "";
             setErrorMessage((error?.message || "Не удалось удалить активность") + httpCode);
         }

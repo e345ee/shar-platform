@@ -24,6 +24,7 @@ import {
   rejectJoinRequest,
   removeStudentFromClass,
   closeCourseForStudent,
+  listClosedCourseStudentIds,
   listClassStudents,
   createStudent,
 } from "../api/teacherApi";
@@ -34,6 +35,7 @@ function ClassManagement({ onBackToMain }) {
   const [classes, setClasses] = useState([]);
   const [applications, setApplications] = useState([]);
   const [studentsByClass, setStudentsByClass] = useState({});
+  const [closedStudentIdsByClass, setClosedStudentIdsByClass] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
@@ -71,16 +73,21 @@ function ClassManagement({ onBackToMain }) {
 
         // Загружаем студентов для всех классов
         const studentsMap = {};
+        const closedMap = {};
         for (const classItem of classesData) {
           try {
             const studentsData = await listClassStudents(classItem.id, 0, 100);
             studentsMap[classItem.id] = studentsData.content || [];
+            const closedIds = await listClosedCourseStudentIds(classItem.id);
+            closedMap[classItem.id] = closedIds;
           } catch (e) {
             console.error(`Ошибка загрузки студентов для класса ${classItem.id}:`, e);
             studentsMap[classItem.id] = [];
+            closedMap[classItem.id] = [];
           }
         }
         setStudentsByClass(studentsMap);
+        setClosedStudentIdsByClass(closedMap);
       } catch (error) {
         setErrorMessage(error?.message || "Не удалось загрузить данные");
         console.error("Ошибка загрузки данных:", error);
@@ -200,9 +207,14 @@ function ClassManagement({ onBackToMain }) {
     try {
       await closeCourseForStudent(classId, studentId);
       const studentsData = await listClassStudents(classId, 0, 100);
+      const closedIds = await listClosedCourseStudentIds(classId);
       setStudentsByClass((prev) => ({
         ...prev,
         [classId]: studentsData.content || [],
+      }));
+      setClosedStudentIdsByClass((prev) => ({
+        ...prev,
+        [classId]: closedIds,
       }));
     } catch (error) {
       setErrorMessage(error?.message || "Не удалось отметить прохождение курса");
@@ -522,8 +534,9 @@ function ClassManagement({ onBackToMain }) {
                                                 {(() => {
                                                   const actionKey = `${classItem.id}:${student.id}`;
                                                   const isClosing = closingCourseKey === actionKey;
+                                                  const closedIdsForClass = closedStudentIdsByClass[classItem.id] || [];
                                                   const isCourseClosed = Boolean(
-                                                      student?.courseClosedAt
+                                                      closedIdsForClass.includes(student.id)
                                                   );
                                                   return (
                                                       <>
@@ -531,7 +544,15 @@ function ClassManagement({ onBackToMain }) {
                                                             className="student-avatar"
                                                             style={{ background: "#3b82f6" }}
                                                         >
-                                                          {getInitials(student.name)}
+                                                          {student.photo ? (
+                                                              <img
+                                                                  src={student.photo}
+                                                                  alt={student.name || "Ученик"}
+                                                                  className="student-avatar-image"
+                                                              />
+                                                          ) : (
+                                                              getInitials(student.name)
+                                                          )}
                                                         </div>
                                                         <div className="student-info">
                                                           <div className="student-name">
