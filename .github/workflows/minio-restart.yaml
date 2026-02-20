@@ -3,7 +3,7 @@ name: MinIO restart (remote only)
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ for-you ]
     paths:
       - ".github/workflows/minio-restart.yaml"
 
@@ -19,8 +19,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           script: |
             set -euo pipefail

@@ -3,7 +3,7 @@ name: Backend CI/CD (deploy jar to ~/shar/backend)
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ for-you ]
     paths:
       - "backend/**"
       - ".github/workflows/backend-cicd.yaml"
@@ -33,8 +33,8 @@ jobs:
           set -euxo pipefail
           mvn -B clean package \
             -DDB_URL="${{ secrets.DB_URL }}" \
-            -DDB_USERNAME="${{ secrets.DB_USERNAME }}" \
-            -DDB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            -DDB_USERNAME="${{ secrets.DB_USERNAME_DANIA }}" \
+            -DDB_PASSWORD="${{ secrets.DB_PASSWORD_DANIA }}"
 
       - name: Pick built jar
         run: |
@@ -52,8 +52,8 @@ jobs:
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           source: app.jar
           target: shar/backend
@@ -63,8 +63,8 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          username: ${{ secrets.REMOTE_USER_DANIA }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_DANIA }}
           port: ${{ secrets.REMOTE_PORT }}
           script: |
             set -euo pipefail
@@ -128,8 +128,8 @@ jobs:
 
             # Postgres
             export SPRING_DATASOURCE_URL="${{ secrets.DB_URL }}"
-            export SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USERNAME }}"
-            export SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}"
+            export SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USERNAME_DANIA }}"
+            export SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD_DANIA }}"
             # CORS / фронт
             export APP_CORS_ALLOWED_ORIGINS="${{ secrets.APP_CORS_ALLOWED_ORIGINS }}"
 
