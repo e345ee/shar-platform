@@ -76,16 +76,19 @@ function ActivityResults({ onBackToMain }) {
       const lessons = Array.isArray(page?.lessons) ? page.lessons : [];
       lessons.forEach((lessonBlock) => {
         const items = Array.isArray(lessonBlock?.activities)
-            ? lessonBlock.activities
-            : [];
+          ? lessonBlock.activities
+          : [];
         items.forEach(pushItem);
       });
+
       const weekly = Array.isArray(page?.weeklyThisWeek) ? page.weeklyThisWeek : [];
       weekly.forEach(pushItem);
+
       const remedial = Array.isArray(page?.remedialThisWeek)
-          ? page.remedialThisWeek
-          : [];
+        ? page.remedialThisWeek
+        : [];
       remedial.forEach(pushItem);
+
       return list;
     };
 
@@ -99,7 +102,7 @@ function ActivityResults({ onBackToMain }) {
         ]);
 
         const pageResults = await Promise.allSettled(
-            (coursesData || []).map((course) => getMyCoursePage(course.id)),
+          (coursesData || []).map((course) => getMyCoursePage(course.id)),
         );
 
         const mergedRows = [];
@@ -132,182 +135,210 @@ function ActivityResults({ onBackToMain }) {
   }, []);
 
   const filteredRows =
-      selectedCourseId === "all"
-          ? rows
-          : rows.filter((r) => String(r.courseId) === String(selectedCourseId));
+    selectedCourseId === "all"
+      ? rows
+      : rows.filter((r) => String(r.courseId) === String(selectedCourseId));
 
   const totalActivities = filteredRows.length;
+
   const completedActivities = filteredRows.filter((r) =>
-      ["SUBMITTED", "GRADED"].includes(String(r.attemptStatus || "").toUpperCase()),
+    ["SUBMITTED", "GRADED"].includes(String(r.attemptStatus || "").toUpperCase()),
   ).length;
+
   const gradedActivities = filteredRows.filter(
-      (r) => String(r.attemptStatus || "").toUpperCase() === "GRADED",
+    (r) => String(r.attemptStatus || "").toUpperCase() === "GRADED",
   ).length;
-  const percents = filteredRows
-      .map((r) => r.percent)
-      .filter((v) => Number.isFinite(v));
-  const averagePercent = percents.length
-      ? Math.round(percents.reduce((a, b) => a + b, 0) / percents.length)
-      : 0;
+
+  const gradedRows = filteredRows.filter(
+    (r) => String(r.attemptStatus || "").toUpperCase() === "GRADED",
+  );
+
+  const totals = gradedRows.reduce(
+    (acc, r) => {
+      const earnedRaw = r.weightedScore ?? r.score;
+      const maxRaw = r.weightedMaxScore ?? r.maxScore;
+
+      const earned = Number(earnedRaw);
+      const max = Number(maxRaw);
+
+      if (!Number.isFinite(earned) || !Number.isFinite(max) || max <= 0) return acc;
+
+      acc.earned += earned;
+      acc.max += max;
+      return acc;
+    },
+    { earned: 0, max: 0 },
+  );
+
+  const averagePercent =
+    totals.max > 0 ? Math.round((totals.earned / totals.max) * 100) : 0;
 
   return (
-      <div className="activity-results-management">
-        <div className="activity-results-container">
-          <header className="activity-results-header">
-            <div className="activity-results-header-left">
-              <div>
-                <h1 className="activity-results-title">Результаты активности</h1>
-                <p className="activity-results-subtitle">
-                  Автоматическое получение результатов на учебные активности с
-                  автоматической проверкой и мгновенной обратной связью
-                </p>
-              </div>
+    <div className="activity-results-management">
+      <div className="activity-results-container">
+        <header className="activity-results-header">
+          <div className="activity-results-header-left">
+            <div>
+              <h1 className="activity-results-title">Результаты активности</h1>
+              <p className="activity-results-subtitle">
+                Автоматическое получение результатов на учебные активности с
+                автоматической проверкой и мгновенной обратной связью
+              </p>
             </div>
-            <div className="activity-results-header-right">
-              <button
-                  className="btn-home"
-                  onClick={onBackToMain}
-                  type="button"
-              >
-                <HomeIcon />
-                На главную
-              </button>
-            </div>
-          </header>
+          </div>
+          <div className="activity-results-header-right">
+            <button className="btn-home" onClick={onBackToMain} type="button">
+              <HomeIcon />
+              На главную
+            </button>
+          </div>
+        </header>
 
-          {errorMessage && (
-              <div className="activity-results-empty">
-                {errorMessage.includes("fetch") || errorMessage.includes("Failed")
-                    ? "Данные временно недоступны."
-                    : errorMessage}
+        {errorMessage && (
+          <div className="activity-results-empty">
+            {errorMessage.includes("fetch") || errorMessage.includes("Failed")
+              ? "Данные временно недоступны."
+              : errorMessage}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="activity-results-empty">Загрузка...</div>
+        ) : overview ? (
+          <>
+            <div className="activity-results-stats">
+              <div className="stat-card stat-blue">
+                <div className="stat-content">
+                  <div className="stat-label">Активностей с результатами</div>
+                  <div className="stat-value">{totalActivities}</div>
+                </div>
               </div>
-          )}
-
-          {isLoading ? (
-              <div className="activity-results-empty">Загрузка...</div>
-          ) : overview ? (
-              <>
-                <div className="activity-results-stats">
-                  <div className="stat-card stat-blue">
-                    <div className="stat-content">
-                      <div className="stat-label">Активностей с результатами</div>
-                      <div className="stat-value">{totalActivities}</div>
-                    </div>
-                  </div>
-                  <div className="stat-card stat-green">
-                    <div className="stat-content">
-                      <div className="stat-label">Завершено / сдано</div>
-                      <div className="stat-value">{completedActivities}</div>
-                    </div>
-                  </div>
-                  <div className="stat-card stat-yellow">
-                    <div className="stat-content">
-                      <div className="stat-label">Проверено / средний %</div>
-                      <div className="stat-value">
-                        {gradedActivities} / {averagePercent}%
-                      </div>
-                    </div>
+              <div className="stat-card stat-green">
+                <div className="stat-content">
+                  <div className="stat-label">Завершено / сдано</div>
+                  <div className="stat-value">{completedActivities}</div>
+                </div>
+              </div>
+              <div className="stat-card stat-yellow">
+                <div className="stat-content">
+                  <div className="stat-label">Проверено / средний %</div>
+                  <div className="stat-value">
+                    {gradedActivities} / {averagePercent}%
                   </div>
                 </div>
+              </div>
+            </div>
 
-                <section className="activity-results-list-section">
-                  <div className="activity-results-list-header">
-                    <h2 className="activity-results-list-title">
-                      Результаты по активностям
-                    </h2>
-                    <p className="activity-results-list-subtitle">
-                      Таблица последних результатов по каждой активности
-                    </p>
-                  </div>
-                  <div className="activity-results-filters">
-                    <label htmlFor="activity-results-course-filter">Курс:</label>
-                    <select
-                        id="activity-results-course-filter"
-                        value={selectedCourseId}
-                        onChange={(e) => setSelectedCourseId(e.target.value)}
-                    >
-                      <option value="all">Все курсы</option>
-                      {courses.map((course) => (
-                          <option key={course.id} value={course.id}>
-                            {course.name || `Курс #${course.id}`}
-                          </option>
-                      ))}
-                    </select>
-                  </div>
-                  {filteredRows.length > 0 ? (
-                      <div className="activity-results-table-wrap">
-                        <table className="activity-results-table">
-                          <thead>
-                          <tr>
-                            <th>Активность</th>
-                            <th>Курс</th>
-                            <th>Статус</th>
-                            <th>Баллы</th>
-                            <th>Процент</th>
-                            <th>Сдано</th>
-                            <th>Дедлайн</th>
-                          </tr>
-                          </thead>
-                          <tbody>
-                          {filteredRows.map((item) => (
-                              <tr key={item.activityId}>
-                                <td>
-                                  <div className="activity-results-course-name">
-                                    <BookIcon />
-                                    <span>{item.title || "-"}</span>
-                                  </div>
-                                </td>
-                                <td>{item.courseName || "-"}</td>
-                                <td>
+            <section className="activity-results-list-section">
+              <div className="activity-results-list-header">
+                <h2 className="activity-results-list-title">
+                  Результаты по активностям
+                </h2>
+                <p className="activity-results-list-subtitle">
+                  Таблица последних результатов по каждой активности
+                </p>
+              </div>
+
+              <div className="activity-results-filters">
+                <label htmlFor="activity-results-course-filter">Курс:</label>
+                <select
+                  id="activity-results-course-filter"
+                  value={selectedCourseId}
+                  onChange={(e) => setSelectedCourseId(e.target.value)}
+                >
+                  <option value="all">Все курсы</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.id}>
+                      {course.name || `Курс #${course.id}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {filteredRows.length > 0 ? (
+                <div className="activity-results-table-wrap">
+                  <table className="activity-results-table">
+                    <thead>
+                      <tr>
+                        <th>Активность</th>
+                        <th>Курс</th>
+                        <th>Статус</th>
+                        <th>Баллы</th>
+                        <th>Процент</th>
+                        <th>Сдано</th>
+                        <th>Дедлайн</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((item) => (
+                        <tr key={item.activityId}>
+                          <td>
+                            <div className="activity-results-course-name">
+                              <BookIcon />
+                              <span>{item.title || "-"}</span>
+                            </div>
+                          </td>
+                          <td>{item.courseName || "-"}</td>
+                          <td>
                             <span
-                                className={`activity-status-badge status-${String(
-                                    item.attemptStatus || "NOT_STARTED",
-                                ).toLowerCase()}`}
+                              className={`activity-status-badge status-${String(
+                                item.attemptStatus || "NOT_STARTED",
+                              ).toLowerCase()}`}
                             >
                               {item.attemptStatusLabel}
                             </span>
-                                </td>
-                                <td>
-                                  {item.score != null && item.maxScore != null
-                                      ? `${item.score}/${item.maxScore}`
-                                      : "—"}
-                                </td>
-                                <td>
-                                  {item.percent != null ? `${item.percent}%` : "—"}
-                                </td>
-                                <td>{formatDate(item.submittedAt)}</td>
-                                <td>{formatDate(item.deadline)}</td>
-                              </tr>
-                          ))}
-                          </tbody>
-                        </table>
-                      </div>
-                  ) : (
-                      <div className="activity-results-empty">
-                        По выбранному фильтру результатов пока нет
-                      </div>
-                  )}
-                </section>
+                          </td>
+                          <td>
+                            {item.score != null && item.maxScore != null
+                              ? `${item.score}/${item.maxScore}`
+                              : "—"}
+                          </td>
+                          <td>{item.percent != null ? `${item.percent}%` : "—"}</td>
+                          <td>{formatDate(item.submittedAt)}</td>
+                          <td>{formatDate(item.deadline)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="activity-results-empty">
+                  По выбранному фильтру результатов пока нет
+                </div>
+              )}
+            </section>
 
-                <section className="activity-results-info-section">
-                  <div className="activity-results-info-card">
-                    <h3>Что означают статусы</h3>
-                    <ul>
-                      <li><strong>Не начато</strong> — попытка по активности еще не создавалась.</li>
-                      <li><strong>В процессе</strong> — активность начата, но еще не отправлена.</li>
-                      <li><strong>На проверке</strong> — отправлена, ожидает проверки преподавателем.</li>
-                      <li><strong>Проверено</strong> — итоговый результат уже выставлен.</li>
-                    </ul>
-                  </div>
-                </section>
-              </>
-          ) : !isLoading && !errorMessage && (
-              <div className="activity-results-empty">
-                Нет данных для отображения
+            <section className="activity-results-info-section">
+              <div className="activity-results-info-card">
+                <h3>Что означают статусы</h3>
+                <ul>
+                  <li>
+                    <strong>Не начато</strong> — попытка по активности еще не
+                    создавалась.
+                  </li>
+                  <li>
+                    <strong>В процессе</strong> — активность начата, но еще не
+                    отправлена.
+                  </li>
+                  <li>
+                    <strong>На проверке</strong> — отправлена, ожидает проверки
+                    преподавателем.
+                  </li>
+                  <li>
+                    <strong>Проверено</strong> — итоговый результат уже выставлен.
+                  </li>
+                </ul>
               </div>
-          )}
-        </div>
+            </section>
+          </>
+        ) : (
+          !isLoading &&
+          !errorMessage && (
+            <div className="activity-results-empty">Нет данных для отображения</div>
+          )
+        )}
       </div>
+    </div>
   );
 }
 
