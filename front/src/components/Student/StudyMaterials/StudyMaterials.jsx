@@ -126,6 +126,33 @@ function StudyMaterials({ onBackToMain }) {
     }
   };
 
+  const handleDownloadMaterial = async (url) => {
+    if (!url) return;
+    const fileName = getMaterialFileName(url);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
       <div className="study-materials-management">
         <div className="study-materials-container">
@@ -247,16 +274,14 @@ function StudyMaterials({ onBackToMain }) {
                                       >
                                         Открыть
                                       </a>
-                                      <a
-                                          href={lesson.presentationUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          download
+                                      <button
+                                          type="button"
                                           className="study-material-download"
+                                          onClick={() => void handleDownloadMaterial(lesson.presentationUrl)}
                                       >
                                         <DownloadIcon />
                                         Скачать
-                                      </a>
+                                      </button>
                                     </div>
                                   </div>
                               )}

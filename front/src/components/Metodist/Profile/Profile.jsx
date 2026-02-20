@@ -275,7 +275,7 @@ function Profile({ onBackToMain }) {
                             </div>
                         </div>
 
-                        <div className="profile-actions">
+                        <div className="profile-actions profile-actions-centered">
                             {isEditing ? (
                                 <button className="btn-primary" onClick={handleSave} type="button" disabled={isSaving}>
                                     Сохранить изменения

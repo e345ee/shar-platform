@@ -187,6 +187,40 @@ public class ClassStudentService {
         );
     }
 
+    public java.util.List<Integer> listClosedCourseStudentIdsInClass(Integer classId) {
+        if (classId == null) {
+            throw new IllegalArgumentException("classId is required");
+        }
+
+        User current = authService.getCurrentUserEntity();
+        if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
+            throw new ForbiddenOperationException("Unauthenticated");
+        }
+
+        RoleName role = current.getRole().getRolename();
+        boolean isTeacher = role == ROLE_TEACHER;
+        boolean isMethodist = role == ROLE_METHODIST;
+        if (!isTeacher && !isMethodist) {
+            throw new ClassStudentAccessDeniedException("Only TEACHER or METHODIST can view course closure statuses");
+        }
+
+        StudyClass sc = classService.getEntityById(classId);
+        if (isTeacher) {
+            if (sc.getTeacher() == null || sc.getTeacher().getId() == null || current.getId() == null
+                    || !sc.getTeacher().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class teacher can view course closure statuses");
+            }
+        }
+        if (isMethodist) {
+            if (sc.getCreatedBy() == null || sc.getCreatedBy().getId() == null || current.getId() == null
+                    || !sc.getCreatedBy().getId().equals(current.getId())) {
+                throw new ClassStudentAccessDeniedException("Only class creator can view course closure statuses");
+            }
+        }
+
+        return classStudentRepository.findClosedStudentIdsByClassId(classId);
+    }
+
 
     @Transactional
     public void removeStudentFromClass(Integer classId, Integer studentId) {

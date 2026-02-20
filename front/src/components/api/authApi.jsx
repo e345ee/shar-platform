@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 
 async function requestJson(path, options = {}) {
     const response = await fetch(`${API_BASE_URL}${path}`, options);
@@ -14,7 +14,12 @@ async function requestJson(path, options = {}) {
     }
 
     if (!response.ok) {
-        const error = new Error("Request failed");
+        const backendMessage = body?.message || body?.error || "";
+        const error = new Error(
+            backendMessage
+                ? `${backendMessage} (HTTP ${response.status})`
+                : `Request failed (HTTP ${response.status})`,
+        );
         error.status = response.status;
         error.body = body;
         throw error;

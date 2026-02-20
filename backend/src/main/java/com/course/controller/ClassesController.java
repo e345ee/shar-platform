@@ -91,6 +91,12 @@ public class ClassesController {
         return ResponseEntity.ok(classStudentService.listMyStudentClasses());
     }
 
+    @GetMapping("/classes/{classId}/students/closed-courses")
+    @PreAuthorize("hasAnyRole('METHODIST','TEACHER')")
+    public ResponseEntity<List<Integer>> listClosedCourseStudentIds(@PathVariable Integer classId) {
+        return ResponseEntity.ok(classStudentService.listClosedCourseStudentIdsInClass(classId));
+    }
+
     @PostMapping("/classes/{classId}/lessons/{lessonId}/open")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")
     public ResponseEntity<Void> openLessonForClass(@PathVariable Integer classId, @PathVariable Integer lessonId) {

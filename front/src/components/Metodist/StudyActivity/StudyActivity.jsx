@@ -209,6 +209,10 @@ function StudyActivity({ onBackToMain }) {
                 setActivities((prev) => [newActivity, ...prev]);
             }
         } catch (error) {
+            if (modalMode === "edit" && error?.status === 400) {
+                setErrorMessage("Опубликованный тест нельзя редактировать");
+                throw error;
+            }
             setErrorMessage(
                 error?.message || (modalMode === "edit" ? "Не удалось обновить активность" : "Не удалось создать активность")
             );
@@ -227,6 +231,10 @@ function StudyActivity({ onBackToMain }) {
 
     const handleOpenEditActivity = (activity) => {
         setErrorMessage("");
+        if (activity?.status === "READY") {
+            setErrorMessage("Опубликованный тест нельзя редактировать");
+            return;
+        }
         getActivityById(activity.id)
             .then((details) => {
                 setModalMode("edit");
@@ -422,10 +430,19 @@ function StudyActivity({ onBackToMain }) {
             setErrorMessage("Не удалось определить активность для удаления");
             return;
         }
+        const targetActivity = activities.find((activity) => activity.id === id);
+        if (targetActivity?.status === "READY") {
+            setErrorMessage("Тест уже опубликован!");
+            return;
+        }
         try {
             await deleteCourseActivity(id);
             setActivities((prev) => prev.filter((activity) => activity.id !== id));
         } catch (error) {
+            if (error?.status === 400) {
+                setErrorMessage("Тест уже опубликован!");
+                return;
+            }
             const httpCode = error?.status ? ` (HTTP ${error.status})` : "";
             setErrorMessage((error?.message || "Не удалось удалить активность") + httpCode);
         }
@@ -652,6 +669,8 @@ function StudyActivity({ onBackToMain }) {
                                             type="button"
                                             aria-label="Edit"
                                             onClick={() => handleOpenEditActivity(activity)}
+                                            disabled={activity.status === "READY"}
+                                            title={activity.status === "READY" ? "Опубликованную активность нельзя редактировать" : "Редактировать"}
                                         >
                                             <EditIcon />
                                         </button>

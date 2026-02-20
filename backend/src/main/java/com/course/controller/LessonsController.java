@@ -94,6 +94,13 @@ public class LessonsController {
         return ResponseEntity.ok(slideService.getPresentationInfo(id));
     }
 
+
+    @GetMapping("/lessons/{id}/open-classes")
+    @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST')")
+    public ResponseEntity<List<Integer>> listOpenClassesForLesson(@PathVariable Integer id) {
+        return ResponseEntity.ok(lessonService.listOpenClassIdsForLesson(id));
+    }
+
     @GetMapping(value = "/lessons/{id}/presentation/pages/{page}", produces = MediaType.IMAGE_PNG_VALUE)
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")
     public ResponseEntity<byte[]> getPresentationPage(

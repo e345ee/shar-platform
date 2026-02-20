@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || "";
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8080";
 const AUTH_TOKEN_KEY = "auth_access_token";
 
 function getAccessToken() {
@@ -317,6 +317,16 @@ export async function closeCourseForStudent(classId, studentId) {
     });
 }
 
+export async function listClosedCourseStudentIds(classId) {
+    const data = await requestJson(`/api/classes/${classId}/students/closed-courses`);
+    if (!Array.isArray(data)) {
+        return [];
+    }
+    return data
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+}
+
 // Создать аккаунт студента
 export async function createStudent(dto) {
     const created = await requestJson("/api/users/students", {
@@ -442,6 +452,26 @@ export async function listActivityAttempts(activityId) {
 // Получить активность по ID (с вопросами для преподавателя)
 export async function getActivityById(activityId) {
     return requestJson(`/api/activities/${activityId}`);
+}
+
+export async function listOpenClassIdsForActivity(activityId) {
+    const data = await requestJson(`/api/activities/${activityId}/open-classes`);
+    if (!Array.isArray(data)) {
+        return [];
+    }
+    return data
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+export async function listOpenClassIdsForLesson(lessonId) {
+    const data = await requestJson(`/api/lessons/${lessonId}/open-classes`);
+    if (!Array.isArray(data)) {
+        return [];
+    }
+    return data
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
 }
 
 // Получить достижения курса (доступные для назначения)

@@ -63,6 +63,8 @@ java.util.List<com.course.entity.Course> findDistinctCoursesByStudentId(@Param("
     @Query("select distinct cs.studyClass from ClassStudent cs where cs.student.id = :studentId order by cs.studyClass.name asc")
     List<StudyClass> findDistinctStudyClassesByStudentId(@Param("studentId") Integer studentId);
 
+    @Query("select cs.student.id from ClassStudent cs where cs.studyClass.id = :classId and cs.courseClosedAt is not null")
+    List<Integer> findClosedStudentIdsByClassId(@Param("classId") Integer classId);
 }
 
 
