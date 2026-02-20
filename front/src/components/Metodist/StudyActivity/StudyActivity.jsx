@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./StudyActivity.css";
 import {
     ActivitiesIcon,
@@ -20,6 +20,7 @@ import {
     getActivityById,
     listActivitiesByLesson,
     listMyCourses,
+    listRemedialActivitiesByCourse,
     listLessonsByCourse,
     listWeeklyActivitiesByCourse,
     publishActivity,
@@ -28,11 +29,19 @@ import {
 } from "../../api/methodistApi";
 
 const ACTIVITY_TYPE_UI = {
-    HOMEWORK_TEST: { format: "Домашнее задание", color: "blue", type: "Тест" },
-    CONTROL_WORK: { format: "Контрольная работа", color: "red", type: "Тест" },
-    WEEKLY_STAR: { format: "Еженедельное задание", color: "green", type: "Тест" },
-    REMEDIAL_TASK: { format: "Для отстающих", color: "orange", type: "Тест" },
+    HOMEWORK_TEST: { format: "Домашнее задание", color: "blue" },
+    CONTROL_WORK: { format: "Контрольная работа", color: "red" },
+    WEEKLY_STAR: { format: "Еженедельное задание", color: "green" },
+    REMEDIAL_TASK: { format: "Для отстающих", color: "orange" },
 };
+
+const ACTIVITY_FILTER_TABS = [
+    { key: "ALL", label: "Все" },
+    { key: "HOMEWORK_TEST", label: "Домашние" },
+    { key: "CONTROL_WORK", label: "Контрольные" },
+    { key: "WEEKLY_STAR", label: "Еженедельные" },
+    { key: "REMEDIAL_TASK", label: "Для отстающих" },
+];
 
 function formatDate(deadline) {
     if (!deadline) return "";
@@ -64,7 +73,6 @@ function mapActivityToCard(activity, courses) {
     const uiMeta = ACTIVITY_TYPE_UI[activity.activityType] || {
         format: activity.activityType || "Активность",
         color: "blue",
-        type: "Тест",
     };
     const courseName = courses.find((course) => course.id === activity.courseId)?.name || "";
     return {
@@ -73,7 +81,6 @@ function mapActivityToCard(activity, courses) {
         title: activity.title,
         topic: activity.topic,
         format: uiMeta.format,
-        type: uiMeta.type,
         class: courseName,
         date: formatDate(activity.deadline),
         description: activity.description || "",
@@ -101,6 +108,7 @@ function StudyActivity({ onBackToMain }) {
     const [errorMessage, setErrorMessage] = useState("");
     const [modalMode, setModalMode] = useState("create");
     const [editingActivity, setEditingActivity] = useState(null);
+    const [activeFilter, setActiveFilter] = useState("ALL");
 
     useEffect(() => {
         let isCancelled = false;
@@ -139,6 +147,9 @@ function StudyActivity({ onBackToMain }) {
 
                     const weekly = await listWeeklyActivitiesByCourse(course.id);
                     weekly.forEach((activity) => collected.push(activity));
+
+                    const remedial = await listRemedialActivitiesByCourse(course.id);
+                    remedial.forEach((activity) => collected.push(activity));
                 }
 
                 const dedup = new Map();
@@ -168,13 +179,19 @@ function StudyActivity({ onBackToMain }) {
     }, [courses]);
 
     const stats = {
-        tests: activities.filter(a => a.type === "Тест").length,
+        controlWorks: activities.filter((a) => a.activityType === "CONTROL_WORK").length,
         homework: activities.filter(a => a.format === "Домашнее задание").length,
         weekly: activities.filter(a => a.format === "Еженедельное задание").length,
         lagging: activities.filter(a => a.format === "Для отстающих").length,
     };
 
     const totalActivities = activities.length;
+    const filteredActivities = useMemo(() => {
+        if (activeFilter === "ALL") {
+            return activities;
+        }
+        return activities.filter((activity) => activity.activityType === activeFilter);
+    }, [activities, activeFilter]);
 
     const handleSubmitActivity = async ({ id, courseId, payload }) => {
         setIsSubmitting(true);
@@ -453,20 +470,15 @@ function StudyActivity({ onBackToMain }) {
         }
     };
 
-    const getActivityTypeTag = (format, type) => {
+    const getActivityTypeTag = (format) => {
         const formatColors = {
             "Контрольная работа": "red",
             "Домашнее задание": "blue",
             "Еженедельное задание": "green",
             "Для отстающих": "orange",
         };
-        const typeColors = {
-            "Тест": "pink",
-            "Текст": "light-green",
-        };
         return {
             format: { text: format, color: formatColors[format] || "gray" },
-            type: { text: type, color: typeColors[type] || "gray" },
         };
     };
 
@@ -501,8 +513,8 @@ function StudyActivity({ onBackToMain }) {
                             <TestIcon />
                         </div>
                         <div className="stat-content">
-                            <div className="stat-label">Тесты</div>
-                            <div className="stat-value">{stats.tests}</div>
+                            <div className="stat-label">Контрольные работы</div>
+                            <div className="stat-value">{stats.controlWorks}</div>
                         </div>
                     </div>
                     <div className="stat-card stat-blue">
@@ -537,15 +549,29 @@ function StudyActivity({ onBackToMain }) {
                 <section className="activities-list-section">
                     <div className="activities-list-header">
                         <h2 className="activities-list-title">Список активностей</h2>
-                        <p className="activities-list-subtitle">Всего активностей: {totalActivities}</p>
+                        <p className="activities-list-subtitle">
+                            Всего активностей: {totalActivities}
+                        </p>
+                    </div>
+                    <div className="activities-filters">
+                        {ACTIVITY_FILTER_TABS.map((tab) => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                className={`activities-filter-btn ${activeFilter === tab.key ? "active" : ""}`}
+                                onClick={() => setActiveFilter(tab.key)}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
                     {errorMessage && <div className="activity-error">{errorMessage}</div>}
                     <div className="activities-list">
-                        {activities.length === 0 && (
+                        {filteredActivities.length === 0 && (
                             <div className="activity-empty">Активностей пока нет</div>
                         )}
-                        {activities.map((activity) => {
-                            const tags = getActivityTypeTag(activity.format, activity.type);
+                        {filteredActivities.map((activity) => {
+                            const tags = getActivityTypeTag(activity.format);
                             return (
                                 <div key={activity.id} className={`activity-card activity-card-${activity.color}`}>
                                     <div className={`activity-icon activity-icon-${activity.color}`}>
@@ -557,9 +583,6 @@ function StudyActivity({ onBackToMain }) {
                                             <div className="activity-tags">
                                                 <span className={`activity-tag tag-${tags.format.color}`}>
                                                     {tags.format.text}
-                                                </span>
-                                                <span className={`activity-tag tag-${tags.type.color}`}>
-                                                    {tags.type.text}
                                                 </span>
                                             </div>
                                         </div>
@@ -588,30 +611,16 @@ function StudyActivity({ onBackToMain }) {
                                             )}
                                         </div>
                                         <p className="activity-description">{activity.description}</p>
-                                        {activity.type === "Текст" && (
-                                            <div className="activity-questions">
-                                                <button
-                                                    className="btn-questions"
-                                                    type="button"
-                                                    onClick={() => handleOpenTextTasks(activity)}
-                                                >
-                                                    <DocumentIcon />
-                                                    {activity.tasks?.length || 0} заданий
-                                                </button>
-                                            </div>
-                                        )}
-                                        {activity.type === "Тест" && (
-                                            <div className="activity-questions">
-                                                <button
-                                                    className="btn-questions"
-                                                    type="button"
-                                                    onClick={() => handleOpenTestQuestions(activity)}
-                                                >
-                                                    <QuestionsListIcon />
-                                                    {activity.questionsCount || 0} вопросов
-                                                </button>
-                                            </div>
-                                        )}
+                                        <div className="activity-questions">
+                                            <button
+                                                className="btn-questions"
+                                                type="button"
+                                                onClick={() => handleOpenTestQuestions(activity)}
+                                            >
+                                                <QuestionsListIcon />
+                                                {activity.questionsCount || 0} вопросов
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="activity-actions">
                                         {activity.activityType === "WEEKLY_STAR" && activity.status === "READY" && (

@@ -57,7 +57,12 @@ public class ActivitiesController {
         return ResponseEntity.ok(testService.listWeeklyActivitiesForCourse(courseId));
     }
 
-    
+    @GetMapping("/courses/{courseId}/activities/remedial")
+    @PreAuthorize("hasAnyRole('ADMIN','METHODIST','TEACHER')")
+    public ResponseEntity<List<ActivityResponse>> listRemedialActivities(@PathVariable Integer courseId) {
+        return ResponseEntity.ok(testService.listRemedialActivitiesForCourse(courseId));
+    }
+
 
     @GetMapping("/activities/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','TEACHER','METHODIST','STUDENT')")

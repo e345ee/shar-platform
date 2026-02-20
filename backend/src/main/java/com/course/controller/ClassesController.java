@@ -85,7 +85,11 @@ public class ClassesController {
         return ResponseEntity.ok(classService.getMyClassById(id));
     }
 
-    
+    @GetMapping("/classes/my-student")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<List<StudyClassResponse>> getMyStudentClasses() {
+        return ResponseEntity.ok(classStudentService.listMyStudentClasses());
+    }
 
     @PostMapping("/classes/{classId}/lessons/{lessonId}/open")
     @PreAuthorize("hasAnyRole('TEACHER','METHODIST')")

@@ -8,7 +8,7 @@
 }
 
 .achievements-container {
-    max-width: 1600px;
+    max-width: 1280px;
     width: 100%;
     margin: 0 auto;
 }
@@ -181,6 +181,9 @@
 
 .achievements-list-section {
     margin-top: 40px;
+    max-width: 1220px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .achievements-list-header {
@@ -224,69 +227,120 @@
     color: var(--muted, #64748b);
 }
 
-.achievement-card {
-    background: var(--card, #ffffff);
-    border-radius: 20px;
-    padding: 32px;
-    display: flex;
+.methodist-achievement-table {
+    margin-bottom: 10px;
+}
+
+.methodist-achievement-head {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 32px;
+    gap: 20px;
+    padding: 0 20px;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.methodist-achievement-list {
+    gap: 12px;
+}
+
+.methodist-achievement-row {
+    background: var(--card, #ffffff);
+    border-radius: 16px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 20px;
     box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
     border: 1px solid var(--border, #cbd5e1);
     transition: all 0.2s ease;
+    min-height: 0;
 }
 
-.achievement-card:hover {
+.methodist-achievement-row:hover {
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
     transform: translateY(-2px);
 }
 
-.achievement-image {
+.methodist-achievement-image {
     flex-shrink: 0;
-    width: 120px;
-    height: 120px;
-    border-radius: 16px;
+    width: 96px;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
     overflow: hidden;
     box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+    border: 1px solid var(--border, #cbd5e1);
+    background: #ffffff;
+    display: grid;
+    place-items: center;
 }
 
-.achievement-image img {
+.methodist-achievement-image img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+    background: #ffffff;
 }
 
-.achievement-info {
+.methodist-achievement-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
+    min-width: 0;
 }
 
-.achievement-title {
-    font-size: 24px;
+.methodist-achievement-title {
+    font-size: 18px;
     font-weight: 700;
     color: var(--text, #1e293b);
     margin: 0;
 }
 
-.achievement-description {
-    font-size: 16px;
+.methodist-achievement-description {
+    font-size: 13px;
     color: var(--muted, #64748b);
     margin: 0;
-    line-height: 1.6;
+    line-height: 1.35;
+    word-break: break-word;
 }
 
-.achievement-actions {
+.methodist-achievement-description-muted {
+    color: #94a3b8;
+}
+
+.methodist-achievement-course-badge {
+    margin: 0;
+    width: fit-content;
+    padding: 3px 9px;
+    border-radius: 9px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.methodist-achievement-actions {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 8px;
     flex-shrink: 0;
+    align-items: center;
+    justify-self: end;
+    align-self: center;
 }
 
-.achievement-action-btn {
-    width: 48px;
-    height: 48px;
+.methodist-achievement-action-btn {
+    width: 40px;
+    height: 40px;
     border-radius: 12px;
     border: 1px solid var(--border, #cbd5e1);
     background: var(--card, #ffffff);
@@ -297,16 +351,16 @@
     transition: all 0.2s ease;
 }
 
-.achievement-action-btn:hover {
+.methodist-achievement-action-btn:hover {
     background: #f8fafc;
     border-color: var(--yellow, #f59e0b);
     color: var(--yellow, #f59e0b);
     transform: translateY(-1px);
 }
 
-.achievement-action-btn svg {
-    width: 20px;
-    height: 20px;
+.methodist-achievement-action-btn svg {
+    width: 18px;
+    height: 18px;
 }
 
 .modal-textarea {
@@ -351,7 +405,7 @@
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
     .achievements-management {
         padding: 20px 16px;
     }
@@ -371,20 +425,26 @@
         justify-content: center;
     }
 
-    .achievement-card {
-        flex-direction: column;
+    .methodist-achievement-head {
+        display: none;
+    }
+
+    .methodist-achievement-row {
+        grid-template-columns: 1fr;
         align-items: flex-start;
+        gap: 12px;
     }
 
-    .achievement-image {
+    .methodist-achievement-image {
         width: 100%;
-        height: 200px;
+        aspect-ratio: 16 / 9;
     }
 
-    .achievement-actions {
+    .methodist-achievement-actions {
         flex-direction: row;
         width: 100%;
         justify-content: flex-end;
+        justify-self: stretch;
     }
 
     .modal-content {

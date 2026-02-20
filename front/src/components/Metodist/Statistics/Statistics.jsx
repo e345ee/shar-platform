@@ -5,6 +5,8 @@ import {
     HomeIcon,
     StatisticsIcon,
     TeachersIcon,
+    ClassesIcon,
+    PeopleIcon,
 } from "../../../svgs/MethodistSvg.jsx";
 import {
     downloadTeacherStatisticsCsv,
@@ -119,10 +121,16 @@ function Statistics({ onBackToMain }) {
                         <div className="methodist-statistics-card-value">{totals.teachers}</div>
                     </div>
                     <div className="methodist-statistics-card">
+                        <div className="methodist-statistics-card-icon">
+                            <ClassesIcon />
+                        </div>
                         <div className="methodist-statistics-card-label">Классов</div>
                         <div className="methodist-statistics-card-value">{totals.classes}</div>
                     </div>
                     <div className="methodist-statistics-card">
+                        <div className="methodist-statistics-card-icon">
+                            <PeopleIcon />
+                        </div>
                         <div className="methodist-statistics-card-label">Студентов</div>
                         <div className="methodist-statistics-card-value">{totals.students}</div>
                     </div>

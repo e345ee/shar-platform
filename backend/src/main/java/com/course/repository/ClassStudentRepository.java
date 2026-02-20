@@ -1,8 +1,8 @@
 package com.course.repository;
 
 import com.course.entity.ClassStudent;
+import com.course.entity.StudyClass;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
@@ -59,6 +59,9 @@ java.util.List<com.course.entity.Course> findDistinctCoursesByStudentId(@Param("
 
     @Query("select count(cs) from ClassStudent cs where cs.studyClass.id = :classId")
     long countStudentsByClassId(@Param("classId") Integer classId);
+
+    @Query("select distinct cs.studyClass from ClassStudent cs where cs.student.id = :studentId order by cs.studyClass.name asc")
+    List<StudyClass> findDistinctStudyClassesByStudentId(@Param("studentId") Integer studentId);
 
 }
 
