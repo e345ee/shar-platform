@@ -108,6 +108,11 @@ export async function createJoinRequest(classCode) {
     });
 }
 
+export async function listMyStudentClasses() {
+    const data = await requestJson("/api/classes/my-student");
+    return Array.isArray(data) ? data : [];
+}
+
 export async function listMyLessonsInCourse(courseId) {
     const data = await requestJson(`/api/me/courses/${courseId}/lessons`);
     return Array.isArray(data) ? data : [];

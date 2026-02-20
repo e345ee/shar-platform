@@ -6,7 +6,6 @@ import com.course.entity.StudyClass;
 import com.course.entity.User;
 import com.course.exception.ClassStudentAccessDeniedException;
 import com.course.exception.ForbiddenOperationException;
-import com.course.exception.ResourceNotFoundException;
 import com.course.exception.StudentNotEnrolledInClassException;
 import com.course.repository.ClassStudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Pageable;
 import com.course.dto.common.PageResponse;
+import com.course.dto.classroom.StudyClassResponse;
 import com.course.dto.user.UserResponse;
 
 @Service
@@ -42,6 +42,16 @@ public class ClassStudentService {
         if (!existsStudentInClass(studentId, classId)) {
             throw new ForbiddenOperationException(message);
         }
+    }
+
+    public java.util.List<StudyClassResponse> listMyStudentClasses() {
+        User current = authService.getCurrentUserEntity();
+        userService.assertUserEntityHasRole(current, ROLE_STUDENT);
+
+        return classStudentRepository.findDistinctStudyClassesByStudentId(current.getId())
+                .stream()
+                .map(this::toStudyClassDto)
+                .toList();
     }
 
     public java.util.List<Integer> findClassIdsByStudentInCourse(Integer studentId, Integer courseId) {
@@ -186,7 +196,7 @@ public class ClassStudentService {
 
         User current = authService.getCurrentUserEntity();
         if (current == null || current.getRole() == null || current.getRole().getRolename() == null) {
-            
+
             throw new ForbiddenOperationException("Unauthenticated");
         }
 
@@ -223,7 +233,7 @@ public class ClassStudentService {
         classStudentRepository.delete(cs);
     }
 
-    
+
     @Transactional
     public void closeCourseForStudent(Integer classId, Integer studentId) {
         if (classId == null || studentId == null) {
@@ -268,5 +278,26 @@ public class ClassStudentService {
             cs.setCourseClosedAt(java.time.LocalDateTime.now());
             classStudentRepository.save(cs);
         }
+    }
+
+    private StudyClassResponse toStudyClassDto(StudyClass sc) {
+        StudyClassResponse dto = new StudyClassResponse();
+        dto.setId(sc.getId());
+        dto.setName(sc.getName());
+        dto.setJoinCode(sc.getJoinCode());
+        if (sc.getCourse() != null) {
+            dto.setCourseId(sc.getCourse().getId());
+        }
+        if (sc.getTeacher() != null) {
+            dto.setTeacherId(sc.getTeacher().getId());
+            dto.setTeacherName(sc.getTeacher().getName());
+        }
+        if (sc.getCreatedBy() != null) {
+            dto.setCreatedById(sc.getCreatedBy().getId());
+            dto.setCreatedByName(sc.getCreatedBy().getName());
+        }
+        dto.setCreatedAt(sc.getCreatedAt());
+        dto.setUpdatedAt(sc.getUpdatedAt());
+        return dto;
     }
 }

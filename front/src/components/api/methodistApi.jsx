@@ -404,6 +404,14 @@ export async function listWeeklyActivitiesByCourse(courseId) {
     return activities.map(mapActivity);
 }
 
+export async function listRemedialActivitiesByCourse(courseId) {
+    const activities = await requestJson(`/api/courses/${courseId}/activities/remedial`);
+    if (!Array.isArray(activities)) {
+        return [];
+    }
+    return activities.map(mapActivity);
+}
+
 export async function getActivityById(activityId) {
     const activity = await requestJson(`/api/activities/${activityId}`);
     return {

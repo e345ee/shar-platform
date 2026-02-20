@@ -155,28 +155,33 @@ function Achievements({ onBackToMain }) {
                 <section className="achievements-list-section">
                     <div className="achievements-list-header">
                         <h2 className="achievements-list-title">Список достижений</h2>
-                        <p className="achievements-list-subtitle">Все достижения в системе</p>
                     </div>
                     {errorMessage && <div className="achievements-error">{errorMessage}</div>}
-                    <div className="achievements-list">
+                    <div className="achievements-list methodist-achievement-list">
                         {isLoading && <div className="achievements-empty">Загрузка...</div>}
                         {!isLoading && achievements.length === 0 && (
                             <div className="achievements-empty">Достижений пока нет</div>
                         )}
                         {achievements.map((achievement) => (
-                            <div key={achievement.id} className="achievement-card">
-                                <div className="achievement-image">
+                            <div key={achievement.id} className="methodist-achievement-row">
+                                <div className="methodist-achievement-image">
                                     <img src={achievement.photoUrl} alt={achievement.title} />
                                 </div>
-                                <div className="achievement-info">
-                                    <h3 className="achievement-title">{achievement.title}</h3>
-                                    <p className="achievement-description">Курс: {achievement.courseName || "-"}</p>
-                                    <p className="achievement-description">{achievement.jokeDescription}</p>
-                                    <p className="achievement-description">{achievement.description}</p>
+                                <div className="methodist-achievement-info">
+                                    <h3 className="methodist-achievement-title">{achievement.title}</h3>
+                                    <p className="methodist-achievement-course-badge">Курс: {achievement.courseName || "-"}</p>
+                                    {achievement.jokeDescription ? (
+                                        <p className="methodist-achievement-description">{achievement.jokeDescription}</p>
+                                    ) : null}
+                                    {achievement.description ? (
+                                        <p className="methodist-achievement-description methodist-achievement-description-muted">
+                                            {achievement.description}
+                                        </p>
+                                    ) : null}
                                 </div>
-                                <div className="achievement-actions">
+                                <div className="methodist-achievement-actions">
                                     <button
-                                        className="achievement-action-btn"
+                                        className="methodist-achievement-action-btn"
                                         type="button"
                                         aria-label="Edit"
                                         onClick={() => handleOpenEditModal(achievement)}
@@ -184,7 +189,7 @@ function Achievements({ onBackToMain }) {
                                         <EditIcon />
                                     </button>
                                     <button
-                                        className="achievement-action-btn"
+                                        className="methodist-achievement-action-btn"
                                         type="button"
                                         onClick={() => handleDeleteAchievement(achievement.id)}
                                         aria-label="Delete"

@@ -267,6 +267,26 @@ public class TestService {
 
 
     @Transactional(readOnly = true)
+    public List<ActivityResponse> listRemedialActivitiesForCourse(Integer courseId) {
+        User current = authService.getCurrentUserEntity();
+        Course course = courseService.getEntityById(courseId);
+
+        if (isRole(current, ROLE_METHODIST)) {
+            assertOwner(course.getCreatedBy(), current, "Only course creator can view this course activities");
+        }
+        if (isRole(current, ROLE_TEACHER)) {
+            studyClassService.assertTeacherCanManageCourse(courseId, current);
+        }
+
+        List<Test> tests = testRepository.findAllByCourse_IdAndStatusAndActivityTypeIn(
+                courseId,
+                TestStatus.READY,
+                List.of(ActivityType.REMEDIAL_TASK)
+        );
+        return tests.stream().map(this::toSummaryDto).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ActivityResponse> listByLesson(Integer lessonId) {
         
         lessonService.getEntityByIdForCurrentUser(lessonId);

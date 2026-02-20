@@ -1,11 +1,15 @@
 .methodist-statistics {
     min-height: 100vh;
-    background: var(--purple-soft);
+    background: var(--purple-soft, #ede9fe);
     padding: 40px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .methodist-statistics-container {
-    max-width: 1600px;
+    max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
 }
 
@@ -14,7 +18,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 20px;
-    margin-bottom: 28px;
+    margin-bottom: 36px;
     flex-wrap: wrap;
 }
 
@@ -25,31 +29,35 @@
 }
 
 .methodist-statistics-header-icon {
-    width: 56px;
-    height: 56px;
-    border-radius: 14px;
-    background: var(--purple-soft);
-    color: var(--purple);
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: #ffffff;
+    color: var(--purple, #7c3aed);
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    border: 1px solid var(--border, #cbd5e1);
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
 }
 
 .methodist-statistics-header-icon svg {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
 }
 
 .methodist-statistics-title {
-    margin: 0 0 8px 0;
-    font-size: 34px;
-    color: var(--text);
+    margin: 0 0 10px 0;
+    font-size: 42px;
+    color: var(--text, #1e293b);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
 }
 
 .methodist-statistics-subtitle {
     margin: 0;
-    color: var(--muted);
-    font-size: 16px;
+    color: var(--muted, #64748b);
+    font-size: 18px;
 }
 
 .methodist-statistics-actions {
@@ -65,8 +73,8 @@
     align-items: center;
     gap: 10px;
     border-radius: 12px;
-    padding: 12px 20px;
-    font-size: 15px;
+    padding: 14px 24px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -75,14 +83,15 @@
 
 .btn-statistics-download {
     border: none;
-    background: var(--green);
+    background: var(--green, #10b981);
     color: #fff;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
 }
 
 .btn-statistics-download:hover:not(:disabled) {
-    background: var(--green-dark);
+    background: var(--green-dark, #059669);
     transform: translateY(-1px);
+    box-shadow: var(--shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
 }
 
 .btn-statistics-download:disabled {
@@ -91,14 +100,15 @@
 }
 
 .btn-statistics-home {
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
+    border: 1px solid var(--border, #cbd5e1);
+    background: var(--card, #ffffff);
+    color: var(--text, #1e293b);
 }
 
 .btn-statistics-home:hover {
-    border-color: var(--blue);
+    border-color: var(--purple, #7c3aed);
     background: #f8fafc;
+    transform: translateY(-1px);
 }
 
 .btn-statistics-download svg,
@@ -110,44 +120,71 @@
 .methodist-statistics-summary {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    gap: 20px;
+    margin-bottom: 28px;
 }
 
 .methodist-statistics-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: var(--shadow-sm);
+    background: var(--card, #ffffff);
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
+    transition: all 0.2s ease;
+}
+
+.methodist-statistics-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md, 0 4px 6px -1px rgba(0, 0, 0, 0.1));
+}
+
+.methodist-statistics-card:nth-child(1) {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    border: none;
+}
+
+.methodist-statistics-card:nth-child(2) {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: #ffffff;
+    border: none;
+}
+
+.methodist-statistics-card:nth-child(3) {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #ffffff;
+    border: none;
 }
 
 .methodist-statistics-card-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     display: grid;
     place-items: center;
-    background: var(--green-soft);
-    color: var(--green-dark);
-    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    margin-bottom: 14px;
 }
 
 .methodist-statistics-card-icon svg {
-    width: 20px;
-    height: 20px;
+    width: 26px;
+    height: 26px;
 }
 
 .methodist-statistics-card-label {
-    color: var(--muted);
-    font-size: 14px;
+    color: inherit;
+    opacity: 0.9;
+    font-size: 15px;
+    font-weight: 500;
 }
 
 .methodist-statistics-card-value {
     margin-top: 6px;
-    font-size: 30px;
+    font-size: 42px;
     font-weight: 700;
-    color: var(--text);
+    color: inherit;
+    line-height: 1;
 }
 
 .methodist-statistics-table-section {
@@ -156,28 +193,28 @@
 
 .methodist-statistics-error {
     margin-bottom: 14px;
-    padding: 12px 14px;
+    padding: 14px 16px;
     border: 1px solid #fecaca;
-    border-radius: 10px;
+    border-radius: 12px;
     background: #fef2f2;
     color: #b91c1c;
 }
 
 .methodist-statistics-empty {
-    background: var(--card);
-    border: 1px dashed var(--border);
-    border-radius: 12px;
+    background: var(--card, #ffffff);
+    border: 1px dashed var(--border, #cbd5e1);
+    border-radius: 14px;
     padding: 36px 18px;
     text-align: center;
-    color: var(--muted);
+    color: var(--muted, #64748b);
 }
 
 .methodist-statistics-table-wrap {
     overflow-x: auto;
-    background: var(--card);
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-sm);
+    background: var(--card, #ffffff);
+    border-radius: 18px;
+    border: 1px solid var(--border, #cbd5e1);
+    box-shadow: var(--shadow-sm, 0 1px 2px 0 rgba(0, 0, 0, 0.05));
 }
 
 .methodist-statistics-table {
@@ -186,25 +223,27 @@
 }
 
 .methodist-statistics-table thead {
-    background: #f8fafc;
+    background: #f1f5f9;
 }
 
 .methodist-statistics-table th {
-    padding: 14px 16px;
+    padding: 15px 16px;
     text-align: left;
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;
-    color: var(--text);
-    border-bottom: 2px solid var(--border);
+    color: var(--text, #1e293b);
+    border-bottom: 1px solid var(--border, #cbd5e1);
     letter-spacing: 0.03em;
+    white-space: nowrap;
 }
 
 .methodist-statistics-table td {
-    padding: 14px 16px;
+    padding: 13px 16px;
     font-size: 14px;
-    color: var(--text);
-    border-bottom: 1px solid var(--border);
+    color: var(--text, #1e293b);
+    border-bottom: 1px solid var(--border, #cbd5e1);
+    white-space: nowrap;
 }
 
 .methodist-statistics-table tbody tr:last-child td {
