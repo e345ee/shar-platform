@@ -1,0 +1,252 @@
+.my-attempts-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    z-index: 2000;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+}
+
+.my-attempts-modal {
+    width: min(1200px, 100%);
+    max-height: 90vh;
+    overflow: auto;
+    border-radius: 16px;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 20px 45px rgba(2, 6, 23, 0.25);
+    padding: 20px;
+    color: #0f172a;
+}
+
+.my-attempts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.my-attempts-header h2 {
+    margin: 0;
+    font-size: 26px;
+    color: #0f172a;
+}
+
+.my-attempts-header p {
+    margin: 6px 0 0;
+    color: #64748b;
+}
+
+.my-attempts-close {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 10px;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 22px;
+    line-height: 1;
+    color: #0f172a;
+}
+
+.my-attempts-error {
+    margin-bottom: 12px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.my-attempts-body {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 14px;
+}
+
+.my-attempts-list {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: #f8fafc;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+}
+
+.my-attempts-list h3 {
+    margin: 0 0 4px 0;
+    color: #0f172a;
+}
+
+.my-attempt-item {
+    text-align: left;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+    display: grid;
+    gap: 4px;
+    cursor: pointer;
+    color: #0f172a;
+    font-weight: 500;
+}
+
+.my-attempt-item.active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.my-attempts-details {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+    color: #0f172a;
+}
+
+.my-attempt-summary {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    color: #334155;
+}
+
+.my-attempt-answers {
+    display: grid;
+    gap: 12px;
+}
+
+.my-attempt-question {
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    color: #0f172a;
+}
+
+.my-attempt-question h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.my-attempt-question p {
+    margin: 0;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.my-attempt-options {
+    display: grid;
+    gap: 6px;
+}
+
+.my-attempt-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    padding: 8px 10px;
+    color: #0f172a;
+}
+
+.my-attempt-option.student {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.my-attempt-option.correct {
+    border-color: #10b981;
+    background: #ecfdf5;
+}
+
+.my-attempt-option-letter {
+    color: #334155;
+    font-weight: 700;
+}
+
+.my-attempt-option-text {
+    color: #0f172a;
+    font-weight: 600;
+    flex: 1;
+}
+
+.my-attempt-option-mark {
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.my-attempt-option-mark.student-mark {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.my-attempt-option-mark.correct-mark {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.my-attempt-texts {
+    display: grid;
+    gap: 6px;
+    color: #0f172a;
+}
+
+.my-attempt-result {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    color: #1e293b;
+    align-items: center;
+}
+
+.my-attempt-result-status {
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.my-attempt-result-status.correct {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.my-attempt-result-status.incorrect {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.my-attempt-result-status.pending {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.my-attempt-result-points {
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.my-attempts-empty {
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    color: #64748b;
+    padding: 14px;
+    text-align: center;
+}
+
+@media (max-width: 920px) {
+    .my-attempts-body {
+        grid-template-columns: 1fr;
+    }
+}

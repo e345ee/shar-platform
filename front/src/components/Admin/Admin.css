@@ -1,0 +1,334 @@
+.role-admin.login-page {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  position: relative;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 60px 16px;
+}
+
+.role-admin .login-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: scale(1);
+  transform-origin: center;
+  gap: 18px;
+}
+
+.admin-title-block {
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--font-display);
+}
+
+.admin-card {
+  width: min(1200px, 96vw);
+  min-height: calc(100vh - 140px);
+  height: auto;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(0, 168, 255, 0.08);
+  transform: none;
+}
+
+.role-admin .terminal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-logo {
+  width: min(360px, 70vw);
+  height: auto;
+  display: block;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.admin-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 2px;
+
+  padding: 6px;
+  background: #0c0e13;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+}
+
+.admin-nav-btn {
+  width: auto;
+  min-width: 220px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text);
+  padding: 9px 14px;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.admin-nav-btn.active,
+.admin-nav-btn:hover {
+  background: rgba(0, 168, 255, 0.12);
+  border-color: rgba(0, 168, 255, 0.3);
+  color: var(--accent);
+}
+
+.admin-nav-btn:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.admin-methodists {
+  width: 100%;
+  max-width: 1000px;
+  margin-top: 10px;
+}
+
+.admin-section-title {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 10px;
+}
+
+.admin-methodists-table {
+  background: #0c0e13;
+}
+
+.admin-methodists-table table {
+  width: 100%;
+}
+
+.admin-methodists-table td:last-child,
+.admin-methodists-table th:last-child {
+  text-align: right;
+}
+
+.admin-empty {
+  text-align: center;
+  color: var(--muted);
+}
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+
+  padding: 6px;
+  background: #0c0e13;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+}
+
+.admin-tab {
+  width: auto;
+  min-width: 220px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--text);
+  padding: 9px 14px;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.admin-tab.active,
+.admin-tab:hover {
+  background: rgba(0, 168, 255, 0.12);
+  border-color: rgba(0, 168, 255, 0.3);
+  color: var(--accent);
+}
+
+.role-admin .login-form {
+  width: 100%;
+  max-width: 680px;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-form .input-wrapper,
+.admin-form .login-btn,
+.admin-card > .admin-logout {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+}
+
+.admin-form .login-input,
+.admin-form .login-select {
+  width: 100%;
+}
+
+.role-admin .login-form h2 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.role-admin .input-wrapper {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.role-admin .login-input {
+  width: 100%;
+  height: 48px;
+  background: #0c0e13;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: none;
+}
+
+.role-admin .login-textarea {
+  height: auto;
+  min-height: 80px;
+  padding-top: 10px;
+  text-transform: none;
+}
+
+.role-admin .login-select {
+  width: 100%;
+  height: 48px;
+  background: #0c0e13;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  text-transform: none;
+  appearance: none;
+}
+
+.role-admin .login-select:focus,
+.role-admin .login-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.role-admin .login-select option {
+  color: var(--text);
+}
+
+.role-admin .login-input::placeholder {
+  color: var(--muted);
+}
+
+.role-admin .login-btn,
+.role-admin .admin-logout {
+  width: 100%;
+  height: 48px;
+  background: rgba(0, 168, 255, 0.18);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: none;
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+}
+
+.admin-logout {
+  margin-top: 8px;
+}
+
+.role-admin .login-btn:hover,
+.role-admin .admin-logout:hover {
+  background: rgba(0, 168, 255, 0.28);
+}
+
+.admin-notice {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.admin-notice-success {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--text);
+}
+
+.admin-notice-error {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: var(--text);
+}
+
+.admin-notice-close {
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  border-radius: var(--r-pill);
+  height: 28px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 600px) {
+  .role-admin .login-content {
+    transform: scale(1);
+  }
+}

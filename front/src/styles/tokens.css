@@ -1,0 +1,104 @@
+:root {
+
+  --bg: #0a0c10;
+  --surface: #0d0f14;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --stroke: #1e2230;
+  --chip-bg: #12151c;
+  --accent: #00a8ff;
+  --accent-2: #0080cc;
+  --accent-3: #336791;
+  --accent-gradient: linear-gradient(
+    90deg,
+    #00a8ff 0%,
+    #0080cc 50%,
+    #336791 100%
+  );
+
+
+  --font-sans: "JetBrains Mono", "Space Mono", "Courier New", monospace;
+  --font-display: "Bebas Neue", "Impact", sans-serif;
+
+  --fs-body: 16px;
+  --fs-sm: 14px;
+  --fs-lg: 18px;
+  --fs-h3: 20px;
+  --fs-h2: 28px;
+  --fs-h1: 36px;
+  --fs-hero: 48px;
+
+  --lh-body: 1.5;
+  --lh-tight: 1.15;
+
+
+  --r-card: 24px;
+  --r-panel: 28px;
+  --r-control: 16px;
+  --r-chip: 999px;
+  --r-pill: 999px;
+
+
+  --s-0: 0px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 28px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+
+
+  --shadow-1: 0 12px 30px rgba(0, 0, 0, 0.35);
+
+
+  --focus-ring: 0 0 0 3px rgba(0, 168, 255, 0.25);
+
+
+  --container-max: 1180px;
+
+
+  --card: var(--surface);
+  --border: var(--stroke);
+
+  --bg-dark: #0a0c10;
+  --bg-teal: #0d9488;
+
+  --blue: #00a8ff;
+  --blue-hover: #0080cc;
+  --blue-soft: rgba(0, 168, 255, 0.18);
+  --blue-light: rgba(0, 168, 255, 0.12);
+
+  --green: #22c55e;
+  --green-dark: #16a34a;
+  --green-soft: rgba(34, 197, 94, 0.16);
+  --green-light: rgba(34, 197, 94, 0.1);
+
+  --yellow: #f59e0b;
+  --yellow-soft: rgba(245, 158, 11, 0.2);
+  --yellow-light: rgba(245, 158, 11, 0.12);
+
+  --orange: #f97316;
+  --orange-soft: rgba(249, 115, 22, 0.16);
+  --orange-light: rgba(249, 115, 22, 0.1);
+
+  --purple: #7c3aed;
+  --purple-soft: rgba(124, 58, 237, 0.16);
+  --purple-light: rgba(124, 58, 237, 0.1);
+
+  --pink: #ec4899;
+  --pink-soft: rgba(236, 72, 153, 0.12);
+
+  --cyan: #22adf6;
+  --cyan-soft: rgba(34, 173, 246, 0.16);
+
+  --red: #ef4444;
+  --red-soft: rgba(239, 68, 68, 0.16);
+
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-md: 0 10px 22px rgba(17, 24, 39, 0.10);
+  --shadow-lg: var(--shadow-1);
+}
