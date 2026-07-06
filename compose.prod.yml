@@ -1,0 +1,187 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: infra/gateway/Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:?set REACT_APP_API_URL}
+    container_name: course_gateway
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ${TLS_CERTS_DIR:?set TLS_CERTS_DIR}:/etc/nginx/certs:ro
+      - ./infra/certbot/www:/var/www/certbot:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - course_internal
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        SERVER_PORT: 8080
+    container_name: course_backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-course_db}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+
+      APP_S3_HOST: minio
+      APP_S3_PORT: 9000
+      APP_S3_PUBLIC_HOST: ${APP_S3_PUBLIC_HOST:-}
+      APP_S3_PUBLIC_PORT: ${APP_S3_PUBLIC_PORT:-}
+      APP_S3_PUBLIC_URL: ${APP_S3_PUBLIC_URL:-}
+      APP_S3_REGION: ${APP_S3_REGION:-us-east-1}
+      APP_S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      APP_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      APP_S3_BUCKET: ${APP_S3_BUCKET:-avatars}
+
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-guest}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-guest}
+
+      APP_MAIL_ENABLED: ${APP_MAIL_ENABLED:-false}
+      APP_MAIL_FROM: ${APP_MAIL_FROM:-no-reply@course.local}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-localhost}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-25}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_SMTP_AUTH: ${SPRING_MAIL_SMTP_AUTH:-false}
+      SPRING_MAIL_SMTP_STARTTLS: ${SPRING_MAIL_SMTP_STARTTLS:-false}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    networks:
+      - course_internal
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: course_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-course_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - course_internal
+
+  minio:
+    image: minio/minio:latest
+    container_name: course_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --address ":9000" --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - course_internal
+
+  minio_init:
+    image: minio/mc:latest
+    container_name: course_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb -p local/${APP_S3_BUCKET:-avatars} || true;
+      exit 0;
+      "
+    networks:
+      - course_internal
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: course_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    networks:
+      - course_internal
+
+  db-seeder:
+    image: postgres:15-alpine
+    container_name: course_db_seeder
+    profiles: ["seed"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-course_db}
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SEED_MODE: ${SEED_MODE:-full}
+    volumes:
+      - ./db/seed:/seed:ro
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Seeding mode: ' \"$${SEED_MODE}\";
+      if [ \"$${SEED_MODE}\" = 'small' ]; then
+        psql -v ON_ERROR_STOP=1 -f /seed/seed_small.sql;
+      else
+        psql -v ON_ERROR_STOP=1 -f /seed/seed_full.sql;
+      fi
+      "
+    networks:
+      - course_internal
+
+volumes:
+  postgres_data:
+  minio_data:
+  rabbitmq_data:
+
+networks:
+  course_internal:
+    driver: bridge
+    internal: true

@@ -1,0 +1,37 @@
+name: CI Infra
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'compose.prod.yml'
+      - 'docker-compose.yml'
+      - 'infra/**'
+      - 'db/seed/**'
+      - '.github/workflows/ci-infra.yml'
+  pull_request:
+    paths:
+      - 'compose.prod.yml'
+      - 'docker-compose.yml'
+      - 'infra/**'
+      - 'db/seed/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-compose-and-nginx:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker compose config (prod)
+        run: docker compose -f compose.prod.yml config
+
+      - name: Build gateway (for nginx -t)
+        run: docker build -f infra/gateway/Dockerfile -t shar-gateway:lint .
+
+      - name: nginx -t
+        run: docker run --rm shar-gateway:lint nginx -t

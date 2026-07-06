@@ -1,0 +1,50 @@
+name: CI Backend
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+      - 'db/init/**'
+      - '.github/workflows/ci-backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'db/init/**'
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Maven tests
+        working-directory: backend
+        run: mvn -B test
+
+      - name: Maven package (skip tests)
+        working-directory: backend
+        run: mvn -B -DskipTests package
+
+      - name: Build backend image
+        run: docker build -t shar-backend:ci ./backend
+
+      - name: Trivy scan backend image (report-only)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: shar-backend:ci
+          format: table
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'

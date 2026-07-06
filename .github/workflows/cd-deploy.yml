@@ -1,0 +1,61 @@
+name: CD Deploy (Docker Compose)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (branch/tag/SHA)'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            echo "Deploying ref: ${{ inputs.ref }}"
+            cd "${{ secrets.DEPLOY_PATH }}"
+
+            git fetch --all --prune
+            git checkout "${{ inputs.ref }}"
+            git pull --ff-only || true
+
+            docker compose --env-file .env.prod -f compose.prod.yml up -d --build
+            docker compose --env-file .env.prod -f compose.prod.yml ps
+
+            echo "Waiting for gateway health..."
+            for i in $(seq 1 60); do
+              if curl -kfsS https://localhost/healthz >/dev/null; then
+                break
+              fi
+              sleep 2
+            done
+
+            echo "Waiting for backend health..."
+            for i in $(seq 1 60); do
+              if curl -kfsS https://localhost/actuator/health | grep -q UP; then
+                break
+              fi
+              sleep 2
+            done
+
+            echo "Health checks passed"
+
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          echo "Remote deploy failed; check SSH logs above."
