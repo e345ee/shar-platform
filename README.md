@@ -1,6 +1,6 @@
 # SHAR Platform
 
-## Стек
+## Stack
 
 ![Java](https://img.shields.io/badge/Java-17-007396?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
@@ -13,24 +13,24 @@
 ![Nginx](https://img.shields.io/badge/Nginx-Gateway-009639?style=for-the-badge&logo=nginx&logoColor=white)
 ![Maven](https://img.shields.io/badge/Maven-Build-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)
 
-SHAR Platform - это веб-образовательная платформа с тестами.
+SHAR Platform is a web-based learning platform with tests.
 
-В системе есть несколько ролей: администратор, методист, преподаватель и ученик. Методист создаёт курсы, классы, учебные материалы, тесты и достижения. Преподаватель работает со своими классами, открывает материалы и проверяет ответы учеников. Ученик проходит занятия, выполняет тесты, смотрит результаты и получает достижения.
+The system has several roles: administrator, methodologist, teacher, and student. A methodologist creates courses, classes, learning materials, tests, and achievements. A teacher works with assigned classes, opens materials, and reviews student answers. A student completes lessons and tests, views results, and earns achievements.
 
-## Что умеет платформа
+## Platform Features
 
-- регистрация и вход пользователей;
-- управление ролями пользователей;
-- создание курсов, классов и уроков;
-- загрузка учебных материалов и презентаций;
-- создание тестов и заданий;
-- прохождение тестов учениками;
-- проверка открытых ответов преподавателем;
-- статистика по ученикам, классам и курсам;
-- достижения и сертификаты;
-- хранение файлов через S3-совместимое хранилище.
+- user registration and sign-in;
+- user role management;
+- course, class, and lesson creation;
+- learning material and presentation uploads;
+- test and assignment creation;
+- student test taking;
+- teacher review of open-ended answers;
+- statistics for students, classes, and courses;
+- achievements and certificates;
+- file storage through an S3-compatible storage service.
 
-## Технологии
+## Technologies
 
 Backend:
 
@@ -40,10 +40,10 @@ Backend:
 - Spring Security;
 - Spring Data JPA;
 - PostgreSQL;
-- JWT для авторизации;
-- MinIO или другое S3-совместимое хранилище;
-- RabbitMQ для демо-интеграции;
-- PDFBox для работы с PDF;
+- JWT for authorization;
+- MinIO or another S3-compatible storage service;
+- RabbitMQ for demo integration;
+- PDFBox for working with PDF files;
 - Maven.
 
 Frontend:
@@ -53,9 +53,9 @@ Frontend:
 - JavaScript;
 - CSS;
 - Framer Motion;
-- Nginx для отдачи собранного frontend.
+- Nginx for serving the built frontend.
 
-Инфраструктура:
+Infrastructure:
 
 - Docker;
 - Docker Compose;
@@ -63,77 +63,77 @@ Frontend:
 - PostgreSQL 15;
 - MinIO;
 - RabbitMQ;
-- GitHub Actions для CI/CD.
+- GitHub Actions for CI/CD.
 
-## Структура проекта
+## Project Structure
 
-- `backend/` - серверная часть на Spring Boot;
-- `front/` - клиентская часть на React;
-- `db/init/` - схема базы и начальные данные;
-- `db/seed/` - дополнительные наборы тестовых данных;
-- `infra/nginx/` - конфигурация Nginx;
-- `infra/certbot/` - скрипты для TLS-сертификатов;
-- `docker-compose.yml` - локальный запуск;
-- `compose.prod.yml` - запуск ближе к production.
+- `backend/` - Spring Boot server application;
+- `front/` - React client application;
+- `db/init/` - database schema and initial data;
+- `db/seed/` - additional test data sets;
+- `infra/nginx/` - Nginx configuration;
+- `infra/certbot/` - TLS certificate scripts;
+- `docker-compose.yml` - local run configuration;
+- `compose.prod.yml` - production-like run configuration.
 
-## Запуск через Docker
+## Running with Docker
 
-Нужны Docker и Docker Compose v2.
+Docker and Docker Compose v2 are required.
 
-1. Скопируйте пример настроек:
+1. Copy the sample configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Запустите проект:
+2. Start the project:
 
 ```bash
 docker compose up -d --build
 ```
 
-3. Откройте приложение:
+3. Open the application:
 
 ```text
 http://localhost:3000
 ```
 
-Backend будет доступен на:
+The backend will be available at:
 
 ```text
 http://localhost:8080
 ```
 
-MinIO будет доступен на:
+MinIO will be available at:
 
 ```text
 http://localhost:9001
 ```
 
-Остановить проект:
+Stop the project:
 
 ```bash
 docker compose down
 ```
 
-Если нужно полностью пересоздать базу вместе с начальными данными:
+To fully recreate the database together with the initial data:
 
 ```bash
 docker compose down -v
 docker compose up -d --build
 ```
 
-## Production-запуск через Docker
+## Production Docker Run
 
-Для сервера используется `compose.prod.yml`. В этом варианте frontend собирается в gateway-контейнер, а наружу открываются только HTTP и HTTPS.
+The server uses `compose.prod.yml`. In this mode, the frontend is built into the gateway container, and only HTTP and HTTPS are exposed externally.
 
-1. Подготовьте файл настроек:
+1. Prepare the configuration file:
 
 ```bash
 cp .env.example .env.prod
 ```
 
-2. В `.env.prod` задайте основные переменные:
+2. Set the main variables in `.env.prod`:
 
 ```env
 REACT_APP_API_URL=https://your-domain.ru
@@ -146,44 +146,44 @@ MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadmin
 ```
 
-В папке из `TLS_CERTS_DIR` должны лежать файлы:
+The directory referenced by `TLS_CERTS_DIR` must contain these files:
 
 ```text
 fullchain.pem
 privkey.pem
 ```
 
-3. Запустите:
+3. Start the stack:
 
 ```bash
 docker compose --env-file .env.prod -f compose.prod.yml up -d --build
 ```
 
-4. Проверьте состояние:
+4. Check the status:
 
 ```bash
 curl -k https://localhost/healthz
 curl -k https://localhost/actuator/health
 ```
 
-Если сертификата ещё нет, можно использовать готовые скрипты:
+If there is no certificate yet, you can use the included scripts:
 
 ```bash
 bash deploy.sh up
 bash deploy.sh issue-le DOMAIN=your-domain.ru CERTBOT_EMAIL=mail@example.com
 ```
 
-## Запуск backend через WildFly
+## Running the Backend with WildFly
 
-Backend можно собрать как WAR-файл и развернуть в WildFly. Нужен WildFly с поддержкой Jakarta EE 10, JDK 17 и Maven.
+The backend can be built as a WAR file and deployed to WildFly. WildFly with Jakarta EE 10 support, JDK 17, and Maven are required.
 
-PostgreSQL и MinIO всё равно должны быть запущены отдельно. Для локальной разработки их можно поднять через Docker:
+PostgreSQL and MinIO must still be running separately. For local development, you can start them with Docker:
 
 ```bash
 docker compose up -d postgres minio minio_init
 ```
 
-Перед запуском WildFly задайте переменные окружения. Если база и MinIO подняты через локальный `docker-compose.yml`, подойдут такие значения:
+Before starting WildFly, set the environment variables. If the database and MinIO are running through the local `docker-compose.yml`, these values will work:
 
 ```bash
 export SERVER_PORT=8080
@@ -204,34 +204,34 @@ export APP_S3_BUCKET=avatars
 export APP_MAIL_ENABLED=false
 ```
 
-Соберите backend:
+Build the backend:
 
 ```bash
 cd backend
 mvn clean package -DskipTests
 ```
 
-Скопируйте WAR в WildFly:
+Copy the WAR file to WildFly:
 
 ```bash
 cp target/course-management-1.0.0.war "$WILDFLY_HOME/standalone/deployments/ROOT.war"
 ```
 
-Запустите WildFly:
+Start WildFly:
 
 ```bash
 "$WILDFLY_HOME/bin/standalone.sh" -b 0.0.0.0
 ```
 
-Проверка backend:
+Backend health check:
 
 ```bash
 curl http://localhost:8080/actuator/health
 ```
 
-Если WAR развёрнут не как `ROOT.war`, то у backend появится context path. В этом случае `REACT_APP_API_URL` для frontend должен включать этот путь.
+If the WAR is not deployed as `ROOT.war`, the backend will have a context path. In that case, `REACT_APP_API_URL` for the frontend must include that path.
 
-Frontend при запуске через WildFly собирается отдельно:
+When using WildFly, the frontend is built separately:
 
 ```bash
 cd front
@@ -239,29 +239,29 @@ npm ci
 REACT_APP_API_URL=http://localhost:8080 npm run build
 ```
 
-После сборки папку `front/build` нужно отдавать через Nginx или другой статический веб-сервер.
+After the build, the `front/build` directory should be served through Nginx or another static web server.
 
-## Начальный вход
+## Initial Login
 
-При первом запуске создаётся администратор:
+On the first run, an administrator account is created:
 
 ```text
-логин: admin
-пароль: admin
+login: admin
+password: admin
 ```
 
-После входа пароль лучше сразу поменять.
+After signing in, it is best to change the password immediately.
 
-## Полезные команды
+## Useful Commands
 
-Запустить backend-тесты:
+Run backend tests:
 
 ```bash
 cd backend
 mvn test
 ```
 
-Запустить frontend в режиме разработки:
+Run the frontend in development mode:
 
 ```bash
 cd front
@@ -269,7 +269,7 @@ npm install
 npm start
 ```
 
-Собрать frontend:
+Build the frontend:
 
 ```bash
 cd front
