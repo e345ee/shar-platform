@@ -1,0 +1,23 @@
+spring:
+  main:
+    banner-mode: "off"
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations:
+        - classpath:01_schema.sql
+        - classpath:03_triggers.sql
+      data-locations:
+        - classpath:02_seed.sql
+
+logging:
+  level:
+    root: WARN
+    org.springframework: WARN
+    com.course: INFO

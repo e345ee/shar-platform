@@ -1,0 +1,9 @@
+загрузка докера
+docker compose down -v
+docker compose up --build -d
+docker compose up --build -d course_app
+перезапуск докера если крашнулся (моя проблема)
+osascript -e 'quit app "Docker"'
+pkill -9 -f Docker
+pkill -9 -f com.docker
+open -a Docker
